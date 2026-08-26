@@ -3,17 +3,37 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { db } from '../firebase/config';
 import { onValue, ref, set } from 'firebase/database';
 
+type EventData = {
+  name: string;
+  status: string;
+  showStartTime?: number | null;
+  flashPattern?: number[];
+};
+
 export default function Join() {
   const navigate = useNavigate();
   const { eventId } = useParams();
 
-  const [event, setEvent] = useState<any>(null);
-  const [joined, setJoined] = useState(false);
-  const [error, setError] = useState('');
+  const [event, setEvent] =
+    useState<EventData | null>(null);
 
-  const trackRef = useRef<MediaStreamTrack | null>(null);
-  const animationRef = useRef<number | null>(null);
-  const currentLightRef = useRef(false);
+  const [joined, setJoined] =
+    useState(false);
+
+  const [error, setError] =
+    useState('');
+
+  const trackRef =
+    useRef<MediaStreamTrack | null>(null);
+
+  const timersRef =
+    useRef<number[]>([]);
+
+  const participantIdRef =
+    useRef<string | null>(null);
+
+  const currentLightRef =
+    useRef(false);
 
   useEffect(() => {
     if (!eventId) return;
@@ -30,23 +50,28 @@ export default function Join() {
     if (!eventId) return;
 
     try {
+      setError('');
+
       const stream =
         await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: { ideal: 'environment' },
+            facingMode: {
+              ideal: 'environment',
+            },
           },
         });
 
-      const track = stream.getVideoTracks()[0];
+      const track =
+        stream.getVideoTracks()[0];
 
       const capabilities =
-        track.getCapabilities() as any;
+        track.getCapabilities?.() as any;
 
-      if (!capabilities.torch) {
+      if (!capabilities?.torch) {
         track.stop();
 
         setError(
-          'Flashlight control is not supported.'
+          'This phone/browser does not support flashlight control.'
         );
 
         return;
@@ -54,10 +79,16 @@ export default function Join() {
 
       trackRef.current = track;
 
+      const participantId =
+        crypto.randomUUID();
+
+      participantIdRef.current =
+        participantId;
+
       await set(
         ref(
           db,
-          `events/${eventId}/participants/${crypto.randomUUID()}`
+          `events/${eventId}/participants/${participantId}`
         ),
         {
           joinedAt: Date.now(),
@@ -67,134 +98,176 @@ export default function Join() {
 
       setJoined(true);
 
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error(err);
 
       setError(
-        'Camera permission is required.'
+        'Camera/flashlight permission was denied or unavailable.'
       );
     }
   }
 
-  async function setTorch(on: boolean) {
-    const track = trackRef.current;
+  async function setFlash(
+    enabled: boolean
+  ) {
+    const track =
+      trackRef.current;
 
     if (!track) return;
 
-    if (currentLightRef.current === on) {
+    if (
+      currentLightRef.current === enabled
+    ) {
       return;
     }
-
-    currentLightRef.current = on;
 
     try {
       await track.applyConstraints({
         advanced: [
           {
-            torch: on,
+            torch: enabled,
           } as any,
         ],
       });
+
+      currentLightRef.current =
+        enabled;
+
     } catch (error) {
-      console.error('Torch error:', error);
+      console.error(
+        'Torch error:',
+        error
+      );
     }
   }
 
-  function stopShow() {
-    if (animationRef.current !== null) {
-      cancelAnimationFrame(animationRef.current);
-      animationRef.current = null;
-    }
+  function clearTimers() {
+    timersRef.current.forEach(
+      timer => clearTimeout(timer)
+    );
 
-    setTorch(false);
+    timersRef.current = [];
   }
 
-  function runMusicPattern(startTime: number) {
-    if (animationRef.current !== null) {
-      cancelAnimationFrame(animationRef.current);
+  function stopLightShow() {
+    clearTimers();
+
+    setFlash(false);
+  }
+
+  function startLightShow(
+    startTime: number,
+    pattern: number[]
+  ) {
+    clearTimers();
+
+    if (!pattern?.length) {
+      return;
     }
 
-    const animate = () => {
-      const now = Date.now();
+    const now = Date.now();
 
-      const elapsed =
-        (now - startTime) / 1000;
+    const elapsed =
+      now - startTime;
 
-      if (elapsed < 0) {
-        setTorch(false);
-
-        animationRef.current =
-          requestAnimationFrame(animate);
-
-        return;
-      }
+    for (
+      let i = 0;
+      i < pattern.length;
+      i++
+    ) {
+      const beatTime =
+        pattern[i];
 
       /*
-       * Pattern repeats every 6 seconds.
+       * The pattern stores milliseconds
+       * from the beginning of the song.
        *
-       * 0-2  OFF
-       * 2-3  ON
-       * 3-4  OFF
-       * 4-5  ON
-       * 5-6  OFF
+       * Each detected beat toggles
+       * the flashlight.
        */
-
-      const position = elapsed % 6;
-
-      let light = false;
-
-      if (
-        position >= 2 &&
-        position < 3
-      ) {
-        light = true;
+      if (beatTime <= elapsed) {
+        continue;
       }
 
-      if (
-        position >= 4 &&
-        position < 5
-      ) {
-        light = true;
-      }
+      const delay =
+        startTime +
+        beatTime -
+        now;
 
-      setTorch(light);
+      const timer =
+        window.setTimeout(() => {
+          setFlash(
+            !currentLightRef.current
+          );
+        }, delay);
 
-      animationRef.current =
-        requestAnimationFrame(animate);
-    };
-
-    animate();
+      timersRef.current.push(timer);
+    }
   }
 
   useEffect(() => {
-    if (!joined || !event) return;
+    if (!event) return;
 
     if (
       event.status === 'running' &&
-      event.showStartTime
+      event.showStartTime &&
+      event.flashPattern &&
+      joined
     ) {
-      runMusicPattern(
-        event.showStartTime
+      startLightShow(
+        event.showStartTime,
+        event.flashPattern
       );
-    } else {
-      stopShow();
     }
+
+    if (
+      event.status !== 'running'
+    ) {
+      stopLightShow();
+    }
+
   }, [
     event?.status,
     event?.showStartTime,
+    event?.flashPattern,
     joined,
   ]);
 
   useEffect(() => {
     return () => {
-      stopShow();
+      clearTimers();
 
       if (trackRef.current) {
+        trackRef.current
+          .applyConstraints({
+            advanced: [
+              {
+                torch: false,
+              } as any,
+            ],
+          })
+          .catch(() => {});
+
         trackRef.current.stop();
-        trackRef.current = null;
+      }
+
+      if (
+        eventId &&
+        participantIdRef.current
+      ) {
+        set(
+          ref(
+            db,
+            `events/${eventId}/participants/${participantIdRef.current}`
+          ),
+          {
+            active: false,
+            leftAt: Date.now(),
+          }
+        ).catch(() => {});
       }
     };
-  }, []);
+  }, [eventId]);
 
   if (!event) {
     return (
@@ -221,8 +294,6 @@ export default function Join() {
 
           <p className="light-description">
             Join the audience light show.
-            <br />
-            Allow camera access.
           </p>
 
           <button
@@ -280,7 +351,8 @@ export default function Join() {
             </div>
 
             <p className="waiting-description">
-              Synchronized light show active.
+              Your flashlight is synchronized
+              with the music.
             </p>
           </>
         ) : (
@@ -297,6 +369,12 @@ export default function Join() {
               Waiting for the organizer.
             </p>
           </>
+        )}
+
+        {error && (
+          <p className="light-error">
+            {error}
+          </p>
         )}
 
       </div>
