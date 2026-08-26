@@ -9,10 +9,6 @@ type EventData = {
   status: string;
 };
 
-type TorchCapabilities = MediaTrackCapabilities & {
-  torch?: boolean;
-};
-
 export default function Join() {
   const navigate = useNavigate();
   const { eventId } = useParams();
@@ -69,8 +65,7 @@ export default function Join() {
 
       const track = stream.getVideoTracks()[0];
 
-      const capabilities =
-        track.getCapabilities() as TorchCapabilities;
+      const capabilities = track.getCapabilities() as any;
 
       if (!capabilities.torch) {
         track.stop();
@@ -88,7 +83,7 @@ export default function Join() {
         advanced: [
           {
             torch: !torchOn,
-          } as MediaTrackConstraintSet,
+          } as any,
         ],
       });
 
