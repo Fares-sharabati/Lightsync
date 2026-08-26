@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { db } from '../firebase/config';
 import { onValue, ref, set } from 'firebase/database';
@@ -15,47 +15,30 @@ export default function Join() {
 
   const [event, setEvent] = useState<EventData | null>(null);
   const [joined, setJoined] = useState(false);
-  const [torchSupported, setTorchSupported] = useState(false);
-  const [torchOn, setTorchOn] = useState(false);
   const [error, setError] = useState('');
+  const [torchReady, setTorchReady] = useState(false);
+
+  const trackRef = useRef<MediaStreamTrack | null>(null);
+  const torchStateRef = useRef(false);
 
   useEffect(() => {
     if (!eventId) return;
 
-    return onValue(
-      ref(db, `events/${eventId}`),
-      (snapshot) => {
-        setEvent(snapshot.val());
-      }
-    );
+    const eventRef = ref(db, `events/${eventId}`);
+
+    return onValue(eventRef, (snapshot) => {
+      setEvent(snapshot.val());
+    });
   }, [eventId]);
 
   async function joinShow() {
     if (!eventId) return;
 
     try {
-      await set(
-        ref(
-          db,
-          `events/${eventId}/participants/${crypto.randomUUID()}`
-        ),
-        {
-          joinedAt: Date.now(),
-          active: true,
-        }
-      );
-
-      setJoined(true);
-    } catch (err) {
-      console.error(err);
-      setError('Could not join.');
-    }
-  }
-
-  async function testTorch() {
-    try {
       setError('');
 
+      // Ask for camera permission.
+      // We need this before the organizer can control the torch.
       const stream =
         await navigator.mediaDevices.getUserMedia({
           video: {
@@ -71,35 +54,77 @@ export default function Join() {
         track.stop();
 
         setError(
-          'Your browser does not support flashlight control.'
+          'This phone/browser does not support flashlight control.'
         );
 
         return;
       }
 
-      setTorchSupported(true);
+      trackRef.current = track;
 
-      await track.applyConstraints({
-        advanced: [
-          {
-            torch: !torchOn,
-          } as any,
-        ],
-      });
+      await set(
+        ref(
+          db,
+          `events/${eventId}/participants/${crypto.randomUUID()}`
+        ),
+        {
+          joinedAt: Date.now(),
+          active: true,
+        }
+      );
 
-      setTorchOn(!torchOn);
+      setTorchReady(true);
+      setJoined(true);
 
-      if (torchOn) {
-        track.stop();
-      }
     } catch (err) {
       console.error(err);
 
       setError(
-        'Camera permission was denied or flashlight control is unavailable.'
+        'Camera permission is required to control the flashlight.'
       );
     }
   }
+
+  async function setTorch(on: boolean) {
+    const track = trackRef.current;
+
+    if (!track) return;
+
+    try {
+      await track.applyConstraints({
+        advanced: [
+          {
+            torch: on,
+          } as any,
+        ],
+      });
+
+      torchStateRef.current = on;
+    } catch (err) {
+      console.error('Torch error:', err);
+    }
+  }
+
+  // Watch the organizer's show status.
+  useEffect(() => {
+    if (!joined || !event) return;
+
+    if (event.status === 'running') {
+      setTorch(true);
+    } else {
+      setTorch(false);
+    }
+  }, [event?.status, joined]);
+
+  // Turn flashlight off when leaving the page.
+  useEffect(() => {
+    return () => {
+      if (trackRef.current) {
+        trackRef.current.stop();
+        trackRef.current = null;
+      }
+    };
+  }, []);
 
   if (!event) {
     return (
@@ -126,6 +151,8 @@ export default function Join() {
 
           <p className="light-description">
             Join the audience light show.
+            <br />
+            Allow camera access so LightSync can control your flashlight.
           </p>
 
           <button
@@ -134,6 +161,12 @@ export default function Join() {
           >
             JOIN SHOW
           </button>
+
+          {error && (
+            <p className="light-error">
+              {error}
+            </p>
+          )}
 
           <button
             className="button button-secondary"
@@ -147,8 +180,16 @@ export default function Join() {
     );
   }
 
+  const showRunning = event.status === 'running';
+
   return (
-    <main className="light-page">
+    <main
+      className={
+        showRunning
+          ? 'light-page show-running'
+          : 'light-page waiting'
+      }
+    >
       <div className="light-content">
 
         <div className="light-logo">
@@ -160,30 +201,43 @@ export default function Join() {
         </div>
 
         <div className="light-status">
-          CONNECTED
+          {torchReady ? 'CONNECTED' : 'CONNECTING'}
         </div>
 
-        <h2>Flashlight Test</h2>
+        {showRunning ? (
+          <>
+            <div className="show-live-indicator">
+              ●
+            </div>
 
-        <button
-          className="light-join-button"
-          onClick={testTorch}
-        >
-          {torchOn
-            ? 'TURN FLASH OFF'
-            : 'TURN FLASH ON'}
-        </button>
+            <div className="show-live-text">
+              SHOW LIVE
+            </div>
 
-        <p className="waiting-description">
-          {torchSupported
-            ? 'Torch control is supported.'
-            : 'Press the button to test your phone.'}
-        </p>
+            <div className="show-light">
+              🔦
+            </div>
 
-        {error && (
-          <p className="light-error">
-            {error}
-          </p>
+            <p className="waiting-description">
+              Your flashlight is being controlled by LightSync.
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="connected-icon">
+              ✓
+            </div>
+
+            <div className="waiting-message">
+              READY
+            </div>
+
+            <p className="waiting-description">
+              Keep your phone open.
+              <br />
+              The organizer will start the show.
+            </p>
+          </>
         )}
 
       </div>
