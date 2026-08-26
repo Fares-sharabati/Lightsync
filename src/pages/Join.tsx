@@ -12,7 +12,8 @@ export default function Join() {
   const [error, setError] = useState('');
 
   const trackRef = useRef<MediaStreamTrack | null>(null);
-  const patternTimerRef = useRef<number | null>(null);
+  const animationRef = useRef<number | null>(null);
+  const currentLightRef = useRef(false);
 
   useEffect(() => {
     if (!eventId) return;
@@ -80,6 +81,12 @@ export default function Join() {
 
     if (!track) return;
 
+    if (currentLightRef.current === on) {
+      return;
+    }
+
+    currentLightRef.current = on;
+
     try {
       await track.applyConstraints({
         advanced: [
@@ -89,51 +96,98 @@ export default function Join() {
         ],
       });
     } catch (error) {
-      console.error(
-        'Torch error:',
-        error
-      );
+      console.error('Torch error:', error);
     }
   }
 
-  function stopPattern() {
-    if (patternTimerRef.current !== null) {
-      window.clearInterval(
-        patternTimerRef.current
-      );
-
-      patternTimerRef.current = null;
+  function stopShow() {
+    if (animationRef.current !== null) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
     }
 
     setTorch(false);
   }
 
-  function startPattern() {
-    stopPattern();
+  function runMusicPattern(startTime: number) {
+    if (animationRef.current !== null) {
+      cancelAnimationFrame(animationRef.current);
+    }
 
-    let lightOn = false;
+    const animate = () => {
+      const now = Date.now();
 
-    patternTimerRef.current =
-      window.setInterval(() => {
-        lightOn = !lightOn;
+      const elapsed =
+        (now - startTime) / 1000;
 
-        setTorch(lightOn);
-      }, 500);
+      if (elapsed < 0) {
+        setTorch(false);
+
+        animationRef.current =
+          requestAnimationFrame(animate);
+
+        return;
+      }
+
+      /*
+       * Pattern repeats every 6 seconds.
+       *
+       * 0-2  OFF
+       * 2-3  ON
+       * 3-4  OFF
+       * 4-5  ON
+       * 5-6  OFF
+       */
+
+      const position = elapsed % 6;
+
+      let light = false;
+
+      if (
+        position >= 2 &&
+        position < 3
+      ) {
+        light = true;
+      }
+
+      if (
+        position >= 4 &&
+        position < 5
+      ) {
+        light = true;
+      }
+
+      setTorch(light);
+
+      animationRef.current =
+        requestAnimationFrame(animate);
+    };
+
+    animate();
   }
 
   useEffect(() => {
     if (!joined || !event) return;
 
-    if (event.status === 'running') {
-      startPattern();
+    if (
+      event.status === 'running' &&
+      event.showStartTime
+    ) {
+      runMusicPattern(
+        event.showStartTime
+      );
     } else {
-      stopPattern();
+      stopShow();
     }
-  }, [event?.status, joined]);
+  }, [
+    event?.status,
+    event?.showStartTime,
+    joined,
+  ]);
 
   useEffect(() => {
     return () => {
-      stopPattern();
+      stopShow();
 
       if (trackRef.current) {
         trackRef.current.stop();
@@ -226,7 +280,7 @@ export default function Join() {
             </div>
 
             <p className="waiting-description">
-              Flash pattern active.
+              Synchronized light show active.
             </p>
           </>
         ) : (
