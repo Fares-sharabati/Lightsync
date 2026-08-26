@@ -3,11 +3,21 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { db } from '../firebase/config';
 import { onValue, ref, set } from 'firebase/database';
 
+type EventData = {
+  name: string;
+  createdAt: number;
+  status: string;
+};
+
+type TorchCapabilities = MediaTrackCapabilities & {
+  torch?: boolean;
+};
+
 export default function Join() {
   const navigate = useNavigate();
   const { eventId } = useParams();
 
-  const [event, setEvent] = useState<any>(null);
+  const [event, setEvent] = useState<EventData | null>(null);
   const [joined, setJoined] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
@@ -16,9 +26,12 @@ export default function Join() {
   useEffect(() => {
     if (!eventId) return;
 
-    return onValue(ref(db, `events/${eventId}`), snapshot => {
-      setEvent(snapshot.val());
-    });
+    return onValue(
+      ref(db, `events/${eventId}`),
+      (snapshot) => {
+        setEvent(snapshot.val());
+      }
+    );
   }, [eventId]);
 
   async function joinShow() {
@@ -45,27 +58,38 @@ export default function Join() {
 
   async function testTorch() {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-      });
+      setError('');
+
+      const stream =
+        await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' },
+          },
+        });
 
       const track = stream.getVideoTracks()[0];
 
       const capabilities =
-        track.getCapabilities?.();
+        track.getCapabilities() as TorchCapabilities;
 
-      if (!capabilities?.torch) {
-        setError(
-          'Torch control is not supported by this browser.'
-        );
+      if (!capabilities.torch) {
         track.stop();
+
+        setError(
+          'Your browser does not support flashlight control.'
+        );
+
         return;
       }
 
       setTorchSupported(true);
 
       await track.applyConstraints({
-        advanced: [{ torch: !torchOn } as any],
+        advanced: [
+          {
+            torch: !torchOn,
+          } as MediaTrackConstraintSet,
+        ],
       });
 
       setTorchOn(!torchOn);
@@ -75,8 +99,9 @@ export default function Join() {
       }
     } catch (err) {
       console.error(err);
+
       setError(
-        'Camera/flashlight permission was denied or unavailable.'
+        'Camera permission was denied or flashlight control is unavailable.'
       );
     }
   }
@@ -95,7 +120,10 @@ export default function Join() {
     return (
       <main className="light-page">
         <div className="light-content">
-          <div className="light-logo">LIGHTSYNC</div>
+
+          <div className="light-logo">
+            LIGHTSYNC
+          </div>
 
           <div className="light-event-name">
             {event.name}
@@ -118,6 +146,7 @@ export default function Join() {
           >
             Back
           </button>
+
         </div>
       </main>
     );
@@ -145,7 +174,9 @@ export default function Join() {
           className="light-join-button"
           onClick={testTorch}
         >
-          {torchOn ? 'TURN FLASH OFF' : 'TURN FLASH ON'}
+          {torchOn
+            ? 'TURN FLASH OFF'
+            : 'TURN FLASH ON'}
         </button>
 
         <p className="waiting-description">
