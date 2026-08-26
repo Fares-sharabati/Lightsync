@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { db } from '../firebase/config';
@@ -8,12 +8,6 @@ type EventData = {
   name: string;
   createdAt: number;
   status: string;
-  connectedUsers?: number;
-};
-
-type Participant = {
-  joinedAt: number;
-  active: boolean;
 };
 
 export default function EventControl() {
@@ -22,45 +16,42 @@ export default function EventControl() {
 
   const [event, setEvent] = useState<EventData | null>(null);
   const [participantCount, setParticipantCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [song, setSong] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
 
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
   useEffect(() => {
-    if (!eventId) {
-      setLoading(false);
-      return;
-    }
+    if (!eventId) return;
 
     const eventRef = ref(db, `events/${eventId}`);
 
-    const unsubscribeEvent = onValue(eventRef, (snapshot) => {
-      const data = snapshot.val();
-
-      if (data) {
-        setEvent(data);
-      } else {
-        setEvent(null);
-      }
-
-      setLoading(false);
+    const unsubscribeEvent = onValue(eventRef, snapshot => {
+      setEvent(snapshot.val());
     });
 
-    const participantsRef = ref(db, `events/${eventId}/participants`);
+    const participantsRef = ref(
+      db,
+      `events/${eventId}/participants`
+    );
 
-    const unsubscribeParticipants = onValue(participantsRef, (snapshot) => {
-      const data = snapshot.val() as Record<string, Participant> | null;
+    const unsubscribeParticipants = onValue(
+      participantsRef,
+      snapshot => {
+        const data = snapshot.val();
 
-      if (!data) {
-        setParticipantCount(0);
-        return;
+        if (!data) {
+          setParticipantCount(0);
+          return;
+        }
+
+        const active = Object.values(data).filter(
+          (p: any) => p.active === true
+        );
+
+        setParticipantCount(active.length);
       }
-
-      const activeParticipants = Object.values(data).filter(
-        (participant) => participant.active === true
-      );
-
-      setParticipantCount(activeParticipants.length);
-    });
+    );
 
     return () => {
       unsubscribeEvent();
@@ -68,15 +59,47 @@ export default function EventControl() {
     };
   }, [eventId]);
 
+  function chooseSong(
+    e: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+
+    setSong(url);
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+
+    const audio = new Audio(url);
+    audioRef.current = audio;
+  }
+
   async function startShow() {
-    if (!eventId || starting) return;
+    if (!eventId || !audioRef.current) return;
 
     setStarting(true);
 
     try {
-      await set(ref(db, `events/${eventId}/status`), 'running');
+      const startTime = Date.now() + 3000;
+
+      await set(
+        ref(db, `events/${eventId}/show`),
+        {
+          status: 'running',
+          startTime,
+        }
+      );
+
+      setTimeout(() => {
+        audioRef.current?.play();
+      }, 3000);
+
     } catch (error) {
-      console.error('Could not start show:', error);
+      console.error(error);
     } finally {
       setStarting(false);
     }
@@ -85,49 +108,40 @@ export default function EventControl() {
   async function stopShow() {
     if (!eventId) return;
 
-    try {
-      await set(ref(db, `events/${eventId}/status`), 'waiting');
-    } catch (error) {
-      console.error('Could not stop show:', error);
-    }
-  }
+    audioRef.current?.pause();
 
-  if (loading) {
-    return (
-      <main className="page loading-page">
-        <p>Loading event...</p>
-      </main>
+    await set(
+      ref(db, `events/${eventId}/show`),
+      {
+        status: 'waiting',
+        startTime: null,
+      }
     );
   }
 
   if (!event || !eventId) {
     return (
       <main className="page">
-        <section className="card">
-          <h2>Event not found</h2>
-
-          <p>This event does not exist or may have been deleted.</p>
-
-          <button
-            className="button button-secondary"
-            onClick={() => navigate('/admin')}
-          >
-            Back to Events
-          </button>
-        </section>
+        Loading...
       </main>
     );
   }
 
-  const joinUrl = `${window.location.origin}/join/${eventId}`;
+  const joinUrl =
+    `${window.location.origin}/join/${eventId}`;
 
-  const isRunning = event.status === 'running';
+  const running =
+    event.status === 'running';
 
   return (
-    <main className="page event-control-page">
+    <main className="page">
+
       <header className="page-header">
         <div>
-          <p className="eyebrow">LIGHTSYNC EVENT</p>
+          <p className="eyebrow">
+            LIGHTSYNC EVENT
+          </p>
+
           <h1>{event.name}</h1>
         </div>
 
@@ -135,13 +149,17 @@ export default function EventControl() {
           className="button button-secondary"
           onClick={() => navigate('/admin')}
         >
-          Back to Events
+          Back
         </button>
       </header>
 
       <section className="event-control-grid">
+
         <div className="card qr-card">
-          <p className="eyebrow">JOIN THE SHOW</p>
+
+          <p className="eyebrow">
+            JOIN THE SHOW
+          </p>
 
           <h2>Scan to Join</h2>
 
@@ -155,49 +173,82 @@ export default function EventControl() {
             />
           </div>
 
-          <p className="qr-instruction">Scan this QR code with your phone.</p>
+          <p className="qr-instruction">
+            Fans scan this QR code with their phones.
+          </p>
 
-          <p className="join-url">{joinUrl}</p>
         </div>
 
         <div className="card control-card">
-          <p className="eyebrow">AUDIENCE</p>
 
-          <div className="connected-number">{participantCount}</div>
-
-          <p className="connected-label">
-            {participantCount === 1 ? 'Connected Phone' : 'Connected Phones'}
+          <p className="eyebrow">
+            AUDIENCE
           </p>
 
-          <div className="event-status-large">
-            <span className="status-dot" />
-
-            {isRunning ? 'SHOW RUNNING' : 'WAITING'}
+          <div className="connected-number">
+            {participantCount}
           </div>
 
+          <p className="connected-label">
+            Connected Phones
+          </p>
+
+          <hr />
+
+          <p className="eyebrow">
+            MUSIC
+          </p>
+
+          <input
+            type="file"
+            accept="audio/*"
+            onChange={chooseSong}
+          />
+
+          {song && (
+            <p className="song-selected">
+              ✓ Song selected
+            </p>
+          )}
+
           <div className="control-actions">
+
             <button
               className="button button-primary control-button"
               onClick={startShow}
-              disabled={starting || isRunning}
+              disabled={
+                starting ||
+                running ||
+                !song
+              }
             >
-              {starting ? 'Starting...' : 'Start Show'}
+              {starting
+                ? 'Starting...'
+                : 'Start Show'}
             </button>
 
             <button
               className="button button-secondary control-button"
               onClick={stopShow}
-              disabled={!isRunning}
+              disabled={!running}
             >
               Stop Show
             </button>
+
           </div>
 
-          <p className="coming-soon">
-            Light synchronization will be connected next.
-          </p>
+          <div className="event-status-large">
+            <span className="status-dot" />
+
+            {running
+              ? 'SHOW RUNNING'
+              : 'WAITING'}
+          </div>
+
         </div>
+
       </section>
+
     </main>
   );
 }
