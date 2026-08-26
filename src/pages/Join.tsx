@@ -3,42 +3,32 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { db } from '../firebase/config';
 import { onValue, ref, set } from 'firebase/database';
 
-type EventData = {
-  name: string;
-  createdAt: number;
-  status: string;
-};
-
 export default function Join() {
   const navigate = useNavigate();
   const { eventId } = useParams();
 
-  const [event, setEvent] = useState<EventData | null>(null);
+  const [event, setEvent] = useState<any>(null);
   const [joined, setJoined] = useState(false);
   const [error, setError] = useState('');
-  const [torchReady, setTorchReady] = useState(false);
 
   const trackRef = useRef<MediaStreamTrack | null>(null);
-  const torchStateRef = useRef(false);
+  const patternTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!eventId) return;
 
-    const eventRef = ref(db, `events/${eventId}`);
-
-    return onValue(eventRef, (snapshot) => {
-      setEvent(snapshot.val());
-    });
+    return onValue(
+      ref(db, `events/${eventId}`),
+      snapshot => {
+        setEvent(snapshot.val());
+      }
+    );
   }, [eventId]);
 
   async function joinShow() {
     if (!eventId) return;
 
     try {
-      setError('');
-
-      // Ask for camera permission.
-      // We need this before the organizer can control the torch.
       const stream =
         await navigator.mediaDevices.getUserMedia({
           video: {
@@ -48,13 +38,14 @@ export default function Join() {
 
       const track = stream.getVideoTracks()[0];
 
-      const capabilities = track.getCapabilities() as any;
+      const capabilities =
+        track.getCapabilities() as any;
 
       if (!capabilities.torch) {
         track.stop();
 
         setError(
-          'This phone/browser does not support flashlight control.'
+          'Flashlight control is not supported.'
         );
 
         return;
@@ -73,14 +64,13 @@ export default function Join() {
         }
       );
 
-      setTorchReady(true);
       setJoined(true);
 
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
 
       setError(
-        'Camera permission is required to control the flashlight.'
+        'Camera permission is required.'
       );
     }
   }
@@ -98,27 +88,53 @@ export default function Join() {
           } as any,
         ],
       });
-
-      torchStateRef.current = on;
-    } catch (err) {
-      console.error('Torch error:', err);
+    } catch (error) {
+      console.error(
+        'Torch error:',
+        error
+      );
     }
   }
 
-  // Watch the organizer's show status.
+  function stopPattern() {
+    if (patternTimerRef.current !== null) {
+      window.clearInterval(
+        patternTimerRef.current
+      );
+
+      patternTimerRef.current = null;
+    }
+
+    setTorch(false);
+  }
+
+  function startPattern() {
+    stopPattern();
+
+    let lightOn = false;
+
+    patternTimerRef.current =
+      window.setInterval(() => {
+        lightOn = !lightOn;
+
+        setTorch(lightOn);
+      }, 500);
+  }
+
   useEffect(() => {
     if (!joined || !event) return;
 
     if (event.status === 'running') {
-      setTorch(true);
+      startPattern();
     } else {
-      setTorch(false);
+      stopPattern();
     }
   }, [event?.status, joined]);
 
-  // Turn flashlight off when leaving the page.
   useEffect(() => {
     return () => {
+      stopPattern();
+
       if (trackRef.current) {
         trackRef.current.stop();
         trackRef.current = null;
@@ -152,7 +168,7 @@ export default function Join() {
           <p className="light-description">
             Join the audience light show.
             <br />
-            Allow camera access so LightSync can control your flashlight.
+            Allow camera access.
           </p>
 
           <button
@@ -180,16 +196,11 @@ export default function Join() {
     );
   }
 
-  const showRunning = event.status === 'running';
+  const running =
+    event.status === 'running';
 
   return (
-    <main
-      className={
-        showRunning
-          ? 'light-page show-running'
-          : 'light-page waiting'
-      }
-    >
+    <main className="light-page">
       <div className="light-content">
 
         <div className="light-logo">
@@ -201,15 +212,11 @@ export default function Join() {
         </div>
 
         <div className="light-status">
-          {torchReady ? 'CONNECTED' : 'CONNECTING'}
+          CONNECTED
         </div>
 
-        {showRunning ? (
+        {running ? (
           <>
-            <div className="show-live-indicator">
-              ●
-            </div>
-
             <div className="show-live-text">
               SHOW LIVE
             </div>
@@ -219,7 +226,7 @@ export default function Join() {
             </div>
 
             <p className="waiting-description">
-              Your flashlight is being controlled by LightSync.
+              Flash pattern active.
             </p>
           </>
         ) : (
@@ -233,9 +240,7 @@ export default function Join() {
             </div>
 
             <p className="waiting-description">
-              Keep your phone open.
-              <br />
-              The organizer will start the show.
+              Waiting for the organizer.
             </p>
           </>
         )}
