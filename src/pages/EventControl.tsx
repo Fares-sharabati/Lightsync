@@ -16,7 +16,8 @@ export default function EventControl() {
 
   const [event, setEvent] = useState<EventData | null>(null);
   const [participantCount, setParticipantCount] = useState(0);
-  const [song, setSong] = useState<string | null>(null);
+  const [songName, setSongName] = useState('');
+  const [songUrl, setSongUrl] = useState('');
   const [starting, setStarting] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -26,7 +27,7 @@ export default function EventControl() {
 
     const eventRef = ref(db, `events/${eventId}`);
 
-    const unsubscribeEvent = onValue(eventRef, snapshot => {
+    const unsubscribeEvent = onValue(eventRef, (snapshot) => {
       setEvent(snapshot.val());
     });
 
@@ -37,7 +38,7 @@ export default function EventControl() {
 
     const unsubscribeParticipants = onValue(
       participantsRef,
-      snapshot => {
+      (snapshot) => {
         const data = snapshot.val();
 
         if (!data) {
@@ -46,7 +47,8 @@ export default function EventControl() {
         }
 
         const active = Object.values(data).filter(
-          (p: any) => p.active === true
+          (participant: any) =>
+            participant.active === true
         );
 
         setParticipantCount(active.length);
@@ -66,40 +68,67 @@ export default function EventControl() {
 
     if (!file) return;
 
-    const url = URL.createObjectURL(file);
-
-    setSong(url);
-
     if (audioRef.current) {
       audioRef.current.pause();
+      audioRef.current = null;
     }
 
+    const url = URL.createObjectURL(file);
+
+    setSongUrl(url);
+    setSongName(file.name);
+
     const audio = new Audio(url);
+
+    audio.preload = 'auto';
+
     audioRef.current = audio;
   }
 
   async function startShow() {
-    if (!eventId || !audioRef.current) return;
+    if (!eventId || !audioRef.current || !songUrl) {
+      return;
+    }
 
     setStarting(true);
 
     try {
+      /*
+       * Give every phone a common future start time.
+       * 3 seconds gives Firebase enough time to deliver it.
+       */
       const startTime = Date.now() + 3000;
 
       await set(
-        ref(db, `events/${eventId}/show`),
+        ref(db, `events/${eventId}`),
         {
+          ...event,
           status: 'running',
-          startTime,
+          showStartTime: startTime,
         }
       );
 
-      setTimeout(() => {
-        audioRef.current?.play();
-      }, 3000);
+      /*
+       * Start the organizer's music.
+       */
+      audioRef.current.currentTime = 0;
+
+      await new Promise<void>((resolve) => {
+        const delay = Math.max(
+          0,
+          startTime - Date.now()
+        );
+
+        setTimeout(resolve, delay);
+      });
+
+      await audioRef.current.play();
 
     } catch (error) {
-      console.error(error);
+      console.error(
+        'Could not start show:',
+        error
+      );
     } finally {
       setStarting(false);
     }
@@ -111,10 +140,11 @@ export default function EventControl() {
     audioRef.current?.pause();
 
     await set(
-      ref(db, `events/${eventId}/show`),
+      ref(db, `events/${eventId}`),
       {
+        ...event,
         status: 'waiting',
-        startTime: null,
+        showStartTime: null,
       }
     );
   }
@@ -205,9 +235,9 @@ export default function EventControl() {
             onChange={chooseSong}
           />
 
-          {song && (
+          {songName && (
             <p className="song-selected">
-              ✓ Song selected
+              ✓ {songName}
             </p>
           )}
 
@@ -219,7 +249,7 @@ export default function EventControl() {
               disabled={
                 starting ||
                 running ||
-                !song
+                !songUrl
               }
             >
               {starting
