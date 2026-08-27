@@ -1,4 +1,4 @@
-import { onValue, push, ref, update, type Unsubscribe } from 'firebase/database';
+import { equalTo, onValue, orderByChild, push, query, ref, set, update, type Unsubscribe } from 'firebase/database';
 import { db } from './config';
 
 export type ShowStatus = 'waiting' | 'running' | 'finished';
@@ -11,11 +11,12 @@ export async function createShow(organizerId: string, input: CreateShowInput) {
   const showId = showRef.key;
   if (!showId) throw new Error('Could not create show ID.');
   const show = { organizerId, name: input.name.trim(), date: input.date, venue: input.venue.trim(), status: 'waiting' as ShowStatus, createdAt: Date.now(), showStartTime: null };
-  await update(ref(db), {
-    [`shows/${showId}`]: show,
-    [`publicShows/${showId}`]: { name: show.name, date: show.date, venue: show.venue, status: show.status, showStartTime: null, lightTimeline: null },
-    [`showStats/${showId}`]: { totalScans: 0, totalJoined: 0, peakConnected: 0 },
-  });
+
+  // Create the private organizer record first. Firebase rules need the show to exist
+  // before allowing the corresponding public record to be written.
+  await set(showRef, show);
+  await set(ref(db, `publicShows/${showId}`), { name: show.name, date: show.date, venue: show.venue, status: show.status, showStartTime: null, lightTimeline: null });
+  await set(ref(db, `showStats/${showId}`), { totalScans: 0, totalJoined: 0, peakConnected: 0 });
   return showId;
 }
 
@@ -28,7 +29,13 @@ export function watchPublicShow(showId: string, callback: (show: PublicShow | nu
 }
 
 export function watchOrganizerShows(organizerId: string, callback: (shows: Show[]) => void): Unsubscribe {
-  return onValue(ref(db, 'shows'), snapshot => { const value = snapshot.val() ?? {}; callback(Object.entries(value).map(([id, show]) => ({ id, ...(show as Omit<Show, 'id'>) })).filter(show => show.organizerId === organizerId).sort((a, b) => b.createdAt - a.createdAt)); });
+  const showsQuery = query(ref(db, 'shows'), orderByChild('organizerId'), equalTo(organizerId));
+  return onValue(showsQuery, snapshot => {
+    const value = snapshot.val() ?? {};
+    callback(Object.entries(value)
+      .map(([id, show]) => ({ id, ...(show as Omit<Show, 'id'>) }))
+      .sort((a, b) => b.createdAt - a.createdAt));
+  });
 }
 
 export async function updateShow(showId: string, changes: Partial<Omit<Show, 'id' | 'organizerId'>>) {
