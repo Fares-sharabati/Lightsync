@@ -11,56 +11,32 @@ export type Beat = {
   
   
   /*
-   * Check whether the selected file looks like
-   * a supported audio file.
+   * Decode the selected audio file locally.
    *
-   * We check both MIME type AND file extension
-   * because some browsers do not provide a
-   * reliable MIME type.
-   */
-  function isAudioFile(file: File): boolean {
-    if (file.type.startsWith('audio/')) {
-      return true;
-    }
-  
-    const fileName =
-      file.name.toLowerCase();
-  
-    const audioExtensions = [
-      '.mp3',
-      '.wav',
-      '.m4a',
-      '.aac',
-      '.ogg',
-      '.oga',
-      '.flac',
-      '.webm',
-      '.opus',
-    ];
-  
-    return audioExtensions.some(
-      (extension) =>
-        fileName.endsWith(extension)
-    );
-  }
-  
-  
-  /*
-   * Decode an audio file into raw PCM audio data.
+   * We deliberately do NOT reject the file based
+   * on its extension or MIME type.
    *
-   * Everything happens locally in the browser.
-   *
-   * The file is NOT uploaded anywhere.
+   * The browser's Web Audio decoder will determine
+   * whether the file can actually be decoded.
    */
   async function decodeAudioFile(
     file: File
   ): Promise<AudioBuffer> {
   
+    if (file.size === 0) {
+      throw new Error(
+        'The selected audio file is empty.'
+      );
+    }
+  
+  
     const arrayBuffer =
       await file.arrayBuffer();
   
+  
     const audioContext =
       new AudioContext();
+  
   
     try {
   
@@ -69,7 +45,20 @@ export type Beat = {
           arrayBuffer
         );
   
+  
       return audioBuffer;
+  
+    } catch (error) {
+  
+      console.error(
+        'Browser could not decode audio:',
+        error
+      );
+  
+  
+      throw new Error(
+        `The browser could not decode "${file.name}". Try an MP3, WAV, M4A, OGG, or AAC file.`
+      );
   
     } finally {
   
@@ -129,8 +118,8 @@ export type Beat = {
   /*
    * Calculate short-term RMS energy.
    *
-   * This gives us an approximation of how
-   * energetic each small section of the song is.
+   * We analyze small portions of the song
+   * to determine how energetic each moment is.
    */
   function calculateEnergy(
     samples: Float32Array,
@@ -182,6 +171,7 @@ export type Beat = {
         const sample =
           samples[i];
   
+  
         sum +=
           sample * sample;
   
@@ -195,11 +185,13 @@ export type Beat = {
   
   
       result.push({
+  
         time:
           start / sampleRate,
   
         value:
           rms,
+  
       });
     }
   
@@ -209,12 +201,12 @@ export type Beat = {
   
   
   /*
-   * Detect beat-like peaks.
+   * Detect beat-like energy peaks.
    *
-   * This is our first version of the detector.
+   * This is our first automatic detector.
    *
-   * Later we can make this considerably smarter
-   * by looking at frequency bands and estimating BPM.
+   * Later we will improve this with BPM,
+   * rhythm analysis, and frequency bands.
    */
   function detectBeats(
     energy: {
@@ -224,9 +216,10 @@ export type Beat = {
   ): Beat[] {
   
     const beats: Beat[] = [];
-
-  if (energy.length < 10) {
-      return [];
+  
+  
+    if (energy.length < 10) {
+      return beats;
     }
   
   
@@ -245,25 +238,21 @@ export type Beat = {
       total / energy.length;
   
   
-    /*
-     * If the song is extremely quiet,
-     * avoid dividing by a tiny number.
-     */
     if (average <= 0.000001) {
-      return [];
+      return beats;
     }
   
   
     /*
-     * Peaks need to be noticeably stronger
-     * than the average.
+     * A candidate beat must be stronger
+     * than the average energy.
      */
     const threshold =
       average * 1.35;
   
   
     /*
-     * Do not allow extremely rapid flashes.
+     * Prevent excessively fast flashes.
      *
      * 180 ms ≈ 333 BPM.
      */
@@ -292,7 +281,8 @@ export type Beat = {
   
   
       /*
-       * Local maximum.
+       * Check whether this point is
+       * a local maximum.
        */
       const isPeak =
         current.value >=
@@ -302,8 +292,8 @@ export type Beat = {
   
   
       /*
-       * Strong enough to potentially
-       * represent a beat.
+       * Check whether the peak is strong
+       * enough to be considered a beat.
        */
       const isStrongEnough =
         current.value >=
@@ -311,7 +301,8 @@ export type Beat = {
   
   
       /*
-       * Prevent excessive flashing.
+       * Prevent multiple detections
+       * of the same beat.
        */
       const enoughTimePassed =
         current.time -
@@ -326,8 +317,8 @@ export type Beat = {
       ) {
   
         /*
-         * Normalize beat strength
-         * approximately from 0 to 1.
+         * Convert the peak into a strength
+         * value between approximately 0 and 1.
          */
         const strength =
           Math.min(
@@ -337,25 +328,21 @@ export type Beat = {
           );
   
   
-        /*
-         * Avoid accepting extremely tiny
-         * floating-point values.
-         */
         if (strength > 0.05) {
   
-          /*
-           * Store the detected beat.
-           */
-        
           beats.push({
+  
             time:
               current.time,
   
             strength,
+  
           });
+  
   
           lastBeatTime =
             current.time;
+  
         }
       }
     }
@@ -368,40 +355,19 @@ export type Beat = {
   /*
    * Analyze any local audio file.
    *
-   * No API.
-   * No upload.
-   * No external service.
+   * IMPORTANT:
+   *
+   * The file remains on the organizer's computer.
+   *
+   * It is never uploaded to Firebase.
+   * It is never sent to an external API.
    */
   export async function analyzeAudioFile(
     file: File
   ): Promise<AudioAnalysis> {
   
     /*
-     * Validate using MIME type OR extension.
-     */
-    if (!isAudioFile(file)) {
-  
-      throw new Error(
-        `Unsupported audio file: ${file.name}`
-      );
-  
-    }
-  
-  
-    /*
-     * Make sure the file actually contains data.
-     */
-    if (file.size === 0) {
-  
-      throw new Error(
-        'The selected audio file is empty.'
-      );
-  
-    }
-  
-  
-    /*
-     * Decode the audio locally.
+     * Decode the file locally.
      */
     const audioBuffer =
       await decodeAudioFile(
@@ -410,7 +376,7 @@ export type Beat = {
   
   
     /*
-     * Convert to mono.
+     * Convert the audio to mono.
      */
     const mono =
       getMonoSamples(
@@ -419,7 +385,7 @@ export type Beat = {
   
   
     /*
-     * Calculate energy.
+     * Calculate short-term energy.
      */
     const energy =
       calculateEnergy(
@@ -429,7 +395,7 @@ export type Beat = {
   
   
     /*
-     * Detect beats.
+     * Detect beat-like peaks.
      */
     const beats =
       detectBeats(
