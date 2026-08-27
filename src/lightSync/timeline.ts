@@ -3,36 +3,62 @@ export type LightState = {
     on: boolean;
   };
   
-  export type LightTimeline = LightState[];
+  export type LightTimeline =
+    LightState[];
   
-  /*
-   * Temporary synchronization test.
+  /**
+   * Convert detected beats into a flashlight
+   * timeline.
    *
-   * Time is measured in milliseconds.
+   * Each detected beat produces a short flash.
    */
-  export const TEST_TIMELINE: LightTimeline = [
-    { time: 0, on: false },
+  export function generateLightTimeline(
+    beats: {
+      time: number;
+      strength: number;
+    }[]
+  ): LightTimeline {
+    const timeline: LightTimeline = [];
   
-    { time: 1000, on: true },
-    { time: 2000, on: false },
+    for (const beat of beats) {
+      const time =
+        Math.round(
+          beat.time * 1000
+        );
   
-    { time: 2500, on: true },
-    { time: 5000, on: false },
+      /*
+       * Flash duration changes slightly
+       * depending on beat strength.
+       *
+       * Strong beat = slightly longer flash.
+       * Weak beat = shorter flash.
+       */
+      const flashDuration =
+        Math.round(
+          80 +
+          beat.strength * 100
+        );
   
-    { time: 5500, on: true },
-    { time: 8000, on: false },
+      timeline.push({
+        time,
+        on: true,
+      });
   
-    { time: 9000, on: true },
-    { time: 12000, on: false },
-  ];
+      timeline.push({
+        time:
+          time + flashDuration,
+        on: false,
+      });
+    }
   
-  /*
-   * Returns the flashlight state at
-   * the current position in the show.
+    return timeline;
+  }
+  
+  /**
+   * Find the current light state.
    *
-   * This is what allows a late-joining
-   * phone to immediately know whether
-   * it should be ON or OFF.
+   * This is also what allows a phone to join
+   * after the show has already started.
    */
   export function getLightStateAtTime(
     timeline: LightTimeline,
@@ -55,9 +81,8 @@ export type LightState = {
     return state;
   }
   
-  /*
-   * Returns the next light change after
-   * the current position.
+  /**
+   * Find the next light event.
    */
   export function getNextLightEvent(
     timeline: LightTimeline,
@@ -71,3 +96,4 @@ export type LightState = {
   
     return null;
   }
+  

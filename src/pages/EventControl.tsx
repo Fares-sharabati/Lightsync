@@ -3,9 +3,21 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 
 import { db } from '../firebase/config';
-import { onValue, ref, update } from 'firebase/database';
+import {
+  onValue,
+  ref,
+  update,
+} from 'firebase/database';
 
-import { TEST_TIMELINE } from '../lightSync/timeline';
+import {
+  analyzeAudioFile,
+} from '../lightSync/audioAnalyzer';
+
+import {
+  generateLightTimeline,
+  type LightTimeline,
+} from '../lightSync/timeline';
+
 
 type EventData = {
   name: string;
@@ -14,18 +26,43 @@ type EventData = {
   showStartTime?: number | null;
 };
 
+
 export default function EventControl() {
   const navigate = useNavigate();
   const { eventId } = useParams();
 
+
   const [event, setEvent] =
     useState<EventData | null>(null);
+
 
   const [participantCount, setParticipantCount] =
     useState(0);
 
+
   const [starting, setStarting] =
     useState(false);
+
+
+  const [songName, setSongName] =
+    useState('');
+
+
+  const [songFile, setSongFile] =
+    useState<File | null>(null);
+
+
+  const [analyzing, setAnalyzing] =
+    useState(false);
+
+
+  const [analysisMessage, setAnalysisMessage] =
+    useState('');
+
+
+  const [generatedTimeline, setGeneratedTimeline] =
+    useState<LightTimeline | null>(null);
+
 
   /*
    * Listen to the event.
@@ -33,13 +70,19 @@ export default function EventControl() {
   useEffect(() => {
     if (!eventId) return;
 
+
     const eventRef =
       ref(db, `events/${eventId}`);
 
+
     const unsubscribeEvent =
-      onValue(eventRef, (snapshot) => {
-        setEvent(snapshot.val());
-      });
+      onValue(
+        eventRef,
+        (snapshot) => {
+          setEvent(snapshot.val());
+        }
+      );
+
 
     /*
      * Listen to connected participants.
@@ -50,16 +93,20 @@ export default function EventControl() {
         `events/${eventId}/participants`
       );
 
+
     const unsubscribeParticipants =
       onValue(
         participantsRef,
         (snapshot) => {
-          const data = snapshot.val();
+          const data =
+            snapshot.val();
+
 
           if (!data) {
             setParticipantCount(0);
             return;
           }
+
 
           const active =
             Object.values(data).filter(
@@ -67,11 +114,13 @@ export default function EventControl() {
                 participant.active === true
             );
 
+
           setParticipantCount(
             active.length
           );
         }
       );
+
 
     return () => {
       unsubscribeEvent();
@@ -79,45 +128,169 @@ export default function EventControl() {
     };
   }, [eventId]);
 
+
   /*
-   * Start the synchronized test show.
+   * Choose a local music file.
+   *
+   * The file stays on the organizer's computer.
+   * It is NOT uploaded to Firebase.
+   */
+  function chooseSong(
+    e: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const file =
+      e.target.files?.[0];
+
+
+    if (!file) return;
+
+
+    setSongFile(file);
+    setSongName(file.name);
+
+
+    /*
+     * Selecting a new song invalidates
+     * the previous analysis.
+     */
+    setGeneratedTimeline(null);
+    setAnalysisMessage('');
+  }
+
+
+  /*
+   * Analyze the selected song locally.
+   */
+  async function analyzeSong() {
+    if (!songFile) return;
+
+
+    setAnalyzing(true);
+
+    setAnalysisMessage(
+      'Analyzing music...'
+    );
+
+
+    try {
+      const analysis =
+        await analyzeAudioFile(
+          songFile
+        );
+
+
+      const timeline =
+        generateLightTimeline(
+          analysis.beats
+        );
+
+
+      setGeneratedTimeline(
+        timeline
+      );
+
+
+      setAnalysisMessage(
+        `Analysis complete — ${analysis.beats.length} beats detected.`
+      );
+
+
+      console.log(
+        'Audio analysis:',
+        analysis
+      );
+
+
+      console.log(
+        'Generated light timeline:',
+        timeline
+      );
+
+
+    } catch (error) {
+      console.error(
+        'Audio analysis failed:',
+        error
+      );
+
+
+      setAnalysisMessage(
+        'Could not analyze this audio file.'
+      );
+
+
+      setGeneratedTimeline(null);
+
+
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+
+  /*
+   * Start the synchronized show.
    */
   async function startShow() {
-    if (!eventId || !event) return;
-  
+    if (
+      !eventId ||
+      !event ||
+      !generatedTimeline ||
+      generatedTimeline.length === 0
+    ) {
+      return;
+    }
+
+
     setStarting(true);
-  
+
+
     try {
-      const startTime = Date.now() + 5000;
-  
+      /*
+       * Give all phones 5 seconds to receive
+       * the Firebase update.
+       */
+      const startTime =
+        Date.now() + 5000;
+
+
       await update(
-        ref(db, `events/${eventId}`),
+        ref(
+          db,
+          `events/${eventId}`
+        ),
         {
           status: 'running',
-          showStartTime: startTime,
-          lightTimeline: TEST_TIMELINE,
+
+          showStartTime:
+            startTime,
+
+          lightTimeline:
+            generatedTimeline,
         }
       );
-  
+
+
       console.log(
         'Show scheduled for:',
         new Date(startTime)
       );
-  
-      // Firebase has accepted the show.
-      // Allow the button to return to its normal state.
+
+
       setStarting(false);
-  
+
+
     } catch (error) {
       console.error(
         'Could not start show:',
         error
       );
-  
+
+
       setStarting(false);
     }
   }
-  
+
 
   /*
    * Stop the show.
@@ -125,14 +298,22 @@ export default function EventControl() {
   async function stopShow() {
     if (!eventId) return;
 
+
     try {
       await update(
-        ref(db, `events/${eventId}`),
+        ref(
+          db,
+          `events/${eventId}`
+        ),
         {
           status: 'waiting',
-          showStartTime: null,
+
+          showStartTime:
+            null,
         }
       );
+
+
     } catch (error) {
       console.error(
         'Could not stop show:',
@@ -141,6 +322,10 @@ export default function EventControl() {
     }
   }
 
+
+  /*
+   * Wait for Firebase event data.
+   */
   if (!event || !eventId) {
     return (
       <main className="page">
@@ -149,28 +334,39 @@ export default function EventControl() {
     );
   }
 
+
   const joinUrl =
     `${window.location.origin}/join/${eventId}`;
+
 
   const running =
     event.status === 'running';
 
+
   return (
     <main className="page">
+
 
       <header className="page-header">
 
         <div>
+
           <p className="eyebrow">
             LIGHTSYNC EVENT
           </p>
 
-          <h1>{event.name}</h1>
+
+          <h1>
+            {event.name}
+          </h1>
+
 
           <p className="event-id">
             Event ID: {eventId}
           </p>
+
         </div>
+
 
         <button
           className="button button-secondary"
@@ -184,7 +380,10 @@ export default function EventControl() {
 
       <section className="event-control-grid">
 
-        {/* QR CODE */}
+
+        {/* =========================
+            QR CODE
+        ========================== */}
 
         <div className="card qr-card">
 
@@ -192,9 +391,11 @@ export default function EventControl() {
             JOIN THE SHOW
           </p>
 
+
           <h2>
             Scan to Join
           </h2>
+
 
           <div className="qr-wrapper">
 
@@ -208,6 +409,7 @@ export default function EventControl() {
 
           </div>
 
+
           <p className="qr-instruction">
             Scan this QR code with your phone.
           </p>
@@ -215,17 +417,24 @@ export default function EventControl() {
         </div>
 
 
-        {/* CONTROL PANEL */}
+        {/* =========================
+            CONTROL PANEL
+        ========================== */}
 
         <div className="card control-card">
+
+
+          {/* AUDIENCE */}
 
           <p className="eyebrow">
             AUDIENCE
           </p>
 
+
           <div className="connected-number">
             {participantCount}
           </div>
+
 
           <p className="connected-label">
             Connected Phones
@@ -235,64 +444,75 @@ export default function EventControl() {
           <hr />
 
 
+          {/* MUSIC */}
+
           <p className="eyebrow">
-            TEST SHOW
-          </p>
-
-          <p className="muted">
-            This is a temporary synchronization
-            test. No music is being used yet.
+            MUSIC
           </p>
 
 
-          <div className="timeline-preview">
+          <input
+            type="file"
+            accept="audio/*"
+            onChange={chooseSong}
+          />
 
-            <div>
-              0.0s — OFF
-            </div>
 
-            <div>
-              1.0s — ON
-            </div>
+          {songName && (
+            <p className="song-selected">
+              ✓ {songName}
+            </p>
+          )}
 
-            <div>
-              2.0s — OFF
-            </div>
 
-            <div>
-              2.5s — ON
-            </div>
+          <button
+            className="button button-secondary"
+            onClick={analyzeSong}
+            disabled={
+              !songFile ||
+              analyzing
+            }
+          >
+            {analyzing
+              ? 'Analyzing...'
+              : 'Analyze Song'}
+          </button>
 
-            <div>
-              5.0s — OFF
-            </div>
 
-            <div>
-              5.5s — ON
-            </div>
+          {analysisMessage && (
+            <p className="muted">
+              {analysisMessage}
+            </p>
+          )}
 
-            <div>
-              8.0s — OFF
-            </div>
 
-            <div>
-              9.0s — ON
-            </div>
+          {generatedTimeline && (
+            <p className="song-selected">
+              ✓ Light timeline ready
+            </p>
+          )}
 
-            <div>
-              12.0s — OFF
-            </div>
 
-          </div>
+          <hr />
+
+
+          {/* SHOW CONTROLS */}
+
+          <p className="eyebrow">
+            SHOW CONTROL
+          </p>
 
 
           <div className="control-actions">
+
 
             <button
               className="button button-primary control-button"
               onClick={startShow}
               disabled={
-                starting || running
+                starting ||
+                running ||
+                !generatedTimeline
               }
             >
               {starting
@@ -309,6 +529,7 @@ export default function EventControl() {
               Stop Show
             </button>
 
+
           </div>
 
 
@@ -316,11 +537,13 @@ export default function EventControl() {
 
             <span className="status-dot" />
 
+
             {running
               ? 'SHOW RUNNING'
               : 'WAITING'}
 
           </div>
+
 
         </div>
 
