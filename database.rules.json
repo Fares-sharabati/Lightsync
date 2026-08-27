@@ -8,6 +8,8 @@
       }
     },
     "shows": {
+      ".read": "auth != null && query.orderByChild === 'organizerId' && query.equalTo === auth.uid",
+      ".indexOn": ["organizerId"],
       "$showId": {
         ".read": "auth != null && data.child('organizerId').val() === auth.uid",
         ".write": "auth != null && (data.child('organizerId').val() === auth.uid || (!data.exists() && newData.child('organizerId').val() === auth.uid))",
@@ -23,6 +25,7 @@
     },
     "showParticipants": {
       "$showId": {
+        ".read": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
         "$participantId": {
           ".read": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
           ".write": "auth != null && auth.uid === $participantId && root.child('publicShows').child($showId).exists()",
