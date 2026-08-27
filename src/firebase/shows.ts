@@ -1,4 +1,5 @@
 import { onValue, push, ref, update, type Unsubscribe } from 'firebase/database';
+import { db } from './config';
 
 export type ShowStatus = 'waiting' | 'running' | 'finished';
 export type Show = { id: string; organizerId: string; name: string; date: string; venue: string; status: ShowStatus; createdAt: number; showStartTime?: number | null; lightTimeline?: unknown };
