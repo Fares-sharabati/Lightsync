@@ -1,173 +1,117 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { db } from '../firebase/config';
-import { onValue, push, ref, set } from 'firebase/database';
-
-type EventItem = {
-  id: string;
-  name: string;
-  createdAt: number;
-  status: string;
-  connectedUsers: number;
-};
+import { getAuth } from 'firebase/auth';
+import { createShow, watchOrganizerShows, type Show } from '../firebase/shows';
+import { signInOrganizer } from '../firebase/auth';
+import '../styles/lightsync.css';
 
 export default function Admin() {
   const navigate = useNavigate();
-
-  const [eventName, setEventName] = useState('');
+  const auth = getAuth();
+  const [shows, setShows] = useState<Show[]>([]);
+  const [name, setName] = useState('');
+  const [date, setDate] = useState('');
+  const [venue, setVenue] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState('');
-  const [events, setEvents] = useState<EventItem[]>([]);
+  const [authenticated, setAuthenticated] = useState(!!auth.currentUser && !auth.currentUser.isAnonymous);
 
   useEffect(() => {
-    const eventsRef = ref(db, 'events');
-
-    const unsubscribe = onValue(eventsRef, (snapshot) => {
-      const data = snapshot.val();
-
-      if (!data) {
-        setEvents([]);
-        return;
-      }
-
-      const eventList: EventItem[] = Object.entries(data).map(([id, value]) => {
-        const event = value as Omit<EventItem, 'id'>;
-
-        return {
-          id,
-          ...event,
-        };
-      });
-
-      eventList.sort((a, b) => b.createdAt - a.createdAt);
-
-      setEvents(eventList);
+    const unsubscribe = auth.onAuthStateChanged(user => {
+      setAuthenticated(!!user && !user.isAnonymous);
     });
+    return unsubscribe;
+  }, [auth]);
 
-    return () => unsubscribe();
-  }, []);
+  useEffect(() => {
+    if (!authenticated || !auth.currentUser) return;
+    return watchOrganizerShows(auth.currentUser.uid, setShows);
+  }, [authenticated, auth]);
 
-  async function createEvent() {
-    const trimmedName = eventName.trim();
+  async function login() {
+    try {
+      setMessage('');
+      await signInOrganizer(email.trim(), password);
+    } catch (error) {
+      console.error(error);
+      setMessage('Login failed. Check your organizer email and password.');
+    }
+  }
 
-    if (!trimmedName) {
-      setMessage('Please enter an event name.');
+  async function handleCreateShow() {
+    if (!auth.currentUser) return;
+    if (!name.trim() || !date || !venue.trim()) {
+      setMessage('Please enter the show name, date and venue.');
       return;
     }
-
     setCreating(true);
     setMessage('');
-
     try {
-      const eventsRef = ref(db, 'events');
-      const newEventRef = push(eventsRef);
-
-      await set(newEventRef, {
-        name: trimmedName,
-        createdAt: Date.now(),
-        status: 'waiting',
-        connectedUsers: 0,
-      });
-
-      setMessage('✅ Event created successfully!');
-      setEventName('');
+      const id = await createShow(auth.currentUser.uid, { name, date, venue });
+      setName(''); setDate(''); setVenue('');
+      navigate(`/admin/show/${id}`);
     } catch (error) {
-      console.error('Error creating event:', error);
-      setMessage('❌ Failed to create event. Check the console.');
+      console.error(error);
+      setMessage('Could not create the show.');
     } finally {
       setCreating(false);
     }
   }
 
-  function openEvent(eventId: string) {
-    navigate(`/admin/event/${eventId}`);
+  if (!authenticated) {
+    return (
+      <main className="ls-shell">
+        <section className="ls-auth-card">
+          <div className="ls-brand">LIGHTSYNC</div>
+          <p className="ls-eyebrow">ORGANIZER ACCESS</p>
+          <h1>Control the crowd.</h1>
+          <p className="ls-muted">Organizer access is restricted to authorized accounts.</p>
+          <input className="ls-input" type="email" placeholder="Organizer email" value={email} onChange={e => setEmail(e.target.value)} />
+          <input className="ls-input" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} />
+          <button className="ls-button ls-primary" onClick={login}>ENTER DASHBOARD</button>
+          {message && <p className="ls-error">{message}</p>}
+        </section>
+      </main>
+    );
   }
 
   return (
-    <main className="page">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">LIGHTSYNC</p>
-          <h1>Organizer Dashboard</h1>
-        </div>
-
-        <button
-          className="button button-secondary"
-          onClick={() => navigate('/')}
-        >
-          Home
-        </button>
+    <main className="ls-shell">
+      <header className="ls-header">
+        <div><div className="ls-brand">LIGHTSYNC</div><p className="ls-eyebrow">ORGANIZER CONTROL</p></div>
+        <button className="ls-button ls-secondary" onClick={() => navigate('/')}>HOME</button>
       </header>
 
-      <section className="card">
-        <h2>Create an Event</h2>
-
-        <p>
-          Create an event that your audience will later join using a QR code.
-        </p>
-
-        <div className="form-group">
-          <label htmlFor="eventName">Event name</label>
-
-          <input
-            id="eventName"
-            type="text"
-            placeholder="Example: Summer Concert"
-            value={eventName}
-            onChange={(event) => setEventName(event.target.value)}
-            disabled={creating}
-          />
+      <section className="ls-hero-grid">
+        <div>
+          <p className="ls-eyebrow">LIVE SHOW CONTROL</p>
+          <h1>Synchronize the audience.</h1>
+          <p className="ls-muted">Create one LightSync show for every game, then control its music, timeline and crowd.</p>
         </div>
-
-        <button
-          className="button button-primary"
-          onClick={createEvent}
-          disabled={creating}
-        >
-          {creating ? 'Creating...' : 'Create Event'}
-        </button>
-
-        {message && <p className="status-message">{message}</p>}
+        <div className="ls-orbit"><div className="ls-arena"><span>LIGHTSYNC</span></div></div>
       </section>
 
-      <section className="events-section">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">YOUR EVENTS</p>
-            <h2>Events</h2>
-          </div>
-
-          <span className="event-count">{events.length}</span>
+      <section className="ls-card">
+        <div className="ls-section-title"><div><p className="ls-eyebrow">NEW SHOW</p><h2>Create a show</h2></div></div>
+        <div className="ls-form-grid">
+          <input className="ls-input" placeholder="Show name — e.g. Mersin SK vs ..." value={name} onChange={e => setName(e.target.value)} />
+          <input className="ls-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+          <input className="ls-input" placeholder="Venue" value={venue} onChange={e => setVenue(e.target.value)} />
         </div>
+        <button className="ls-button ls-primary" disabled={creating} onClick={handleCreateShow}>{creating ? 'CREATING...' : '+ CREATE SHOW'}</button>
+        {message && <p className="ls-error">{message}</p>}
+      </section>
 
-        {events.length === 0 ? (
-          <div className="empty-state">
-            <p>No events yet.</p>
-            <span>Create your first LightSync event above.</span>
-          </div>
-        ) : (
-          <div className="event-list">
-            {events.map((event) => (
-              <button
-                key={event.id}
-                className="event-item"
-                onClick={() => openEvent(event.id)}
-              >
-                <div className="event-info">
-                  <h3>{event.name}</h3>
-
-                  <span>ID: {event.id}</span>
-                </div>
-
-                <div className="event-meta">
-                  <span className="event-status">{event.status}</span>
-
-                  <span className="event-arrow">→</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
+      <section className="ls-card">
+        <div className="ls-section-title"><div><p className="ls-eyebrow">SHOW HISTORY</p><h2>Your shows</h2></div><span className="ls-count">{shows.length}</span></div>
+        {shows.length === 0 ? <div className="ls-empty">No shows yet. Create your first show above.</div> : <div className="ls-show-list">
+          {shows.map(show => <button className="ls-show-row" key={show.id} onClick={() => navigate(`/admin/show/${show.id}`)}>
+            <div><strong>{show.name}</strong><span>{show.venue} · {show.date}</span></div>
+            <div><span className={`ls-status ls-${show.status}`}>{show.status}</span><b>→</b></div>
+          </button>)}
+        </div>}
       </section>
     </main>
   );
