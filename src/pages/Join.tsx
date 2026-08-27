@@ -1,488 +1,171 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-
+import { onDisconnect, ref, set } from 'firebase/database';
+import { ensureAnonymousAuth } from '../firebase/auth';
+import { watchPublicShow, type PublicShow } from '../firebase/shows';
 import { db } from '../firebase/config';
-import { onValue, ref, set } from 'firebase/database';
-
-import {
-  getLightStateAtTime,
-  getNextLightEvent,
-  type LightTimeline,
-} from '../lightSync/timeline';
-
-
-type EventData = {
-  name: string;
-  status: string;
-  showStartTime?: number | null;
-  lightTimeline?: LightTimeline;
-};
+import { getLightStateAtTime, getNextLightEvent, type LightTimeline } from '../lightSync/timeline';
 
 export default function Join() {
   const navigate = useNavigate();
   const { eventId } = useParams();
+  const [event, setEvent] = useState<PublicShow | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [joined, setJoined] = useState(false);
+  const [error, setError] = useState('');
+  const [lightState, setLightState] = useState(false);
+  const trackRef = useRef<MediaStreamTrack | null>(null);
+  const participantIdRef = useRef<string | null>(null);
+  const nextTimerRef = useRef<number | null>(null);
+  const currentLightRef = useRef(false);
 
-  const [event, setEvent] =
-    useState<EventData | null>(null);
-
-  const [joined, setJoined] =
-    useState(false);
-
-  const [error, setError] =
-    useState('');
-
-  const [lightState, setLightState] =
-    useState(false);
-
-  const trackRef =
-    useRef<MediaStreamTrack | null>(null);
-
-  const participantIdRef =
-    useRef<string | null>(null);
-
-  const nextTimerRef =
-    useRef<number | null>(null);
-
-  const currentLightRef =
-    useRef(false);
-
-  /*
-   * Get the event from Firebase.
-   */
   useEffect(() => {
     if (!eventId) return;
-
-    const eventRef =
-      ref(db, `events/${eventId}`);
-
-    return onValue(
-      eventRef,
-      snapshot => {
-        setEvent(snapshot.val());
-      }
-    );
+    return watchPublicShow(eventId, show => { setEvent(show); setLoaded(true); });
   }, [eventId]);
 
-  /*
-   * Turn the physical flashlight ON/OFF.
-   */
-  async function setFlash(
-    enabled: boolean
-  ) {
-    const track =
-      trackRef.current;
-
-    if (!track) return;
-
-    if (
-      currentLightRef.current === enabled
-    ) {
-      return;
-    }
-
+  async function setFlash(enabled: boolean) {
+    const track = trackRef.current;
+    if (!track || currentLightRef.current === enabled) return;
     try {
-      await track.applyConstraints({
-        advanced: [
-          {
-            torch: enabled,
-          } as any,
-        ],
-      });
-
-      currentLightRef.current =
-        enabled;
-
+      await track.applyConstraints({ advanced: [{ torch: enabled } as MediaTrackConstraintSet] });
+      currentLightRef.current = enabled;
       setLightState(enabled);
-
-    } catch (error) {
-      console.error(
-        'Torch error:',
-        error
-      );
+    } catch (err) {
+      console.error('Torch error:', err);
     }
   }
 
-  /*
-   * Cancel the currently scheduled
-   * timeline event.
-   */
   function clearNextTimer() {
-    if (
-      nextTimerRef.current !== null
-    ) {
-      clearTimeout(
-        nextTimerRef.current
-      );
-
-      nextTimerRef.current = null;
-    }
+    if (nextTimerRef.current !== null) window.clearTimeout(nextTimerRef.current);
+    nextTimerRef.current = null;
   }
 
-  /*
-   * Schedule ONLY the next change.
-   *
-   * We do NOT create thousands of
-   * timers at once.
-   */
-  function scheduleNextEvent(
-    timeline: LightTimeline,
-    showStartTime: number
-  ) {
+  function scheduleNextEvent(timeline: LightTimeline, showStartTime: number) {
     clearNextTimer();
-
-    const now =
-      Date.now();
-
-    const position =
-      now - showStartTime;
-
-    const nextEvent =
-      getNextLightEvent(
-        timeline,
-        position
-      );
-
-    if (!nextEvent) {
-      return;
-    }
-
-    const delay =
-      showStartTime +
-      nextEvent.time -
-      now;
-
-    nextTimerRef.current =
-      window.setTimeout(() => {
-
-        setFlash(
-          nextEvent.on
-        );
-
-        scheduleNextEvent(
-          timeline,
-          showStartTime
-        );
-
-      }, Math.max(0, delay));
+    const nextEvent = getNextLightEvent(timeline, Date.now() - showStartTime);
+    if (!nextEvent) return;
+    const delay = Math.max(0, showStartTime + nextEvent.time - Date.now());
+    nextTimerRef.current = window.setTimeout(() => {
+      void setFlash(nextEvent.on);
+      scheduleNextEvent(timeline, showStartTime);
+    }, delay);
   }
 
-  /*
-   * Synchronize the phone with
-   * the current position of the show.
-   */
-  function synchronizeShow(
-    showStartTime: number,
-    timeline: LightTimeline
-  ) {
-    const position =
-      Date.now() -
-      showStartTime;
-
-    /*
-     * IMPORTANT:
-     *
-     * We immediately calculate the
-     * state instead of starting from
-     * the beginning.
-     *
-     * This is what makes late joining
-     * possible.
-     */
-    const currentState =
-      getLightStateAtTime(
-        timeline,
-        position
-      );
-
-    setFlash(currentState);
-
-    /*
-     * Then schedule the NEXT change.
-     */
-    scheduleNextEvent(
-      timeline,
-      showStartTime
-    );
+  function synchronizeShow(showStartTime: number, timeline: LightTimeline) {
+    const position = Date.now() - showStartTime;
+    void setFlash(getLightStateAtTime(timeline, position));
+    scheduleNextEvent(timeline, showStartTime);
   }
 
-  /*
-   * Join the event.
-   */
   async function joinShow() {
-    if (!eventId) return;
-
+    if (!eventId || !event) return;
     try {
       setError('');
 
-      /*
-       * Request camera access.
-       *
-       * The camera track is used because
-       * torch control is exposed through
-       * MediaStreamTrack.
-       */
-      const stream =
-        await navigator.mediaDevices
-          .getUserMedia({
-            video: {
-              facingMode: {
-                ideal: 'environment',
-              },
-            },
-          });
+      // Anonymous Firebase identity is the participant ID. This prevents the
+      // client from inventing arbitrary IDs and lets Firebase onDisconnect work.
+      const user = await ensureAnonymousAuth();
 
-      const track =
-        stream.getVideoTracks()[0];
-
-      const capabilities =
-        track.getCapabilities?.() as any;
-
+      // Camera access is requested directly from this button click because
+      // torch control requires a real user gesture on supported browsers.
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } });
+      const track = stream.getVideoTracks()[0];
+      const capabilities = track.getCapabilities?.() as MediaTrackCapabilities & { torch?: boolean };
       if (!capabilities?.torch) {
         track.stop();
-
-        setError(
-          'This phone/browser does not support flashlight control.'
-        );
-
+        setError('This phone/browser does not expose flashlight control. Try the latest Safari or Chrome.');
         return;
       }
 
-      trackRef.current =
-        track;
+      trackRef.current = track;
+      participantIdRef.current = user.uid;
+      const participantRef = ref(db, `showParticipants/${eventId}/${user.uid}`);
 
-      const participantId =
-        crypto.randomUUID();
-
-      participantIdRef.current =
-        participantId;
-
-      await set(
-        ref(
-          db,
-          `events/${eventId}/participants/${participantId}`
-        ),
-        {
-          joinedAt: Date.now(),
-          active: true,
-        }
-      );
+      await set(participantRef, {
+        connected: true,
+        device: detectDevice(),
+        browser: detectBrowser(),
+        joinedAt: Date.now(),
+      });
+      await onDisconnect(participantRef).update({ connected: false });
 
       setJoined(true);
-
-      /*
-       * If the show is already running
-       * when the person joins, synchronize
-       * immediately.
-       */
-      if (
-        event?.status === 'running' &&
-        event.showStartTime &&
-        event.lightTimeline
-      ) {
-        synchronizeShow(
-          event.showStartTime,
-          event.lightTimeline
-        );
+      if (event.status === 'running' && event.showStartTime && event.lightTimeline) {
+        synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline);
       }
-
     } catch (err) {
       console.error(err);
-
-      setError(
-        'Flashlight permission was denied or unavailable.'
-      );
+      setError('Flashlight permission was denied or unavailable. Please allow camera access and try again.');
     }
   }
 
-  /*
-   * React to Firebase show state changes.
-   *
-   * If the organizer starts the show,
-   * every phone receives the same
-   * showStartTime.
-   */
   useEffect(() => {
-    if (!joined) return;
-    if (!event) return;
-
-    if (
-      event.status === 'running' &&
-      event.showStartTime &&
-      event.lightTimeline
-    ) {
-      synchronizeShow(
-        event.showStartTime,
-        event.lightTimeline
-      );
-    }
-
-    if (
-      event.status !== 'running'
-    ) {
+    if (!joined || !event) return;
+    if (event.status === 'running' && event.showStartTime && event.lightTimeline) {
+      synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline);
+    } else if (event.status !== 'running') {
       clearNextTimer();
-
-      setFlash(false);
+      void setFlash(false);
     }
+  }, [joined, event?.status, event?.showStartTime, event?.lightTimeline]);
 
-  }, [
-    joined,
-    event?.status,
-    event?.showStartTime,
-    event?.lightTimeline,
-  ]);
+  useEffect(() => () => {
+    clearNextTimer();
+    if (trackRef.current) {
+      void trackRef.current.applyConstraints({ advanced: [{ torch: false } as MediaTrackConstraintSet] }).catch(() => {});
+      trackRef.current.stop();
+    }
+  }, []);
 
-  /*
-   * Cleanup.
-   */
-  useEffect(() => {
-    return () => {
-      clearNextTimer();
+  if (!loaded) return <main className="light-page"><div className="light-content"><div className="light-logo">LIGHTSYNC</div><p>Loading show...</p></div></main>;
+  if (!event || !eventId) return <main className="light-page"><div className="light-content"><div className="light-logo">LIGHTSYNC</div><p>Show not found.</p><button className="button button-secondary" onClick={() => navigate('/')}>Back</button></div></main>;
 
-      if (trackRef.current) {
-        trackRef.current
-          .applyConstraints({
-            advanced: [
-              {
-                torch: false,
-              } as any,
-            ],
-          })
-          .catch(() => {});
-
-        trackRef.current.stop();
-      }
-
-      if (
-        eventId &&
-        participantIdRef.current
-      ) {
-        set(
-          ref(
-            db,
-            `events/${eventId}/participants/${participantIdRef.current}`
-          ),
-          {
-            active: false,
-            leftAt: Date.now(),
-          }
-        ).catch(() => {});
-      }
-    };
-  }, [eventId]);
-
-  /*
-   * Join screen.
-   */
-  if (!joined) {
-    return (
-      <main className="light-page">
-        <div className="light-content">
-
-          <div className="light-logo">
-            LIGHTSYNC
-          </div>
-
-          <div className="light-event-name">
-            {event?.name}
-          </div>
-
-          <p className="light-description">
-            Join the audience light show.
-          </p>
-
-          <button
-            className="light-join-button"
-            onClick={joinShow}
-          >
-            JOIN SHOW
-          </button>
-
-          {error && (
-            <p className="light-error">
-              {error}
-            </p>
-          )}
-
-          <button
-            className="button button-secondary"
-            onClick={() => navigate('/')}
-          >
-            Back
-          </button>
-
-        </div>
-      </main>
-    );
-  }
-
-  const running =
-    event?.status === 'running';
-
-  return (
-    <main
-      className="light-page"
-      style={{
-        background: lightState
-          ? '#ffffff'
-          : '#08080c',
-        color: lightState
-          ? '#08080c'
-          : '#ffffff',
-      }}
-    >
+  if (!joined) return (
+    <main className="light-page">
       <div className="light-content">
-
-        <div className="light-logo">
-          LIGHTSYNC
-        </div>
-
-        <div className="light-event-name">
-          {event?.name}
-        </div>
-
-        <div className="light-status">
-          CONNECTED
-        </div>
-
-        {running ? (
-          <>
-            <div className="show-live-text">
-              SHOW LIVE
-            </div>
-
-            <div
-              style={{
-                fontSize: '4rem',
-                marginTop: '30px',
-              }}
-            >
-              {lightState
-                ? 'ON'
-                : 'OFF'}
-            </div>
-
-            <p className="waiting-description">
-              Your flashlight is synchronized
-              with the show.
-            </p>
-          </>
-        ) : (
-          <>
-            <div className="connected-icon">
-              ✓
-            </div>
-
-            <div className="waiting-message">
-              READY
-            </div>
-
-            <p className="waiting-description">
-              Waiting for the organizer.
-            </p>
-          </>
-        )}
-
+        <div className="light-logo">LIGHTSYNC</div>
+        <div className="light-event-name">{event.name}</div>
+        <p className="light-description">Join the audience light show.</p>
+        <button className="light-join-button" onClick={() => void joinShow()}>JOIN SHOW</button>
+        {error && <p className="light-error">{error}</p>}
+        <button className="button button-secondary" onClick={() => navigate('/')}>Back</button>
       </div>
     </main>
   );
+
+  const running = event.status === 'running';
+  return (
+    <main className="light-page" style={{ background: lightState ? '#fff' : '#08080c', color: lightState ? '#08080c' : '#fff' }}>
+      <div className="light-content">
+        <div className="light-logo">LIGHTSYNC</div>
+        <div className="light-event-name">{event.name}</div>
+        <div className="light-status">CONNECTED</div>
+        {running ? <><div className="show-live-text">SHOW LIVE</div><div style={{ fontSize: '4rem', marginTop: 30 }}>{lightState ? 'ON' : 'OFF'}</div><p className="waiting-description">Your flashlight is synchronized with the show.</p></> : <><div className="connected-icon">✓</div><div className="waiting-message">READY</div><p className="waiting-description">Waiting for the organizer.</p></>}
+      </div>
+    </main>
+  );
+}
+
+function detectDevice() {
+  const ua = navigator.userAgent;
+  if (/iPad|iPhone|iPod/.test(ua)) return 'iPhone/iPad';
+  if (/Android/.test(ua)) return 'Android';
+  if (/Windows Phone/.test(ua)) return 'Windows Phone';
+  if (/Macintosh|Mac OS X/.test(ua)) return 'Mac';
+  if (/Windows/.test(ua)) return 'Windows';
+  if (/Linux/.test(ua)) return 'Linux';
+  return 'Other';
+}
+
+function detectBrowser() {
+  const ua = navigator.userAgent;
+  if (/Edg\//.test(ua)) return 'Edge';
+  if (/OPR\//.test(ua)) return 'Opera';
+  if (/CriOS\//.test(ua)) return 'Chrome';
+  if (/FxiOS\//.test(ua)) return 'Firefox';
+  if (/Chrome\//.test(ua)) return 'Chrome';
+  if (/Safari\//.test(ua) && !/Chrome\//.test(ua)) return 'Safari';
+  if (/Firefox\//.test(ua)) return 'Firefox';
+  return 'Other';
 }
