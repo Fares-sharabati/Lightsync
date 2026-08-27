@@ -71,19 +71,25 @@ export default function EventControl() {
   /*
    * Local audio element.
    *
-   * The music NEVER goes to the phones.
-   *
-   * It plays only on the organizer's laptop,
-   * which can be connected to the arena sound system.
+   * The music stays on the organizer's computer.
+   * It is never uploaded to Firebase.
    */
   const audioRef =
     useRef<HTMLAudioElement | null>(null);
 
 
   /*
+   * Timer used to start the local music.
+   */
+  const startTimerRef =
+    useRef<number | null>(null);
+
+
+  /*
    * Listen to the event.
    */
   useEffect(() => {
+
     if (!eventId) return;
 
 
@@ -145,29 +151,48 @@ export default function EventControl() {
 
 
     return () => {
+
       unsubscribeEvent();
       unsubscribeParticipants();
+
     };
 
   }, [eventId]);
 
 
   /*
-   * Clean up the local audio URL when
-   * the component is removed.
+   * Clean up audio and timer when
+   * leaving the page.
    */
   useEffect(() => {
 
     return () => {
 
+      if (startTimerRef.current !== null) {
+
+        window.clearTimeout(
+          startTimerRef.current
+        );
+
+        startTimerRef.current = null;
+      }
+
+
       if (audioRef.current) {
+
         audioRef.current.pause();
+
+        audioRef.current.currentTime = 0;
+
         audioRef.current.src = '';
       }
 
 
       if (songUrl) {
-        URL.revokeObjectURL(songUrl);
+
+        URL.revokeObjectURL(
+          songUrl
+        );
       }
 
     };
@@ -177,8 +202,6 @@ export default function EventControl() {
 
   /*
    * Choose a local music file.
-   *
-   * The file stays on this computer.
    */
   function chooseSong(
     e: React.ChangeEvent<HTMLInputElement>
@@ -192,7 +215,7 @@ export default function EventControl() {
 
 
     /*
-     * Stop any previous song.
+     * Stop previous song.
      */
     if (audioRef.current) {
 
@@ -207,10 +230,26 @@ export default function EventControl() {
 
 
     /*
-     * Remove the previous object URL.
+     * Cancel any scheduled start.
+     */
+    if (startTimerRef.current !== null) {
+
+      window.clearTimeout(
+        startTimerRef.current
+      );
+
+      startTimerRef.current = null;
+    }
+
+
+    /*
+     * Remove previous local URL.
      */
     if (songUrl) {
-      URL.revokeObjectURL(songUrl);
+
+      URL.revokeObjectURL(
+        songUrl
+      );
     }
 
 
@@ -220,7 +259,9 @@ export default function EventControl() {
      * This does NOT upload the song.
      */
     const localUrl =
-      URL.createObjectURL(file);
+      URL.createObjectURL(
+        file
+      );
 
 
     const audio =
@@ -242,8 +283,8 @@ export default function EventControl() {
 
 
     /*
-     * Selecting a new song means the old
-     * timeline is no longer valid.
+     * Selecting another song invalidates
+     * the previous timeline.
      */
     setGeneratedTimeline(null);
 
@@ -348,26 +389,70 @@ export default function EventControl() {
     try {
 
       /*
-       * Start time is deliberately in the future.
+       * The important part:
        *
-       * This gives Firebase enough time to
-       * deliver the timeline to the phones.
+       * We call play() immediately as part
+       * of the user's button click.
+       *
+       * This satisfies browser autoplay rules.
+       */
+      const audio =
+        audioRef.current;
+
+
+      audio.currentTime = 0;
+
+
+      /*
+       * Start the audio immediately.
+       *
+       * We will pause it almost immediately
+       * and then start it at the synchronized
+       * start time.
+       */
+      try {
+
+        await audio.play();
+
+      } catch (error) {
+
+        console.error(
+          'Browser rejected audio playback:',
+          error
+        );
+
+        setAnalysisMessage(
+          'The browser blocked music playback. Click the page once and press Start Show again.'
+        );
+
+        setStarting(false);
+
+        return;
+      }
+
+
+      /*
+       * Pause immediately after unlocking
+       * audio playback.
+       */
+      audio.pause();
+
+      audio.currentTime = 0;
+
+
+      /*
+       * Schedule the actual synchronized
+       * start 5 seconds in the future.
        */
       const startTime =
         Date.now() + 5000;
 
 
       /*
-       * Reset the local song.
-       */
-      audioRef.current.currentTime = 0;
-
-
-      /*
-       * Send ONLY the timeline and timing
-       * information to Firebase.
+       * Send ONLY the timing and light
+       * timeline to Firebase.
        *
-       * The actual music file is NOT sent.
+       * The song itself remains local.
        */
       await update(
         ref(
@@ -393,8 +478,7 @@ export default function EventControl() {
 
 
       /*
-       * Wait until the exact scheduled
-       * start time.
+       * Calculate how long we need to wait.
        */
       const delay =
         Math.max(
@@ -403,42 +487,52 @@ export default function EventControl() {
         );
 
 
-      setTimeout(
-        async () => {
+      /*
+       * Schedule local music playback.
+       */
+      startTimerRef.current =
+        window.setTimeout(
+          async () => {
 
-          try {
+            startTimerRef.current =
+              null;
 
-            if (audioRef.current) {
+
+            try {
+
+              if (!audioRef.current) {
+                return;
+              }
+
+
+              audioRef.current.currentTime =
+                0;
+
 
               await audioRef.current.play();
 
+
               console.log(
-                'Local music started.'
+                'Local music started at scheduled time.'
+              );
+
+
+            } catch (error) {
+
+              console.error(
+                'Scheduled music playback failed:',
+                error
               );
 
             }
 
-          } catch (error) {
-
-            console.error(
-              'Could not play local music:',
-              error
-            );
-
-            setAnalysisMessage(
-              'Show started, but the browser blocked music playback. Press Start Show again after interacting with the page.'
-            );
-
-          }
-
-        },
-        delay
-      );
+          },
+          delay
+        );
 
 
       /*
-       * Firebase accepted the show,
-       * so the button can return to normal.
+       * Firebase accepted the show.
        */
       setStarting(false);
 
@@ -466,14 +560,26 @@ export default function EventControl() {
 
 
     /*
-     * Stop local music immediately.
+     * Cancel scheduled music start.
+     */
+    if (startTimerRef.current !== null) {
+
+      window.clearTimeout(
+        startTimerRef.current
+      );
+
+      startTimerRef.current = null;
+    }
+
+
+    /*
+     * Stop local music.
      */
     if (audioRef.current) {
 
       audioRef.current.pause();
 
       audioRef.current.currentTime = 0;
-
     }
 
 
