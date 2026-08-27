@@ -6,6 +6,8 @@ import { watchPublicShow, type PublicShow } from '../firebase/shows';
 import { db } from '../firebase/config';
 import { getLightStateAtTime, getNextLightEvent, type LightTimeline } from '../lightSync/timeline';
 
+type TorchConstraints = MediaTrackConstraintSet & { torch?: boolean };
+
 function detectDevice() {
   const ua = navigator.userAgent;
   if (/iPhone|iPod/.test(ua)) return 'iPhone';
@@ -44,7 +46,7 @@ export default function Join() {
     const track = trackRef.current;
     if (!track || currentLightRef.current === enabled) return;
     try {
-      await track.applyConstraints({ advanced: [{ torch: enabled }] });
+      await track.applyConstraints({ advanced: [{ torch: enabled } as TorchConstraints] });
       currentLightRef.current = enabled;
       setLightState(enabled);
     } catch (err) {
@@ -80,7 +82,6 @@ export default function Join() {
     if (!eventId || !event) return;
     try {
       setError('');
-      // Keep both authentication and media permission inside the explicit user gesture.
       const user = await ensureAnonymousAuth();
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera API unavailable');
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
@@ -114,7 +115,7 @@ export default function Join() {
   useEffect(() => () => {
     clearNextTimer();
     if (trackRef.current) {
-      void trackRef.current.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
+      void trackRef.current.applyConstraints({ advanced: [{ torch: false } as TorchConstraints] }).catch(() => {});
       trackRef.current.stop();
     }
   }, []);
