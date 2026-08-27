@@ -1,13 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+
 import { db } from '../firebase/config';
 import { onValue, ref, set } from 'firebase/database';
+
+import {
+  getLightStateAtTime,
+  getNextLightEvent,
+  LightTimeline,
+} from '../lightSync/timeline';
 
 type EventData = {
   name: string;
   status: string;
   showStartTime?: number | null;
-  flashPattern?: number[];
+  lightTimeline?: LightTimeline;
 };
 
 export default function Join() {
@@ -23,90 +30,41 @@ export default function Join() {
   const [error, setError] =
     useState('');
 
+  const [lightState, setLightState] =
+    useState(false);
+
   const trackRef =
     useRef<MediaStreamTrack | null>(null);
-
-  const timersRef =
-    useRef<number[]>([]);
 
   const participantIdRef =
     useRef<string | null>(null);
 
+  const nextTimerRef =
+    useRef<number | null>(null);
+
   const currentLightRef =
     useRef(false);
 
+  /*
+   * Get the event from Firebase.
+   */
   useEffect(() => {
     if (!eventId) return;
 
+    const eventRef =
+      ref(db, `events/${eventId}`);
+
     return onValue(
-      ref(db, `events/${eventId}`),
+      eventRef,
       snapshot => {
         setEvent(snapshot.val());
       }
     );
   }, [eventId]);
 
-  async function joinShow() {
-    if (!eventId) return;
-
-    try {
-      setError('');
-
-      const stream =
-        await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: {
-              ideal: 'environment',
-            },
-          },
-        });
-
-      const track =
-        stream.getVideoTracks()[0];
-
-      const capabilities =
-        track.getCapabilities?.() as any;
-
-      if (!capabilities?.torch) {
-        track.stop();
-
-        setError(
-          'This phone/browser does not support flashlight control.'
-        );
-
-        return;
-      }
-
-      trackRef.current = track;
-
-      const participantId =
-        crypto.randomUUID();
-
-      participantIdRef.current =
-        participantId;
-
-      await set(
-        ref(
-          db,
-          `events/${eventId}/participants/${participantId}`
-        ),
-        {
-          joinedAt: Date.now(),
-          active: true,
-        }
-      );
-
-      setJoined(true);
-
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        'Camera/flashlight permission was denied or unavailable.'
-      );
-    }
-  }
-
+  /*
+   * Turn the physical flashlight ON/OFF.
+   */
   async function setFlash(
     enabled: boolean
   ) {
@@ -133,6 +91,8 @@ export default function Join() {
       currentLightRef.current =
         enabled;
 
+      setLightState(enabled);
+
     } catch (error) {
       console.error(
         'Torch error:',
@@ -141,101 +101,241 @@ export default function Join() {
     }
   }
 
-  function clearTimers() {
-    timersRef.current.forEach(
-      timer => clearTimeout(timer)
-    );
+  /*
+   * Cancel the currently scheduled
+   * timeline event.
+   */
+  function clearNextTimer() {
+    if (
+      nextTimerRef.current !== null
+    ) {
+      clearTimeout(
+        nextTimerRef.current
+      );
 
-    timersRef.current = [];
+      nextTimerRef.current = null;
+    }
   }
 
-  function stopLightShow() {
-    clearTimers();
-
-    setFlash(false);
-  }
-
-  function startLightShow(
-    startTime: number,
-    pattern: number[]
+  /*
+   * Schedule ONLY the next change.
+   *
+   * We do NOT create thousands of
+   * timers at once.
+   */
+  function scheduleNextEvent(
+    timeline: LightTimeline,
+    showStartTime: number
   ) {
-    clearTimers();
+    clearNextTimer();
 
-    if (!pattern?.length) {
+    const now =
+      Date.now();
+
+    const position =
+      now - showStartTime;
+
+    const nextEvent =
+      getNextLightEvent(
+        timeline,
+        position
+      );
+
+    if (!nextEvent) {
       return;
     }
 
-    const now = Date.now();
+    const delay =
+      showStartTime +
+      nextEvent.time -
+      now;
 
-    const elapsed =
-      now - startTime;
+    nextTimerRef.current =
+      window.setTimeout(() => {
 
-    for (
-      let i = 0;
-      i < pattern.length;
-      i++
-    ) {
-      const beatTime =
-        pattern[i];
+        setFlash(
+          nextEvent.on
+        );
+
+        scheduleNextEvent(
+          timeline,
+          showStartTime
+        );
+
+      }, Math.max(0, delay));
+  }
+
+  /*
+   * Synchronize the phone with
+   * the current position of the show.
+   */
+  function synchronizeShow(
+    showStartTime: number,
+    timeline: LightTimeline
+  ) {
+    const position =
+      Date.now() -
+      showStartTime;
+
+    /*
+     * IMPORTANT:
+     *
+     * We immediately calculate the
+     * state instead of starting from
+     * the beginning.
+     *
+     * This is what makes late joining
+     * possible.
+     */
+    const currentState =
+      getLightStateAtTime(
+        timeline,
+        position
+      );
+
+    setFlash(currentState);
+
+    /*
+     * Then schedule the NEXT change.
+     */
+    scheduleNextEvent(
+      timeline,
+      showStartTime
+    );
+  }
+
+  /*
+   * Join the event.
+   */
+  async function joinShow() {
+    if (!eventId) return;
+
+    try {
+      setError('');
 
       /*
-       * The pattern stores milliseconds
-       * from the beginning of the song.
+       * Request camera access.
        *
-       * Each detected beat toggles
-       * the flashlight.
+       * The camera track is used because
+       * torch control is exposed through
+       * MediaStreamTrack.
        */
-      if (beatTime <= elapsed) {
-        continue;
+      const stream =
+        await navigator.mediaDevices
+          .getUserMedia({
+            video: {
+              facingMode: {
+                ideal: 'environment',
+              },
+            },
+          });
+
+      const track =
+        stream.getVideoTracks()[0];
+
+      const capabilities =
+        track.getCapabilities?.() as any;
+
+      if (!capabilities?.torch) {
+        track.stop();
+
+        setError(
+          'This phone/browser does not support flashlight control.'
+        );
+
+        return;
       }
 
-      const delay =
-        startTime +
-        beatTime -
-        now;
+      trackRef.current =
+        track;
 
-      const timer =
-        window.setTimeout(() => {
-          setFlash(
-            !currentLightRef.current
-          );
-        }, delay);
+      const participantId =
+        crypto.randomUUID();
 
-      timersRef.current.push(timer);
+      participantIdRef.current =
+        participantId;
+
+      await set(
+        ref(
+          db,
+          `events/${eventId}/participants/${participantId}`
+        ),
+        {
+          joinedAt: Date.now(),
+          active: true,
+        }
+      );
+
+      setJoined(true);
+
+      /*
+       * If the show is already running
+       * when the person joins, synchronize
+       * immediately.
+       */
+      if (
+        event?.status === 'running' &&
+        event.showStartTime &&
+        event.lightTimeline
+      ) {
+        synchronizeShow(
+          event.showStartTime,
+          event.lightTimeline
+        );
+      }
+
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        'Flashlight permission was denied or unavailable.'
+      );
     }
   }
 
+  /*
+   * React to Firebase show state changes.
+   *
+   * If the organizer starts the show,
+   * every phone receives the same
+   * showStartTime.
+   */
   useEffect(() => {
+    if (!joined) return;
     if (!event) return;
 
     if (
       event.status === 'running' &&
       event.showStartTime &&
-      event.flashPattern &&
-      joined
+      event.lightTimeline
     ) {
-      startLightShow(
+      synchronizeShow(
         event.showStartTime,
-        event.flashPattern
+        event.lightTimeline
       );
     }
 
     if (
       event.status !== 'running'
     ) {
-      stopLightShow();
+      clearNextTimer();
+
+      setFlash(false);
     }
 
   }, [
+    joined,
     event?.status,
     event?.showStartTime,
-    event?.flashPattern,
-    joined,
+    event?.lightTimeline,
   ]);
 
+  /*
+   * Cleanup.
+   */
   useEffect(() => {
     return () => {
-      clearTimers();
+      clearNextTimer();
 
       if (trackRef.current) {
         trackRef.current
@@ -269,16 +369,9 @@ export default function Join() {
     };
   }, [eventId]);
 
-  if (!event) {
-    return (
-      <main className="light-page">
-        <div className="light-content">
-          Loading...
-        </div>
-      </main>
-    );
-  }
-
+  /*
+   * Join screen.
+   */
   if (!joined) {
     return (
       <main className="light-page">
@@ -289,7 +382,7 @@ export default function Join() {
           </div>
 
           <div className="light-event-name">
-            {event.name}
+            {event?.name}
           </div>
 
           <p className="light-description">
@@ -322,10 +415,20 @@ export default function Join() {
   }
 
   const running =
-    event.status === 'running';
+    event?.status === 'running';
 
   return (
-    <main className="light-page">
+    <main
+      className="light-page"
+      style={{
+        background: lightState
+          ? '#ffffff'
+          : '#08080c',
+        color: lightState
+          ? '#08080c'
+          : '#ffffff',
+      }}
+    >
       <div className="light-content">
 
         <div className="light-logo">
@@ -333,7 +436,7 @@ export default function Join() {
         </div>
 
         <div className="light-event-name">
-          {event.name}
+          {event?.name}
         </div>
 
         <div className="light-status">
@@ -346,13 +449,20 @@ export default function Join() {
               SHOW LIVE
             </div>
 
-            <div className="show-light">
-              🔦
+            <div
+              style={{
+                fontSize: '4rem',
+                marginTop: '30px',
+              }}
+            >
+              {lightState
+                ? 'ON'
+                : 'OFF'}
             </div>
 
             <p className="waiting-description">
               Your flashlight is synchronized
-              with the music.
+              with the show.
             </p>
           </>
         ) : (
@@ -369,12 +479,6 @@ export default function Join() {
               Waiting for the organizer.
             </p>
           </>
-        )}
-
-        {error && (
-          <p className="light-error">
-            {error}
-          </p>
         )}
 
       </div>

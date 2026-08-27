@@ -335,3 +335,25 @@
   font-weight: 900;
   letter-spacing: -0.05em;
 }
+.timeline-preview {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin: 16px 0;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  font-family: 'SF Mono', 'Menlo', monospace;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.timeline-preview div {
+  padding: 6px;
+}
+
+@media (max-width: 480px) {
+  .timeline-preview {
+    grid-template-columns: 1fr 1fr;
+  }
+}
