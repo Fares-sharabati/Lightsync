@@ -1,5 +1,4 @@
-import { onValue, push, ref, set, update, type Unsubscribe } from 'firebase/database';
-import { db } from './config';
+import { onValue, push, ref, update, type Unsubscribe } from 'firebase/database';
 
 export type ShowStatus = 'waiting' | 'running' | 'finished';
 export type Show = { id: string; organizerId: string; name: string; date: string; venue: string; status: ShowStatus; createdAt: number; showStartTime?: number | null; lightTimeline?: unknown };
@@ -19,9 +18,17 @@ export async function createShow(organizerId: string, input: CreateShowInput) {
   return showId;
 }
 
-export function watchShow(showId: string, callback: (show: Show | null) => void): Unsubscribe { return onValue(ref(db, `shows/${showId}`), snapshot => { const value = snapshot.val(); callback(value ? { id: showId, ...value } : null); }); }
-export function watchPublicShow(showId: string, callback: (show: PublicShow | null) => void): Unsubscribe { return onValue(ref(db, `publicShows/${showId}`), snapshot => { const value = snapshot.val(); callback(value ? { id: showId, ...value } : null); }); }
-export function watchOrganizerShows(organizerId: string, callback: (shows: Show[]) => void): Unsubscribe { return onValue(ref(db, 'shows'), snapshot => { const value = snapshot.val() ?? {}; callback(Object.entries(value).map(([id, show]) => ({ id, ...(show as Omit<Show, 'id'>) })).filter(show => show.organizerId === organizerId).sort((a, b) => b.createdAt - a.createdAt)); }); }
+export function watchShow(showId: string, callback: (show: Show | null) => void): Unsubscribe {
+  return onValue(ref(db, `shows/${showId}`), snapshot => { const value = snapshot.val(); callback(value ? { id: showId, ...value } : null); });
+}
+
+export function watchPublicShow(showId: string, callback: (show: PublicShow | null) => void): Unsubscribe {
+  return onValue(ref(db, `publicShows/${showId}`), snapshot => { const value = snapshot.val(); callback(value ? { id: showId, ...value } : null); });
+}
+
+export function watchOrganizerShows(organizerId: string, callback: (shows: Show[]) => void): Unsubscribe {
+  return onValue(ref(db, 'shows'), snapshot => { const value = snapshot.val() ?? {}; callback(Object.entries(value).map(([id, show]) => ({ id, ...(show as Omit<Show, 'id'>) })).filter(show => show.organizerId === organizerId).sort((a, b) => b.createdAt - a.createdAt)); });
+}
 
 export async function updateShow(showId: string, changes: Partial<Omit<Show, 'id' | 'organizerId'>>) {
   const updates: Record<string, unknown> = { [`shows/${showId}`]: changes };
