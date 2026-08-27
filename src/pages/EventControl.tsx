@@ -27,9 +27,87 @@ type EventData = {
 };
 
 
+/*
+ * Determine a browser-friendly MIME type.
+ *
+ * Some music files have strange names such as:
+ *
+ * song.mp3.mpeg
+ *
+ * We don't want to trust the File.type alone.
+ */
+function getAudioMimeType(file: File): string {
+
+  const name =
+    file.name.toLowerCase();
+
+
+  if (
+    name.endsWith('.mp3') ||
+    name.endsWith('.mpeg')
+  ) {
+    return 'audio/mpeg';
+  }
+
+
+  if (
+    name.endsWith('.m4a') ||
+    name.endsWith('.mp4')
+  ) {
+    return 'audio/mp4';
+  }
+
+
+  if (
+    name.endsWith('.wav')
+  ) {
+    return 'audio/wav';
+  }
+
+
+  if (
+    name.endsWith('.ogg') ||
+    name.endsWith('.oga')
+  ) {
+    return 'audio/ogg';
+  }
+
+
+  if (
+    name.endsWith('.webm')
+  ) {
+    return 'audio/webm';
+  }
+
+
+  if (
+    name.endsWith('.aac')
+  ) {
+    return 'audio/aac';
+  }
+
+
+  if (
+    name.endsWith('.flac')
+  ) {
+    return 'audio/flac';
+  }
+
+
+  /*
+   * Fall back to whatever the browser
+   * says the file type is.
+   */
+  return file.type || 'audio/mpeg';
+}
+
+
 export default function EventControl() {
+
   const navigate = useNavigate();
-  const { eventId } = useParams();
+
+  const { eventId } =
+    useParams();
 
 
   const [event, setEvent] =
@@ -72,6 +150,10 @@ export default function EventControl() {
     useState(false);
 
 
+  const [audioSupported, setAudioSupported] =
+    useState<boolean | null>(null);
+
+
   const [countdown, setCountdown] =
     useState<number | null>(null);
 
@@ -107,15 +189,17 @@ export default function EventControl() {
       onValue(
         eventRef,
         (snapshot) => {
+
           setEvent(
             snapshot.val()
           );
+
         }
       );
 
 
     /*
-     * Listen to participants.
+     * Listen to connected participants.
      */
     const participantsRef =
       ref(
@@ -134,8 +218,11 @@ export default function EventControl() {
 
 
           if (!data) {
+
             setParticipantCount(0);
+
             return;
+
           }
 
 
@@ -149,6 +236,7 @@ export default function EventControl() {
           setParticipantCount(
             active.length
           );
+
         }
       );
 
@@ -156,6 +244,7 @@ export default function EventControl() {
     return () => {
 
       unsubscribeEvent();
+
       unsubscribeParticipants();
 
     };
@@ -164,7 +253,7 @@ export default function EventControl() {
 
 
   /*
-   * Cleanup.
+   * Cleanup timers/audio.
    */
   useEffect(() => {
 
@@ -196,9 +285,11 @@ export default function EventControl() {
 
         audioRef.current.pause();
 
-        audioRef.current.currentTime = 0;
+        audioRef.current.removeAttribute(
+          'src'
+        );
 
-        audioRef.current.src = '';
+        audioRef.current.load();
 
       }
 
@@ -217,7 +308,7 @@ export default function EventControl() {
 
 
   /*
-   * Select a local song.
+   * Select song.
    */
   function chooseSong(
     e: React.ChangeEvent<HTMLInputElement>
@@ -231,7 +322,7 @@ export default function EventControl() {
 
 
     /*
-     * Stop old audio.
+     * Stop previous audio.
      */
     if (audioRef.current) {
 
@@ -239,7 +330,11 @@ export default function EventControl() {
 
       audioRef.current.currentTime = 0;
 
-      audioRef.current.src = '';
+      audioRef.current.removeAttribute(
+        'src'
+      );
+
+      audioRef.current.load();
 
       audioRef.current = null;
 
@@ -247,7 +342,7 @@ export default function EventControl() {
 
 
     /*
-     * Cancel old timers.
+     * Cancel timers.
      */
     if (
       startTimerRef.current !== null
@@ -276,7 +371,7 @@ export default function EventControl() {
 
 
     /*
-     * Remove old local URL.
+     * Remove previous URL.
      */
     if (songUrl) {
 
@@ -288,59 +383,165 @@ export default function EventControl() {
 
 
     /*
-     * Create local browser URL.
-     *
-     * The file remains on this computer.
+     * Determine MIME type.
      */
-    const localUrl =
-      URL.createObjectURL(
-        file
+    const mimeType =
+      getAudioMimeType(file);
+
+
+    console.log(
+      'Selected audio:',
+      {
+        name: file.name,
+        originalType: file.type,
+        detectedType: mimeType,
+        size: file.size,
+      }
+    );
+
+
+    /*
+     * Create a new Blob with a reliable
+     * audio MIME type.
+     */
+    const audioBlob =
+      new Blob(
+        [file],
+        {
+          type: mimeType,
+        }
       );
 
 
+    const localUrl =
+      URL.createObjectURL(
+        audioBlob
+      );
+
+
+    /*
+     * Create audio element.
+     */
     const audio =
-      new Audio(localUrl);
+      new Audio();
 
 
-    audio.preload = 'auto';
+    audio.preload =
+      'auto';
 
-    audio.volume = 1;
+    audio.volume =
+      1;
+
+    audio.src =
+      localUrl;
+
+
+    /*
+     * Force browser to load the new source.
+     */
+    audio.load();
+
+
+    /*
+     * Detect whether browser can play it.
+     */
+    const canPlay =
+      audio.canPlayType(
+        mimeType
+      );
+
+
+    console.log(
+      'Browser audio support:',
+      {
+        mimeType,
+        canPlay,
+      }
+    );
+
+
+    setAudioSupported(
+      canPlay !== ''
+    );
+
+
+    audio.addEventListener(
+      'error',
+      () => {
+
+        console.error(
+          'Audio element error:',
+          audio.error
+        );
+
+      }
+    );
 
 
     audioRef.current =
       audio;
 
 
-    setSongFile(file);
+    setSongFile(
+      file
+    );
 
-    setSongName(file.name);
 
-    setSongUrl(localUrl);
+    setSongName(
+      file.name
+    );
+
+
+    setSongUrl(
+      localUrl
+    );
 
 
     /*
-     * New song requires new analysis.
+     * New song means new analysis.
      */
-    setGeneratedTimeline(null);
+    setGeneratedTimeline(
+      null
+    );
 
-    setAnalysisMessage('');
 
-    setMusicReady(false);
+    setAnalysisMessage(
+      ''
+    );
 
-    setCountdown(null);
+
+    setMusicReady(
+      false
+    );
+
+
+    setCountdown(
+      null
+    );
 
   }
 
 
   /*
-   * Analyze the song locally.
+   * Analyze selected song.
    */
   async function analyzeSong() {
 
-    if (!songFile) return;
+    if (!songFile) {
+
+      setAnalysisMessage(
+        'Please select an audio file first.'
+      );
+
+      return;
+
+    }
 
 
-    setAnalyzing(true);
+    setAnalyzing(
+      true
+    );
+
 
     setAnalysisMessage(
       'Analyzing music...'
@@ -391,17 +592,21 @@ export default function EventControl() {
       );
 
 
+      setGeneratedTimeline(
+        null
+      );
+
+
       setAnalysisMessage(
         'Could not analyze this audio file.'
       );
 
 
-      setGeneratedTimeline(null);
-
-
     } finally {
 
-      setAnalyzing(false);
+      setAnalyzing(
+        false
+      );
 
     }
 
@@ -409,17 +614,21 @@ export default function EventControl() {
 
 
   /*
-   * Prepare the music.
+   * Prepare music.
    *
-   * This MUST be triggered directly by the
-   * organizer clicking the button.
-   *
-   * This is what gives the browser permission
-   * to play audio later.
+   * This is a deliberate user interaction.
    */
   async function prepareMusic() {
 
-    if (!audioRef.current) return;
+    if (!audioRef.current) {
+
+      setAnalysisMessage(
+        'Please select a song first.'
+      );
+
+      return;
+
+    }
 
 
     const audio =
@@ -429,25 +638,114 @@ export default function EventControl() {
     try {
 
       /*
-       * Start playback as part of the
-       * user's button click.
+       * Make absolutely sure the audio is loaded.
+       */
+      audio.load();
+
+
+      /*
+       * Wait until browser knows the metadata.
+       */
+      if (
+        audio.readyState <
+        HTMLMediaElement.HAVE_METADATA
+      ) {
+
+        await new Promise<void>(
+          (resolve, reject) => {
+
+            const onLoaded =
+              () => {
+
+                cleanup();
+
+                resolve();
+
+              };
+
+
+            const onError =
+              () => {
+
+                cleanup();
+
+                reject(
+                  new Error(
+                    'Browser could not load this audio file.'
+                  )
+                );
+
+              };
+
+
+            const cleanup =
+              () => {
+
+                audio.removeEventListener(
+                  'loadedmetadata',
+                  onLoaded
+                );
+
+                audio.removeEventListener(
+                  'error',
+                  onError
+                );
+
+              };
+
+
+            audio.addEventListener(
+              'loadedmetadata',
+              onLoaded,
+              {
+                once: true,
+              }
+            );
+
+
+            audio.addEventListener(
+              'error',
+              onError,
+              {
+                once: true,
+              }
+            );
+
+          }
+        );
+
+      }
+
+
+      /*
+       * Reset playback position.
+       */
+      audio.currentTime =
+        0;
+
+
+      /*
+       * User gesture attempts playback.
        */
       await audio.play();
 
 
       /*
-       * Immediately pause it.
+       * Pause immediately.
        *
-       * The important part is that the browser
-       * has now received a legitimate user gesture
-       * allowing this media element to play.
+       * This unlocks the media element
+       * without playing the entire song.
        */
       audio.pause();
 
-      audio.currentTime = 0;
+      audio.currentTime =
+        0;
 
 
-      setMusicReady(true);
+      setMusicReady(
+        true
+      );
+
 
       setAnalysisMessage(
         '✓ Music ready. You can start the show.'
@@ -455,7 +753,7 @@ export default function EventControl() {
 
 
       console.log(
-        'Music playback unlocked.'
+        'Music playback unlocked successfully.'
       );
 
 
@@ -467,11 +765,13 @@ export default function EventControl() {
       );
 
 
-      setMusicReady(false);
+      setMusicReady(
+        false
+      );
 
 
       setAnalysisMessage(
-        'The browser still blocked music. Try clicking Prepare Music again.'
+        'This browser cannot play this audio file. Try an MP3, WAV, or M4A file.'
       );
 
     }
@@ -480,7 +780,7 @@ export default function EventControl() {
 
 
   /*
-   * Start the synchronized show.
+   * Start synchronized show.
    */
   async function startShow() {
 
@@ -498,29 +798,33 @@ export default function EventControl() {
     }
 
 
-    setStarting(true);
+    setStarting(
+      true
+    );
 
 
     try {
 
       /*
-       * Five seconds gives the phones time
-       * to receive the timeline.
+       * Five seconds gives phones time to
+       * receive the Firebase update.
        */
       const startTime =
         Date.now() + 5000;
 
 
       /*
-       * Reset local music.
+       * Reset laptop music.
        */
-      audioRef.current.currentTime = 0;
+      audioRef.current.currentTime =
+        0;
 
 
       /*
-       * Send timeline + start time.
+       * Send timeline to phones.
        *
-       * The actual music file stays local.
+       * The music file itself NEVER goes
+       * to the phones.
        */
       await update(
         ref(
@@ -528,7 +832,8 @@ export default function EventControl() {
           `events/${eventId}`
         ),
         {
-          status: 'running',
+          status:
+            'running',
 
           showStartTime:
             startTime,
@@ -546,51 +851,56 @@ export default function EventControl() {
 
 
       /*
-       * Start visible countdown.
+       * Countdown.
        */
-      setCountdown(5);
+      setCountdown(
+        5
+      );
 
 
       countdownTimerRef.current =
-        window.setInterval(() => {
+        window.setInterval(
+          () => {
 
-          setCountdown(
-            (current) => {
-
-              if (
-                current === null ||
-                current <= 1
-              ) {
+            setCountdown(
+              (current) => {
 
                 if (
-                  countdownTimerRef.current !== null
+                  current === null ||
+                  current <= 1
                 ) {
 
-                  window.clearInterval(
-                    countdownTimerRef.current
-                  );
+                  if (
+                    countdownTimerRef.current !== null
+                  ) {
 
-                  countdownTimerRef.current =
-                    null;
+                    window.clearInterval(
+                      countdownTimerRef.current
+                    );
+
+                    countdownTimerRef.current =
+                      null;
+
+                  }
+
+
+                  return null;
 
                 }
 
 
-                return null;
+                return current - 1;
 
               }
+            );
 
-
-              return current - 1;
-
-            }
-          );
-
-        }, 1000);
+          },
+          1000
+        );
 
 
       /*
-       * Schedule laptop music.
+       * Schedule music.
        */
       const delay =
         Math.max(
@@ -640,7 +950,9 @@ export default function EventControl() {
         );
 
 
-      setStarting(false);
+      setStarting(
+        false
+      );
 
 
     } catch (error) {
@@ -651,9 +963,14 @@ export default function EventControl() {
       );
 
 
-      setStarting(false);
+      setStarting(
+        false
+      );
 
-      setCountdown(null);
+
+      setCountdown(
+        null
+      );
 
     }
 
@@ -668,9 +985,6 @@ export default function EventControl() {
     if (!eventId) return;
 
 
-    /*
-     * Cancel scheduled music.
-     */
     if (
       startTimerRef.current !== null
     ) {
@@ -679,14 +993,12 @@ export default function EventControl() {
         startTimerRef.current
       );
 
-      startTimerRef.current = null;
+      startTimerRef.current =
+        null;
 
     }
 
 
-    /*
-     * Cancel countdown.
-     */
     if (
       countdownTimerRef.current !== null
     ) {
@@ -695,12 +1007,15 @@ export default function EventControl() {
         countdownTimerRef.current
       );
 
-      countdownTimerRef.current = null;
+      countdownTimerRef.current =
+        null;
 
     }
 
 
-    setCountdown(null);
+    setCountdown(
+      null
+    );
 
 
     /*
@@ -710,7 +1025,8 @@ export default function EventControl() {
 
       audioRef.current.pause();
 
-      audioRef.current.currentTime = 0;
+      audioRef.current.currentTime =
+        0;
 
     }
 
@@ -723,7 +1039,8 @@ export default function EventControl() {
           `events/${eventId}`
         ),
         {
-          status: 'waiting',
+          status:
+            'waiting',
 
           showStartTime:
             null,
@@ -744,7 +1061,7 @@ export default function EventControl() {
 
 
   /*
-   * Wait for Firebase event.
+   * Loading.
    */
   if (!event || !eventId) {
 
@@ -792,7 +1109,9 @@ export default function EventControl() {
 
         <button
           className="button button-secondary"
-          onClick={() => navigate('/admin')}
+          onClick={() =>
+            navigate('/admin')
+          }
         >
           Back
         </button>
@@ -875,7 +1194,7 @@ export default function EventControl() {
 
           <input
             type="file"
-            accept="audio/*"
+            accept="audio/*,.mp3,.mpeg,.m4a,.wav,.ogg,.webm,.aac,.flac"
             onChange={chooseSong}
           />
 
@@ -886,6 +1205,41 @@ export default function EventControl() {
             </p>
           )}
 
+
+          {audioSupported === false && (
+            <p className="muted">
+              This browser does not appear to
+              support playback of this audio file.
+            </p>
+          )}
+
+
+          {audioSupported === true && (
+            <p className="song-selected">
+              ✓ Browser can play this audio
+            </p>
+          )}
+
+
+          {/* AUDIO PLAYER */}
+
+          {songUrl && (
+            <audio
+              controls
+              preload="metadata"
+              src={songUrl}
+              style={{
+                width: '100%',
+                marginTop: '12px',
+              }}
+            >
+              Your browser does not support
+              audio playback.
+            </audio>
+          )}
+
+
+          {/* ANALYZE */}
 
           <button
             className="button button-secondary"
@@ -945,9 +1299,9 @@ export default function EventControl() {
 
 
           <p className="muted">
-            Music plays locally on the
-            organizer's computer. Phones
-            receive only the light timeline.
+            Music stays on the organizer's
+            computer. Phones receive only
+            the synchronized light timeline.
           </p>
 
 
