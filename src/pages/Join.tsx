@@ -1,15 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { db } from '../firebase/config';
-import { onValue, ref, set } from 'firebase/database';
+import { auth, db } from '../firebase/config';
+
+import {
+  onAuthStateChanged,
+  signInAnonymously,
+  type User,
+} from 'firebase/auth';
+
+import {
+  onDisconnect,
+  onValue,
+  ref,
+  set,
+} from 'firebase/database';
 
 import {
   getLightStateAtTime,
   getNextLightEvent,
   type LightTimeline,
 } from '../lightSync/timeline';
-
 
 type EventData = {
   name: string;
@@ -22,22 +33,16 @@ export default function Join() {
   const navigate = useNavigate();
   const { eventId } = useParams();
 
-  const [event, setEvent] =
-    useState<EventData | null>(null);
-
-  const [joined, setJoined] =
-    useState(false);
-
-  const [error, setError] =
-    useState('');
-
-  const [lightState, setLightState] =
-    useState(false);
+  const [event, setEvent] = useState<EventData | null>(null);
+  const [joined, setJoined] = useState(false);
+  const [error, setError] = useState('');
+  const [lightState, setLightState] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
 
   const trackRef =
     useRef<MediaStreamTrack | null>(null);
 
-  const participantIdRef =
+  const participantPathRef =
     useRef<string | null>(null);
 
   const nextTimerRef =
@@ -47,7 +52,7 @@ export default function Join() {
     useRef(false);
 
   /*
-   * Get the event from Firebase.
+   * Load the event from Firebase.
    */
   useEffect(() => {
     if (!eventId) return;
@@ -62,6 +67,54 @@ export default function Join() {
       }
     );
   }, [eventId]);
+
+  /*
+   * Make sure the participant has
+   * a Firebase Anonymous Auth identity.
+   *
+   * The Firebase UID becomes the participant ID.
+   */
+  useEffect(() => {
+    let cancelled = false;
+
+    const unsubscribe =
+      onAuthStateChanged(
+        auth,
+        async (user: User | null) => {
+          try {
+            if (user) {
+              if (!cancelled) {
+                setAuthReady(true);
+              }
+
+              return;
+            }
+
+            await signInAnonymously(auth);
+
+            if (!cancelled) {
+              setAuthReady(true);
+            }
+          } catch (err) {
+            console.error(
+              'Anonymous authentication failed:',
+              err
+            );
+
+            if (!cancelled) {
+              setError(
+                'Unable to connect to LightSync. Please try again.'
+              );
+            }
+          }
+        }
+      );
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, []);
 
   /*
    * Turn the physical flashlight ON/OFF.
@@ -93,7 +146,6 @@ export default function Join() {
         enabled;
 
       setLightState(enabled);
-
     } catch (error) {
       console.error(
         'Torch error:',
@@ -110,7 +162,7 @@ export default function Join() {
     if (
       nextTimerRef.current !== null
     ) {
-      clearTimeout(
+      window.clearTimeout(
         nextTimerRef.current
       );
 
@@ -119,10 +171,7 @@ export default function Join() {
   }
 
   /*
-   * Schedule ONLY the next change.
-   *
-   * We do NOT create thousands of
-   * timers at once.
+   * Schedule ONLY the next timeline event.
    */
   function scheduleNextEvent(
     timeline: LightTimeline,
@@ -153,7 +202,6 @@ export default function Join() {
 
     nextTimerRef.current =
       window.setTimeout(() => {
-
         setFlash(
           nextEvent.on
         );
@@ -162,7 +210,6 @@ export default function Join() {
           timeline,
           showStartTime
         );
-
       }, Math.max(0, delay));
   }
 
@@ -178,16 +225,6 @@ export default function Join() {
       Date.now() -
       showStartTime;
 
-    /*
-     * IMPORTANT:
-     *
-     * We immediately calculate the
-     * state instead of starting from
-     * the beginning.
-     *
-     * This is what makes late joining
-     * possible.
-     */
     const currentState =
       getLightStateAtTime(
         timeline,
@@ -196,12 +233,61 @@ export default function Join() {
 
     setFlash(currentState);
 
-    /*
-     * Then schedule the NEXT change.
-     */
     scheduleNextEvent(
       timeline,
       showStartTime
+    );
+  }
+
+  /*
+   * Register the authenticated participant.
+   *
+   * Firebase Anonymous Auth gives us the UID.
+   * Firebase onDisconnect() marks the participant
+   * inactive if the connection disappears.
+   */
+  async function registerParticipant(
+    user: User
+  ) {
+    if (!eventId) {
+      throw new Error(
+        'Missing event ID.'
+      );
+    }
+
+    const participantPath =
+      `events/${eventId}/participants/${user.uid}`;
+
+    const participantRef =
+      ref(db, participantPath);
+
+    /*
+     * Store the path so cleanup can use
+     * the same participant identity.
+     */
+    participantPathRef.current =
+      participantPath;
+
+    /*
+     * If Firebase detects that this client
+     * disconnects, automatically mark it inactive.
+     */
+    await onDisconnect(
+      participantRef
+    ).set({
+      active: false,
+      leftAt: Date.now(),
+    });
+
+    /*
+     * Mark the participant as active.
+     */
+    await set(
+      participantRef,
+      {
+        joinedAt: Date.now(),
+        active: true,
+      }
     );
   }
 
@@ -211,28 +297,57 @@ export default function Join() {
   async function joinShow() {
     if (!eventId) return;
 
+    if (!authReady) {
+      setError(
+        'Connecting to LightSync. Please try again.'
+      );
+
+      return;
+    }
+
+    const user =
+      auth.currentUser;
+
+    if (!user) {
+      setError(
+        'Unable to establish a participant connection.'
+      );
+
+      return;
+    }
+
     try {
       setError('');
 
       /*
        * Request camera access.
        *
-       * The camera track is used because
-       * torch control is exposed through
-       * MediaStreamTrack.
+       * The camera track is currently used
+       * for physical torch control.
        */
       const stream =
-        await navigator.mediaDevices
-          .getUserMedia({
-            video: {
-              facingMode: {
-                ideal: 'environment',
-              },
+        await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: {
+              ideal: 'environment',
             },
-          });
+          },
+        });
 
       const track =
         stream.getVideoTracks()[0];
+
+      if (!track) {
+        stream.getTracks().forEach(
+          mediaTrack => mediaTrack.stop()
+        );
+
+        setError(
+          'Unable to access the phone camera.'
+        );
+
+        return;
+      }
 
       const capabilities =
         track.getCapabilities?.() as any;
@@ -250,29 +365,20 @@ export default function Join() {
       trackRef.current =
         track;
 
-      const participantId =
-        crypto.randomUUID();
-
-      participantIdRef.current =
-        participantId;
-
-      await set(
-        ref(
-          db,
-          `events/${eventId}/participants/${participantId}`
-        ),
-        {
-          joinedAt: Date.now(),
-          active: true,
-        }
+      /*
+       * Register using the Firebase
+       * Anonymous Authentication UID.
+       */
+      await registerParticipant(
+        user
       );
 
       setJoined(true);
 
       /*
        * If the show is already running
-       * when the person joins, synchronize
-       * immediately.
+       * when the participant joins,
+       * synchronize immediately.
        */
       if (
         event?.status === 'running' &&
@@ -284,9 +390,20 @@ export default function Join() {
           event.lightTimeline
         );
       }
-
     } catch (err) {
-      console.error(err);
+      console.error(
+        'Join error:',
+        err
+      );
+
+      /*
+       * Stop any camera tracks that may
+       * have been opened before the error.
+       */
+      if (trackRef.current) {
+        trackRef.current.stop();
+        trackRef.current = null;
+      }
 
       setError(
         'Flashlight permission was denied or unavailable.'
@@ -296,10 +413,6 @@ export default function Join() {
 
   /*
    * React to Firebase show state changes.
-   *
-   * If the organizer starts the show,
-   * every phone receives the same
-   * showStartTime.
    */
   useEffect(() => {
     if (!joined) return;
@@ -323,7 +436,6 @@ export default function Join() {
 
       setFlash(false);
     }
-
   }, [
     joined,
     event?.status,
@@ -350,16 +462,23 @@ export default function Join() {
           .catch(() => {});
 
         trackRef.current.stop();
+        trackRef.current = null;
       }
 
+      /*
+       * Explicitly mark the participant inactive
+       * when the React page is closed/unmounted.
+       *
+       * onDisconnect() remains the important
+       * backup for unexpected disconnections.
+       */
       if (
-        eventId &&
-        participantIdRef.current
+        participantPathRef.current
       ) {
         set(
           ref(
             db,
-            `events/${eventId}/participants/${participantIdRef.current}`
+            participantPathRef.current
           ),
           {
             active: false,
@@ -368,7 +487,7 @@ export default function Join() {
         ).catch(() => {});
       }
     };
-  }, [eventId]);
+  }, []);
 
   /*
    * Join screen.
@@ -393,8 +512,11 @@ export default function Join() {
           <button
             className="light-join-button"
             onClick={joinShow}
+            disabled={!authReady}
           >
-            JOIN SHOW
+            {authReady
+              ? 'JOIN SHOW'
+              : 'CONNECTING...'}
           </button>
 
           {error && (
