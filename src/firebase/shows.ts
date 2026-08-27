@@ -15,6 +15,8 @@ export type Show = {
   lightTimeline?: unknown;
 };
 
+export type PublicShow = Omit<Show, 'organizerId' | 'createdAt'>;
+
 export type CreateShowInput = {
   name: string;
   date: string;
@@ -26,13 +28,22 @@ export async function createShow(organizerId: string, input: CreateShowInput) {
   const showId = showRef.key;
   if (!showId) throw new Error('Could not create show ID.');
 
-  await set(showRef, {
+  const show = {
     organizerId,
     name: input.name.trim(),
     date: input.date,
     venue: input.venue.trim(),
-    status: 'waiting',
+    status: 'waiting' as ShowStatus,
     createdAt: Date.now(),
+    showStartTime: null,
+  };
+
+  await set(showRef, show);
+  await set(ref(db, `publicShows/${showId}`), {
+    name: show.name,
+    date: show.date,
+    venue: show.venue,
+    status: show.status,
     showStartTime: null,
   });
 
@@ -41,6 +52,13 @@ export async function createShow(organizerId: string, input: CreateShowInput) {
 
 export function watchShow(showId: string, callback: (show: Show | null) => void): Unsubscribe {
   return onValue(ref(db, `shows/${showId}`), snapshot => {
+    const value = snapshot.val();
+    callback(value ? { id: showId, ...value } : null);
+  });
+}
+
+export function watchPublicShow(showId: string, callback: (show: PublicShow | null) => void): Unsubscribe {
+  return onValue(ref(db, `publicShows/${showId}`), snapshot => {
     const value = snapshot.val();
     callback(value ? { id: showId, ...value } : null);
   });
@@ -59,4 +77,16 @@ export function watchOrganizerShows(organizerId: string, callback: (shows: Show[
 
 export async function updateShow(showId: string, changes: Partial<Omit<Show, 'id' | 'organizerId'>>) {
   await update(ref(db, `shows/${showId}`), changes);
+
+  const publicChanges: Partial<PublicShow> = {};
+  if (changes.name !== undefined) publicChanges.name = changes.name;
+  if (changes.date !== undefined) publicChanges.date = changes.date;
+  if (changes.venue !== undefined) publicChanges.venue = changes.venue;
+  if (changes.status !== undefined) publicChanges.status = changes.status;
+  if (changes.showStartTime !== undefined) publicChanges.showStartTime = changes.showStartTime;
+  if (changes.lightTimeline !== undefined) publicChanges.lightTimeline = changes.lightTimeline;
+
+  if (Object.keys(publicChanges).length > 0) {
+    await update(ref(db, `publicShows/${showId}`), publicChanges);
+  }
 }
