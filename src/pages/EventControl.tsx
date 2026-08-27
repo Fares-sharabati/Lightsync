@@ -27,14 +27,10 @@ type EventData = {
 };
 
 
-/*
- * Determine a browser-friendly MIME type.
- */
 function getAudioMimeType(file: File): string {
 
   const name =
     file.name.toLowerCase();
-
 
   if (
     name.endsWith('.mp3') ||
@@ -43,7 +39,6 @@ function getAudioMimeType(file: File): string {
     return 'audio/mpeg';
   }
 
-
   if (
     name.endsWith('.m4a') ||
     name.endsWith('.mp4')
@@ -51,13 +46,9 @@ function getAudioMimeType(file: File): string {
     return 'audio/mp4';
   }
 
-
-  if (
-    name.endsWith('.wav')
-  ) {
+  if (name.endsWith('.wav')) {
     return 'audio/wav';
   }
-
 
   if (
     name.endsWith('.ogg') ||
@@ -66,27 +57,17 @@ function getAudioMimeType(file: File): string {
     return 'audio/ogg';
   }
 
-
-  if (
-    name.endsWith('.webm')
-  ) {
+  if (name.endsWith('.webm')) {
     return 'audio/webm';
   }
 
-
-  if (
-    name.endsWith('.aac')
-  ) {
+  if (name.endsWith('.aac')) {
     return 'audio/aac';
   }
 
-
-  if (
-    name.endsWith('.flac')
-  ) {
+  if (name.endsWith('.flac')) {
     return 'audio/flac';
   }
-
 
   return file.type || 'audio/mpeg';
 }
@@ -136,14 +117,6 @@ export default function EventControl() {
     useState<LightTimeline | null>(null);
 
 
-  const [musicReady, setMusicReady] =
-    useState(false);
-
-
-  const [audioSupported, setAudioSupported] =
-    useState<boolean | null>(null);
-
-
   const [countdown, setCountdown] =
     useState<number | null>(null);
 
@@ -161,7 +134,7 @@ export default function EventControl() {
 
 
   /*
-   * Listen to event.
+   * Listen to the event.
    */
   useEffect(() => {
 
@@ -189,7 +162,7 @@ export default function EventControl() {
 
 
     /*
-     * Listen to participants.
+     * Listen to connected participants.
      */
     const participantsRef =
       ref(
@@ -243,7 +216,7 @@ export default function EventControl() {
 
 
   /*
-   * Cleanup.
+   * Cleanup timers/audio.
    */
   useEffect(() => {
 
@@ -275,30 +248,15 @@ export default function EventControl() {
 
         audioRef.current.pause();
 
-        audioRef.current.removeAttribute(
-          'src'
-        );
-
-        audioRef.current.load();
-
-      }
-
-
-      if (songUrl) {
-
-        URL.revokeObjectURL(
-          songUrl
-        );
-
       }
 
     };
 
-  }, [songUrl]);
+  }, []);
 
 
   /*
-   * Select a song.
+   * Select song.
    */
   function chooseSong(
     e: React.ChangeEvent<HTMLInputElement>
@@ -312,7 +270,7 @@ export default function EventControl() {
 
 
     /*
-     * Stop old audio.
+     * Stop previous audio.
      */
     if (audioRef.current) {
 
@@ -332,36 +290,7 @@ export default function EventControl() {
 
 
     /*
-     * Cancel old timers.
-     */
-    if (
-      startTimerRef.current !== null
-    ) {
-
-      window.clearTimeout(
-        startTimerRef.current
-      );
-
-      startTimerRef.current = null;
-
-    }
-
-
-    if (
-      countdownTimerRef.current !== null
-    ) {
-
-      window.clearInterval(
-        countdownTimerRef.current
-      );
-
-      countdownTimerRef.current = null;
-
-    }
-
-
-    /*
-     * Remove previous URL.
+     * Revoke previous URL.
      */
     if (songUrl) {
 
@@ -388,7 +317,7 @@ export default function EventControl() {
 
 
     /*
-     * Create browser-friendly Blob.
+     * Create a browser-friendly Blob.
      */
     const audioBlob =
       new Blob(
@@ -406,7 +335,7 @@ export default function EventControl() {
 
 
     /*
-     * Create audio element.
+     * Create the actual audio player.
      */
     const audio =
       new Audio();
@@ -422,33 +351,7 @@ export default function EventControl() {
       localUrl;
 
 
-    /*
-     * Load it.
-     */
     audio.load();
-
-
-    /*
-     * Check browser support.
-     */
-    const canPlay =
-      audio.canPlayType(
-        mimeType
-      );
-
-
-    console.log(
-      'Browser audio support:',
-      {
-        mimeType,
-        canPlay,
-      }
-    );
-
-
-    setAudioSupported(
-      canPlay !== ''
-    );
 
 
     audio.addEventListener(
@@ -483,6 +386,9 @@ export default function EventControl() {
     );
 
 
+    /*
+     * New song means new analysis.
+     */
     setGeneratedTimeline(
       null
     );
@@ -490,11 +396,6 @@ export default function EventControl() {
 
     setAnalysisMessage(
       ''
-    );
-
-
-    setMusicReady(
-      false
     );
 
 
@@ -506,7 +407,7 @@ export default function EventControl() {
 
 
   /*
-   * Analyze song.
+   * Analyze the selected song.
    */
   async function analyzeSong() {
 
@@ -556,8 +457,8 @@ export default function EventControl() {
 
 
       console.log(
-        'Audio analysis:',
-        analysis
+        'Detected beats:',
+        analysis.beats
       );
 
 
@@ -584,7 +485,6 @@ export default function EventControl() {
         'Could not analyze this audio file.'
       );
 
-
     } finally {
 
       setAnalyzing(
@@ -597,28 +497,24 @@ export default function EventControl() {
 
 
   /*
-   * Prepare music.
+   * START SHOW
    *
-   * IMPORTANT:
+   * This button is intentionally the
+   * direct user action that starts music.
    *
-   * We do NOT wait for loadedmetadata here.
-   *
-   * The audio player has already demonstrated
-   * that the browser can load/play this file.
-   *
-   * The user's click on this button is the
-   * important browser permission gesture.
+   * No Prepare Music step.
    */
-  async function prepareMusic() {
+  async function startShow() {
 
-    const audio =
-      audioRef.current;
+    console.log(
+      'START SHOW clicked'
+    );
 
 
-    if (!audio) {
+    if (!eventId) {
 
-      setAnalysisMessage(
-        'Please select a song first.'
+      console.error(
+        'No event ID.'
       );
 
       return;
@@ -628,8 +524,12 @@ export default function EventControl() {
 
     if (!generatedTimeline) {
 
+      console.error(
+        'No generated timeline.'
+      );
+
       setAnalysisMessage(
-        'Analyze the song first.'
+        'Analyze the song before starting the show.'
       );
 
       return;
@@ -637,105 +537,14 @@ export default function EventControl() {
     }
 
 
-    try {
-
-      console.log(
-        'Preparing music...'
-      );
-
-
-      /*
-       * Make sure playback starts from
-       * the beginning.
-       */
-      audio.currentTime =
-        0;
-
-
-      /*
-       * This happens directly from the
-       * button click.
-       */
-      await audio.play();
-
-
-      console.log(
-        'Music playback permission granted.'
-      );
-
-
-      /*
-       * Immediately pause.
-       */
-      audio.pause();
-
-      audio.currentTime =
-        0;
-
-
-      setMusicReady(
-        true
-      );
-
-
-      setAnalysisMessage(
-        '✓ Music ready. You can start the show.'
-      );
-
-
-      console.log(
-        '✓ Music is ready.'
-      );
-
-
-    } catch (error) {
+    if (!audioRef.current) {
 
       console.error(
-        'Could not prepare music:',
-        error
+        'No audio player.'
       );
-
-
-      setMusicReady(
-        false
-      );
-
 
       setAnalysisMessage(
-        'The browser blocked music playback. Click Prepare Music again.'
-      );
-
-    }
-
-  }
-
-
-  /*
-   * Start synchronized show.
-   */
-  async function startShow() {
-
-    if (
-      !eventId ||
-      !event ||
-      !generatedTimeline ||
-      generatedTimeline.length === 0 ||
-      !audioRef.current ||
-      !musicReady
-    ) {
-
-      console.warn(
-        'Cannot start show. Missing:',
-        {
-          eventId: !!eventId,
-          event: !!event,
-          timeline: !!generatedTimeline,
-          timelineLength:
-            generatedTimeline?.length,
-          audio:
-            !!audioRef.current,
-          musicReady,
-        }
+        'Please select the song again.'
       );
 
       return;
@@ -751,22 +560,31 @@ export default function EventControl() {
     try {
 
       /*
-       * Five-second synchronization window.
+       * Five seconds gives phones time
+       * to receive the Firebase update.
        */
       const startTime =
         Date.now() + 5000;
 
 
       /*
-       * Reset local music.
+       * Reset laptop music.
        */
       audioRef.current.currentTime =
         0;
 
 
       /*
-       * Send ONLY the timeline and timing
-       * information to Firebase.
+       * IMPORTANT:
+       *
+       * Firebase receives only:
+       *
+       * - status
+       * - start time
+       * - light timeline
+       *
+       * The music file never leaves
+       * the organizer's computer.
        */
       await update(
         ref(
@@ -787,7 +605,7 @@ export default function EventControl() {
 
 
       console.log(
-        'Show scheduled for:',
+        'Show scheduled:',
         new Date(startTime)
       );
 
@@ -842,7 +660,7 @@ export default function EventControl() {
 
 
       /*
-       * Schedule local music.
+       * Schedule laptop music.
        */
       const delay =
         Math.max(
@@ -874,7 +692,7 @@ export default function EventControl() {
 
 
               console.log(
-                '🎵 Local music started.'
+                '🎵 Music started on organizer laptop.'
               );
 
 
@@ -883,6 +701,11 @@ export default function EventControl() {
               console.error(
                 'Music playback failed:',
                 error
+              );
+
+
+              setAnalysisMessage(
+                'The browser blocked music playback. Click Start Show again.'
               );
 
             }
@@ -920,15 +743,20 @@ export default function EventControl() {
 
 
   /*
-   * Stop show.
+   * STOP SHOW
    */
   async function stopShow() {
+
+    console.log(
+      'STOP SHOW clicked'
+    );
+
 
     if (!eventId) return;
 
 
     /*
-     * Cancel pending music.
+     * Cancel pending start.
      */
     if (
       startTimerRef.current !== null
@@ -967,7 +795,7 @@ export default function EventControl() {
 
 
     /*
-     * Stop local music.
+     * Stop laptop music.
      */
     if (audioRef.current) {
 
@@ -1030,6 +858,31 @@ export default function EventControl() {
     event.status === 'running';
 
 
+  /*
+   * The Start button is now disabled
+   * ONLY when:
+   *
+   * - already starting
+   * - show already running
+   * - no song
+   * - no timeline
+   */
+  const startDisabled =
+    starting ||
+    running ||
+    !songFile ||
+    !generatedTimeline;
+
+
+  /*
+   * Stop is enabled while the show
+   * is running OR during countdown.
+   */
+  const stopDisabled =
+    !running &&
+    countdown === null;
+
+
   return (
     <main className="page">
 
@@ -1056,6 +909,7 @@ export default function EventControl() {
 
 
         <button
+          type="button"
           className="button button-secondary"
           onClick={() =>
             navigate('/admin')
@@ -1127,6 +981,8 @@ export default function EventControl() {
           <hr />
 
 
+          {/* MUSIC */}
+
           <p className="eyebrow">
             MUSIC
           </p>
@@ -1146,23 +1002,6 @@ export default function EventControl() {
           )}
 
 
-          {audioSupported === false && (
-            <p className="muted">
-              This browser does not appear to
-              support playback of this audio file.
-            </p>
-          )}
-
-
-          {audioSupported === true && (
-            <p className="song-selected">
-              ✓ Browser can play this audio
-            </p>
-          )}
-
-
-          {/* AUDIO PLAYER */}
-
           {songUrl && (
             <audio
               controls
@@ -1179,9 +1018,8 @@ export default function EventControl() {
           )}
 
 
-          {/* ANALYZE */}
-
           <button
+            type="button"
             className="button button-secondary"
             onClick={analyzeSong}
             disabled={
@@ -1209,25 +1047,6 @@ export default function EventControl() {
           )}
 
 
-          {/* PREPARE MUSIC */}
-
-          {songFile && (
-            <button
-              className="button button-secondary"
-              onClick={prepareMusic}
-              disabled={
-                !generatedTimeline ||
-                musicReady ||
-                running
-              }
-            >
-              {musicReady
-                ? '✓ Music Ready'
-                : 'Prepare Music'}
-            </button>
-          )}
-
-
           <hr />
 
 
@@ -1239,9 +1058,10 @@ export default function EventControl() {
 
 
           <p className="muted">
-            Music stays on the organizer's
-            computer. Phones receive only
-            the synchronized light timeline.
+            Music plays locally on the
+            organizer's computer. Phones
+            receive only the synchronized
+            light timeline.
           </p>
 
 
@@ -1254,16 +1074,12 @@ export default function EventControl() {
 
           <div className="control-actions">
 
+
             <button
+              type="button"
               className="button button-primary control-button"
               onClick={startShow}
-              disabled={
-                starting ||
-                running ||
-                !generatedTimeline ||
-                !songFile ||
-                !musicReady
-              }
+              disabled={startDisabled}
             >
               {starting
                 ? 'Starting...'
@@ -1272,15 +1088,14 @@ export default function EventControl() {
 
 
             <button
+              type="button"
               className="button button-secondary control-button"
               onClick={stopShow}
-              disabled={
-                !running &&
-                countdown === null
-              }
+              disabled={stopDisabled}
             >
               Stop Show
             </button>
+
 
           </div>
 
@@ -1293,6 +1108,57 @@ export default function EventControl() {
             {running
               ? 'SHOW RUNNING'
               : 'WAITING'}
+
+          </div>
+
+
+          {/* DEBUG INFORMATION */}
+
+          <div
+            style={{
+              marginTop: '20px',
+              padding: '12px',
+              borderRadius: '10px',
+              background:
+                'rgba(255,255,255,0.04)',
+              fontSize: '12px',
+              fontFamily:
+                'monospace',
+            }}
+          >
+
+            <div>
+              Song: {songFile ? 'YES' : 'NO'}
+            </div>
+
+            <div>
+              Timeline:{' '}
+              {generatedTimeline
+                ? `${generatedTimeline.length} events`
+                : 'NO'}
+            </div>
+
+            <div>
+              Running: {running ? 'YES' : 'NO'}
+            </div>
+
+            <div>
+              Starting: {starting ? 'YES' : 'NO'}
+            </div>
+
+            <div>
+              Start disabled:{' '}
+              {startDisabled
+                ? 'YES'
+                : 'NO'}
+            </div>
+
+            <div>
+              Stop disabled:{' '}
+              {stopDisabled
+                ? 'YES'
+                : 'NO'}
+            </div>
 
           </div>
 
