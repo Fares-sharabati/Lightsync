@@ -68,25 +68,28 @@ export default function EventControl() {
     useState<LightTimeline | null>(null);
 
 
-  /*
-   * Local audio element.
-   *
-   * The music stays on the organizer's computer.
-   * It is never uploaded to Firebase.
-   */
+  const [musicReady, setMusicReady] =
+    useState(false);
+
+
+  const [countdown, setCountdown] =
+    useState<number | null>(null);
+
+
   const audioRef =
     useRef<HTMLAudioElement | null>(null);
 
 
-  /*
-   * Timer used to start the local music.
-   */
+  const countdownTimerRef =
+    useRef<number | null>(null);
+
+
   const startTimerRef =
     useRef<number | null>(null);
 
 
   /*
-   * Listen to the event.
+   * Listen to event.
    */
   useEffect(() => {
 
@@ -112,7 +115,7 @@ export default function EventControl() {
 
 
     /*
-     * Listen to connected participants.
+     * Listen to participants.
      */
     const participantsRef =
       ref(
@@ -161,20 +164,31 @@ export default function EventControl() {
 
 
   /*
-   * Clean up audio and timer when
-   * leaving the page.
+   * Cleanup.
    */
   useEffect(() => {
 
     return () => {
 
-      if (startTimerRef.current !== null) {
+      if (
+        startTimerRef.current !== null
+      ) {
 
         window.clearTimeout(
           startTimerRef.current
         );
 
-        startTimerRef.current = null;
+      }
+
+
+      if (
+        countdownTimerRef.current !== null
+      ) {
+
+        window.clearInterval(
+          countdownTimerRef.current
+        );
+
       }
 
 
@@ -185,6 +199,7 @@ export default function EventControl() {
         audioRef.current.currentTime = 0;
 
         audioRef.current.src = '';
+
       }
 
 
@@ -193,6 +208,7 @@ export default function EventControl() {
         URL.revokeObjectURL(
           songUrl
         );
+
       }
 
     };
@@ -201,7 +217,7 @@ export default function EventControl() {
 
 
   /*
-   * Choose a local music file.
+   * Select a local song.
    */
   function chooseSong(
     e: React.ChangeEvent<HTMLInputElement>
@@ -215,7 +231,7 @@ export default function EventControl() {
 
 
     /*
-     * Stop previous song.
+     * Stop old audio.
      */
     if (audioRef.current) {
 
@@ -226,37 +242,55 @@ export default function EventControl() {
       audioRef.current.src = '';
 
       audioRef.current = null;
+
     }
 
 
     /*
-     * Cancel any scheduled start.
+     * Cancel old timers.
      */
-    if (startTimerRef.current !== null) {
+    if (
+      startTimerRef.current !== null
+    ) {
 
       window.clearTimeout(
         startTimerRef.current
       );
 
       startTimerRef.current = null;
+
+    }
+
+
+    if (
+      countdownTimerRef.current !== null
+    ) {
+
+      window.clearInterval(
+        countdownTimerRef.current
+      );
+
+      countdownTimerRef.current = null;
+
     }
 
 
     /*
-     * Remove previous local URL.
+     * Remove old local URL.
      */
     if (songUrl) {
 
       URL.revokeObjectURL(
         songUrl
       );
+
     }
 
 
     /*
-     * Create a local browser URL.
+     * Create local browser URL.
      *
-     * This does NOT upload the song.
+     * The file remains on this computer.
      */
     const localUrl =
       URL.createObjectURL(
@@ -269,6 +303,8 @@ export default function EventControl() {
 
 
     audio.preload = 'auto';
+
+    audio.volume = 1;
 
 
     audioRef.current =
@@ -283,17 +319,21 @@ export default function EventControl() {
 
 
     /*
-     * Selecting another song invalidates
-     * the previous timeline.
+     * New song requires new analysis.
      */
     setGeneratedTimeline(null);
 
     setAnalysisMessage('');
+
+    setMusicReady(false);
+
+    setCountdown(null);
+
   }
 
 
   /*
-   * Analyze the selected song locally.
+   * Analyze the song locally.
    */
   async function analyzeSong() {
 
@@ -364,6 +404,78 @@ export default function EventControl() {
       setAnalyzing(false);
 
     }
+
+  }
+
+
+  /*
+   * Prepare the music.
+   *
+   * This MUST be triggered directly by the
+   * organizer clicking the button.
+   *
+   * This is what gives the browser permission
+   * to play audio later.
+   */
+  async function prepareMusic() {
+
+    if (!audioRef.current) return;
+
+
+    const audio =
+      audioRef.current;
+
+
+    try {
+
+      /*
+       * Start playback as part of the
+       * user's button click.
+       */
+      await audio.play();
+
+
+      /*
+       * Immediately pause it.
+       *
+       * The important part is that the browser
+       * has now received a legitimate user gesture
+       * allowing this media element to play.
+       */
+      audio.pause();
+
+      audio.currentTime = 0;
+
+
+      setMusicReady(true);
+
+      setAnalysisMessage(
+        '✓ Music ready. You can start the show.'
+      );
+
+
+      console.log(
+        'Music playback unlocked.'
+      );
+
+
+    } catch (error) {
+
+      console.error(
+        'Could not prepare music:',
+        error
+      );
+
+
+      setMusicReady(false);
+
+
+      setAnalysisMessage(
+        'The browser still blocked music. Try clicking Prepare Music again.'
+      );
+
+    }
+
   }
 
 
@@ -377,9 +489,12 @@ export default function EventControl() {
       !event ||
       !generatedTimeline ||
       generatedTimeline.length === 0 ||
-      !audioRef.current
+      !audioRef.current ||
+      !musicReady
     ) {
+
       return;
+
     }
 
 
@@ -389,70 +504,23 @@ export default function EventControl() {
     try {
 
       /*
-       * The important part:
-       *
-       * We call play() immediately as part
-       * of the user's button click.
-       *
-       * This satisfies browser autoplay rules.
-       */
-      const audio =
-        audioRef.current;
-
-
-      audio.currentTime = 0;
-
-
-      /*
-       * Start the audio immediately.
-       *
-       * We will pause it almost immediately
-       * and then start it at the synchronized
-       * start time.
-       */
-      try {
-
-        await audio.play();
-
-      } catch (error) {
-
-        console.error(
-          'Browser rejected audio playback:',
-          error
-        );
-
-        setAnalysisMessage(
-          'The browser blocked music playback. Click the page once and press Start Show again.'
-        );
-
-        setStarting(false);
-
-        return;
-      }
-
-
-      /*
-       * Pause immediately after unlocking
-       * audio playback.
-       */
-      audio.pause();
-
-      audio.currentTime = 0;
-
-
-      /*
-       * Schedule the actual synchronized
-       * start 5 seconds in the future.
+       * Five seconds gives the phones time
+       * to receive the timeline.
        */
       const startTime =
         Date.now() + 5000;
 
 
       /*
-       * Send ONLY the timing and light
-       * timeline to Firebase.
+       * Reset local music.
+       */
+      audioRef.current.currentTime = 0;
+
+
+      /*
+       * Send timeline + start time.
        *
-       * The song itself remains local.
+       * The actual music file stays local.
        */
       await update(
         ref(
@@ -478,7 +546,51 @@ export default function EventControl() {
 
 
       /*
-       * Calculate how long we need to wait.
+       * Start visible countdown.
+       */
+      setCountdown(5);
+
+
+      countdownTimerRef.current =
+        window.setInterval(() => {
+
+          setCountdown(
+            (current) => {
+
+              if (
+                current === null ||
+                current <= 1
+              ) {
+
+                if (
+                  countdownTimerRef.current !== null
+                ) {
+
+                  window.clearInterval(
+                    countdownTimerRef.current
+                  );
+
+                  countdownTimerRef.current =
+                    null;
+
+                }
+
+
+                return null;
+
+              }
+
+
+              return current - 1;
+
+            }
+          );
+
+        }, 1000);
+
+
+      /*
+       * Schedule laptop music.
        */
       const delay =
         Math.max(
@@ -487,9 +599,6 @@ export default function EventControl() {
         );
 
 
-      /*
-       * Schedule local music playback.
-       */
       startTimerRef.current =
         window.setTimeout(
           async () => {
@@ -498,12 +607,12 @@ export default function EventControl() {
               null;
 
 
+            if (!audioRef.current) {
+              return;
+            }
+
+
             try {
-
-              if (!audioRef.current) {
-                return;
-              }
-
 
               audioRef.current.currentTime =
                 0;
@@ -513,14 +622,14 @@ export default function EventControl() {
 
 
               console.log(
-                'Local music started at scheduled time.'
+                '🎵 Local music started.'
               );
 
 
             } catch (error) {
 
               console.error(
-                'Scheduled music playback failed:',
+                'Music playback failed:',
                 error
               );
 
@@ -531,9 +640,6 @@ export default function EventControl() {
         );
 
 
-      /*
-       * Firebase accepted the show.
-       */
       setStarting(false);
 
 
@@ -547,12 +653,15 @@ export default function EventControl() {
 
       setStarting(false);
 
+      setCountdown(null);
+
     }
+
   }
 
 
   /*
-   * Stop the show.
+   * Stop show.
    */
   async function stopShow() {
 
@@ -560,26 +669,49 @@ export default function EventControl() {
 
 
     /*
-     * Cancel scheduled music start.
+     * Cancel scheduled music.
      */
-    if (startTimerRef.current !== null) {
+    if (
+      startTimerRef.current !== null
+    ) {
 
       window.clearTimeout(
         startTimerRef.current
       );
 
       startTimerRef.current = null;
+
     }
 
 
     /*
-     * Stop local music.
+     * Cancel countdown.
+     */
+    if (
+      countdownTimerRef.current !== null
+    ) {
+
+      window.clearInterval(
+        countdownTimerRef.current
+      );
+
+      countdownTimerRef.current = null;
+
+    }
+
+
+    setCountdown(null);
+
+
+    /*
+     * Stop laptop music.
      */
     if (audioRef.current) {
 
       audioRef.current.pause();
 
       audioRef.current.currentTime = 0;
+
     }
 
 
@@ -607,11 +739,12 @@ export default function EventControl() {
       );
 
     }
+
   }
 
 
   /*
-   * Wait for event data.
+   * Wait for Firebase event.
    */
   if (!event || !eventId) {
 
@@ -620,6 +753,7 @@ export default function EventControl() {
         Loading...
       </main>
     );
+
   }
 
 
@@ -781,6 +915,25 @@ export default function EventControl() {
           )}
 
 
+          {/* PREPARE MUSIC */}
+
+          {songFile && (
+            <button
+              className="button button-secondary"
+              onClick={prepareMusic}
+              disabled={
+                !generatedTimeline ||
+                musicReady ||
+                running
+              }
+            >
+              {musicReady
+                ? '✓ Music Ready'
+                : 'Prepare Music'}
+            </button>
+          )}
+
+
           <hr />
 
 
@@ -798,8 +951,14 @@ export default function EventControl() {
           </p>
 
 
-          <div className="control-actions">
+          {countdown !== null && (
+            <div className="event-status-large">
+              STARTING IN {countdown}
+            </div>
+          )}
 
+
+          <div className="control-actions">
 
             <button
               className="button button-primary control-button"
@@ -808,7 +967,8 @@ export default function EventControl() {
                 starting ||
                 running ||
                 !generatedTimeline ||
-                !songFile
+                !songFile ||
+                !musicReady
               }
             >
               {starting
@@ -820,11 +980,13 @@ export default function EventControl() {
             <button
               className="button button-secondary control-button"
               onClick={stopShow}
-              disabled={!running}
+              disabled={
+                !running &&
+                countdown === null
+              }
             >
               Stop Show
             </button>
-
 
           </div>
 
