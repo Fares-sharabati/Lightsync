@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { onDisconnect, onValue, ref, set } from 'firebase/database';
+import { onDisconnect, ref, set } from 'firebase/database';
 import { ensureAnonymousAuth } from '../firebase/auth';
 import { watchPublicShow, type PublicShow } from '../firebase/shows';
 import { db } from '../firebase/config';
