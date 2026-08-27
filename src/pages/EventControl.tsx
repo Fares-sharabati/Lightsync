@@ -29,12 +29,6 @@ type EventData = {
 
 /*
  * Determine a browser-friendly MIME type.
- *
- * Some music files have strange names such as:
- *
- * song.mp3.mpeg
- *
- * We don't want to trust the File.type alone.
  */
 function getAudioMimeType(file: File): string {
 
@@ -94,10 +88,6 @@ function getAudioMimeType(file: File): string {
   }
 
 
-  /*
-   * Fall back to whatever the browser
-   * says the file type is.
-   */
   return file.type || 'audio/mpeg';
 }
 
@@ -199,7 +189,7 @@ export default function EventControl() {
 
 
     /*
-     * Listen to connected participants.
+     * Listen to participants.
      */
     const participantsRef =
       ref(
@@ -253,7 +243,7 @@ export default function EventControl() {
 
 
   /*
-   * Cleanup timers/audio.
+   * Cleanup.
    */
   useEffect(() => {
 
@@ -308,7 +298,7 @@ export default function EventControl() {
 
 
   /*
-   * Select song.
+   * Select a song.
    */
   function chooseSong(
     e: React.ChangeEvent<HTMLInputElement>
@@ -322,7 +312,7 @@ export default function EventControl() {
 
 
     /*
-     * Stop previous audio.
+     * Stop old audio.
      */
     if (audioRef.current) {
 
@@ -342,7 +332,7 @@ export default function EventControl() {
 
 
     /*
-     * Cancel timers.
+     * Cancel old timers.
      */
     if (
       startTimerRef.current !== null
@@ -382,9 +372,6 @@ export default function EventControl() {
     }
 
 
-    /*
-     * Determine MIME type.
-     */
     const mimeType =
       getAudioMimeType(file);
 
@@ -401,8 +388,7 @@ export default function EventControl() {
 
 
     /*
-     * Create a new Blob with a reliable
-     * audio MIME type.
+     * Create browser-friendly Blob.
      */
     const audioBlob =
       new Blob(
@@ -437,13 +423,13 @@ export default function EventControl() {
 
 
     /*
-     * Force browser to load the new source.
+     * Load it.
      */
     audio.load();
 
 
     /*
-     * Detect whether browser can play it.
+     * Check browser support.
      */
     const canPlay =
       audio.canPlayType(
@@ -497,9 +483,6 @@ export default function EventControl() {
     );
 
 
-    /*
-     * New song means new analysis.
-     */
     setGeneratedTimeline(
       null
     );
@@ -523,7 +506,7 @@ export default function EventControl() {
 
 
   /*
-   * Analyze selected song.
+   * Analyze song.
    */
   async function analyzeSong() {
 
@@ -616,11 +599,23 @@ export default function EventControl() {
   /*
    * Prepare music.
    *
-   * This is a deliberate user interaction.
+   * IMPORTANT:
+   *
+   * We do NOT wait for loadedmetadata here.
+   *
+   * The audio player has already demonstrated
+   * that the browser can load/play this file.
+   *
+   * The user's click on this button is the
+   * important browser permission gesture.
    */
   async function prepareMusic() {
 
-    if (!audioRef.current) {
+    const audio =
+      audioRef.current;
+
+
+    if (!audio) {
 
       setAnalysisMessage(
         'Please select a song first.'
@@ -631,110 +626,46 @@ export default function EventControl() {
     }
 
 
-    const audio =
-      audioRef.current;
+    if (!generatedTimeline) {
+
+      setAnalysisMessage(
+        'Analyze the song first.'
+      );
+
+      return;
+
+    }
 
 
     try {
 
-      /*
-       * Make absolutely sure the audio is loaded.
-       */
-      audio.load();
+      console.log(
+        'Preparing music...'
+      );
 
 
       /*
-       * Wait until browser knows the metadata.
-       */
-      if (
-        audio.readyState <
-        HTMLMediaElement.HAVE_METADATA
-      ) {
-
-        await new Promise<void>(
-          (resolve, reject) => {
-
-            const onLoaded =
-              () => {
-
-                cleanup();
-
-                resolve();
-
-              };
-
-
-            const onError =
-              () => {
-
-                cleanup();
-
-                reject(
-                  new Error(
-                    'Browser could not load this audio file.'
-                  )
-                );
-
-              };
-
-
-            const cleanup =
-              () => {
-
-                audio.removeEventListener(
-                  'loadedmetadata',
-                  onLoaded
-                );
-
-                audio.removeEventListener(
-                  'error',
-                  onError
-                );
-
-              };
-
-
-            audio.addEventListener(
-              'loadedmetadata',
-              onLoaded,
-              {
-                once: true,
-              }
-            );
-
-
-            audio.addEventListener(
-              'error',
-              onError,
-              {
-                once: true,
-              }
-            );
-
-          }
-        );
-
-      }
-
-
-      /*
-       * Reset playback position.
+       * Make sure playback starts from
+       * the beginning.
        */
       audio.currentTime =
         0;
 
 
       /*
-       * User gesture attempts playback.
+       * This happens directly from the
+       * button click.
        */
       await audio.play();
 
 
+      console.log(
+        'Music playback permission granted.'
+      );
+
+
       /*
-       * Pause immediately.
-       *
-       * This unlocks the media element
-       * without playing the entire song.
+       * Immediately pause.
        */
       audio.pause();
 
@@ -753,7 +684,7 @@ export default function EventControl() {
 
 
       console.log(
-        'Music playback unlocked successfully.'
+        '✓ Music is ready.'
       );
 
 
@@ -771,7 +702,7 @@ export default function EventControl() {
 
 
       setAnalysisMessage(
-        'This browser cannot play this audio file. Try an MP3, WAV, or M4A file.'
+        'The browser blocked music playback. Click Prepare Music again.'
       );
 
     }
@@ -793,6 +724,20 @@ export default function EventControl() {
       !musicReady
     ) {
 
+      console.warn(
+        'Cannot start show. Missing:',
+        {
+          eventId: !!eventId,
+          event: !!event,
+          timeline: !!generatedTimeline,
+          timelineLength:
+            generatedTimeline?.length,
+          audio:
+            !!audioRef.current,
+          musicReady,
+        }
+      );
+
       return;
 
     }
@@ -806,25 +751,22 @@ export default function EventControl() {
     try {
 
       /*
-       * Five seconds gives phones time to
-       * receive the Firebase update.
+       * Five-second synchronization window.
        */
       const startTime =
         Date.now() + 5000;
 
 
       /*
-       * Reset laptop music.
+       * Reset local music.
        */
       audioRef.current.currentTime =
         0;
 
 
       /*
-       * Send timeline to phones.
-       *
-       * The music file itself NEVER goes
-       * to the phones.
+       * Send ONLY the timeline and timing
+       * information to Firebase.
        */
       await update(
         ref(
@@ -900,7 +842,7 @@ export default function EventControl() {
 
 
       /*
-       * Schedule music.
+       * Schedule local music.
        */
       const delay =
         Math.max(
@@ -985,6 +927,9 @@ export default function EventControl() {
     if (!eventId) return;
 
 
+    /*
+     * Cancel pending music.
+     */
     if (
       startTimerRef.current !== null
     ) {
@@ -999,6 +944,9 @@ export default function EventControl() {
     }
 
 
+    /*
+     * Cancel countdown.
+     */
     if (
       countdownTimerRef.current !== null
     ) {
@@ -1019,7 +967,7 @@ export default function EventControl() {
 
 
     /*
-     * Stop laptop music.
+     * Stop local music.
      */
     if (audioRef.current) {
 
@@ -1122,9 +1070,7 @@ export default function EventControl() {
       <section className="event-control-grid">
 
 
-        {/* =========================
-            QR CODE
-        ========================== */}
+        {/* QR CODE */}
 
         <div className="card qr-card">
 
@@ -1158,14 +1104,10 @@ export default function EventControl() {
         </div>
 
 
-        {/* =========================
-            CONTROL PANEL
-        ========================== */}
+        {/* CONTROL PANEL */}
 
         <div className="card control-card">
 
-
-          {/* AUDIENCE */}
 
           <p className="eyebrow">
             AUDIENCE
@@ -1184,8 +1126,6 @@ export default function EventControl() {
 
           <hr />
 
-
-          {/* MUSIC */}
 
           <p className="eyebrow">
             MUSIC
