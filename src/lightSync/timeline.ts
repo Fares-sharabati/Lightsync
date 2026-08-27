@@ -3,30 +3,12 @@ export type LightState = {
     on: boolean;
   };
   
-  /*
-   * Time is stored in milliseconds from
-   * the beginning of the song.
-   *
-   * Example:
-   *
-   * 0ms     ON
-   * 1200ms  OFF
-   * 1500ms  ON
-   * 4000ms  OFF
-   *
-   * This means the light stays ON from
-   * 0 → 1200ms.
-   */
-  
   export type LightTimeline = LightState[];
   
   /*
-   * Temporary test timeline.
+   * Temporary synchronization test.
    *
-   * This is NOT the Gangnam Style choreography.
-   *
-   * We are using it only to test the
-   * synchronization engine.
+   * Time is measured in milliseconds.
    */
   export const TEST_TIMELINE: LightTimeline = [
     { time: 0, on: false },
@@ -45,12 +27,12 @@ export type LightState = {
   ];
   
   /*
-   * Find the flashlight state at a specific
-   * position in the song.
+   * Returns the flashlight state at
+   * the current position in the show.
    *
-   * This is the key function that allows
-   * late-joining phones to immediately know
-   * whether they should be ON or OFF.
+   * This is what allows a late-joining
+   * phone to immediately know whether
+   * it should be ON or OFF.
    */
   export function getLightStateAtTime(
     timeline: LightTimeline,
@@ -74,7 +56,7 @@ export type LightState = {
   }
   
   /*
-   * Find the next timeline event after
+   * Returns the next light change after
    * the current position.
    */
   export function getNextLightEvent(

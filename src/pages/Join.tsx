@@ -7,8 +7,9 @@ import { onValue, ref, set } from 'firebase/database';
 import {
   getLightStateAtTime,
   getNextLightEvent,
-  LightTimeline,
+  type LightTimeline,
 } from '../lightSync/timeline';
+
 
 type EventData = {
   name: string;
