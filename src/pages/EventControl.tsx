@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -52,6 +52,10 @@ export default function EventControl() {
     useState<File | null>(null);
 
 
+  const [songUrl, setSongUrl] =
+    useState<string | null>(null);
+
+
   const [analyzing, setAnalyzing] =
     useState(false);
 
@@ -65,6 +69,18 @@ export default function EventControl() {
 
 
   /*
+   * Local audio element.
+   *
+   * The music NEVER goes to the phones.
+   *
+   * It plays only on the organizer's laptop,
+   * which can be connected to the arena sound system.
+   */
+  const audioRef =
+    useRef<HTMLAudioElement | null>(null);
+
+
+  /*
    * Listen to the event.
    */
   useEffect(() => {
@@ -72,14 +88,19 @@ export default function EventControl() {
 
 
     const eventRef =
-      ref(db, `events/${eventId}`);
+      ref(
+        db,
+        `events/${eventId}`
+      );
 
 
     const unsubscribeEvent =
       onValue(
         eventRef,
         (snapshot) => {
-          setEvent(snapshot.val());
+          setEvent(
+            snapshot.val()
+          );
         }
       );
 
@@ -98,6 +119,7 @@ export default function EventControl() {
       onValue(
         participantsRef,
         (snapshot) => {
+
           const data =
             snapshot.val();
 
@@ -126,18 +148,42 @@ export default function EventControl() {
       unsubscribeEvent();
       unsubscribeParticipants();
     };
+
   }, [eventId]);
+
+
+  /*
+   * Clean up the local audio URL when
+   * the component is removed.
+   */
+  useEffect(() => {
+
+    return () => {
+
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
+
+
+      if (songUrl) {
+        URL.revokeObjectURL(songUrl);
+      }
+
+    };
+
+  }, [songUrl]);
 
 
   /*
    * Choose a local music file.
    *
-   * The file stays on the organizer's computer.
-   * It is NOT uploaded to Firebase.
+   * The file stays on this computer.
    */
   function chooseSong(
     e: React.ChangeEvent<HTMLInputElement>
   ) {
+
     const file =
       e.target.files?.[0];
 
@@ -145,15 +191,62 @@ export default function EventControl() {
     if (!file) return;
 
 
-    setSongFile(file);
-    setSongName(file.name);
+    /*
+     * Stop any previous song.
+     */
+    if (audioRef.current) {
+
+      audioRef.current.pause();
+
+      audioRef.current.currentTime = 0;
+
+      audioRef.current.src = '';
+
+      audioRef.current = null;
+    }
 
 
     /*
-     * Selecting a new song invalidates
-     * the previous analysis.
+     * Remove the previous object URL.
+     */
+    if (songUrl) {
+      URL.revokeObjectURL(songUrl);
+    }
+
+
+    /*
+     * Create a local browser URL.
+     *
+     * This does NOT upload the song.
+     */
+    const localUrl =
+      URL.createObjectURL(file);
+
+
+    const audio =
+      new Audio(localUrl);
+
+
+    audio.preload = 'auto';
+
+
+    audioRef.current =
+      audio;
+
+
+    setSongFile(file);
+
+    setSongName(file.name);
+
+    setSongUrl(localUrl);
+
+
+    /*
+     * Selecting a new song means the old
+     * timeline is no longer valid.
      */
     setGeneratedTimeline(null);
+
     setAnalysisMessage('');
   }
 
@@ -162,6 +255,7 @@ export default function EventControl() {
    * Analyze the selected song locally.
    */
   async function analyzeSong() {
+
     if (!songFile) return;
 
 
@@ -173,6 +267,7 @@ export default function EventControl() {
 
 
     try {
+
       const analysis =
         await analyzeAudioFile(
           songFile
@@ -208,6 +303,7 @@ export default function EventControl() {
 
 
     } catch (error) {
+
       console.error(
         'Audio analysis failed:',
         error
@@ -223,7 +319,9 @@ export default function EventControl() {
 
 
     } finally {
+
       setAnalyzing(false);
+
     }
   }
 
@@ -232,11 +330,13 @@ export default function EventControl() {
    * Start the synchronized show.
    */
   async function startShow() {
+
     if (
       !eventId ||
       !event ||
       !generatedTimeline ||
-      generatedTimeline.length === 0
+      generatedTimeline.length === 0 ||
+      !audioRef.current
     ) {
       return;
     }
@@ -246,14 +346,29 @@ export default function EventControl() {
 
 
     try {
+
       /*
-       * Give all phones 5 seconds to receive
-       * the Firebase update.
+       * Start time is deliberately in the future.
+       *
+       * This gives Firebase enough time to
+       * deliver the timeline to the phones.
        */
       const startTime =
         Date.now() + 5000;
 
 
+      /*
+       * Reset the local song.
+       */
+      audioRef.current.currentTime = 0;
+
+
+      /*
+       * Send ONLY the timeline and timing
+       * information to Firebase.
+       *
+       * The actual music file is NOT sent.
+       */
       await update(
         ref(
           db,
@@ -277,10 +392,59 @@ export default function EventControl() {
       );
 
 
+      /*
+       * Wait until the exact scheduled
+       * start time.
+       */
+      const delay =
+        Math.max(
+          0,
+          startTime - Date.now()
+        );
+
+
+      setTimeout(
+        async () => {
+
+          try {
+
+            if (audioRef.current) {
+
+              await audioRef.current.play();
+
+              console.log(
+                'Local music started.'
+              );
+
+            }
+
+          } catch (error) {
+
+            console.error(
+              'Could not play local music:',
+              error
+            );
+
+            setAnalysisMessage(
+              'Show started, but the browser blocked music playback. Press Start Show again after interacting with the page.'
+            );
+
+          }
+
+        },
+        delay
+      );
+
+
+      /*
+       * Firebase accepted the show,
+       * so the button can return to normal.
+       */
       setStarting(false);
 
 
     } catch (error) {
+
       console.error(
         'Could not start show:',
         error
@@ -288,6 +452,7 @@ export default function EventControl() {
 
 
       setStarting(false);
+
     }
   }
 
@@ -296,10 +461,24 @@ export default function EventControl() {
    * Stop the show.
    */
   async function stopShow() {
+
     if (!eventId) return;
 
 
+    /*
+     * Stop local music immediately.
+     */
+    if (audioRef.current) {
+
+      audioRef.current.pause();
+
+      audioRef.current.currentTime = 0;
+
+    }
+
+
     try {
+
       await update(
         ref(
           db,
@@ -315,18 +494,21 @@ export default function EventControl() {
 
 
     } catch (error) {
+
       console.error(
         'Could not stop show:',
         error
       );
+
     }
   }
 
 
   /*
-   * Wait for Firebase event data.
+   * Wait for event data.
    */
   if (!event || !eventId) {
+
     return (
       <main className="page">
         Loading...
@@ -496,10 +678,17 @@ export default function EventControl() {
           <hr />
 
 
-          {/* SHOW CONTROLS */}
+          {/* SHOW CONTROL */}
 
           <p className="eyebrow">
             SHOW CONTROL
+          </p>
+
+
+          <p className="muted">
+            Music plays locally on the
+            organizer's computer. Phones
+            receive only the light timeline.
           </p>
 
 
@@ -512,7 +701,8 @@ export default function EventControl() {
               disabled={
                 starting ||
                 running ||
-                !generatedTimeline
+                !generatedTimeline ||
+                !songFile
               }
             >
               {starting
