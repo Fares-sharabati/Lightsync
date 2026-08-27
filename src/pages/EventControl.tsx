@@ -84,17 +84,12 @@ export default function EventControl() {
    */
   async function startShow() {
     if (!eventId || !event) return;
-
+  
     setStarting(true);
-
+  
     try {
-      /*
-       * Give all phones 5 seconds to receive
-       * the Firebase update before the show begins.
-       */
-      const startTime =
-        Date.now() + 5000;
-
+      const startTime = Date.now() + 5000;
+  
       await update(
         ref(db, `events/${eventId}`),
         {
@@ -103,21 +98,26 @@ export default function EventControl() {
           lightTimeline: TEST_TIMELINE,
         }
       );
-
+  
       console.log(
         'Show scheduled for:',
         new Date(startTime)
       );
-
+  
+      // Firebase has accepted the show.
+      // Allow the button to return to its normal state.
+      setStarting(false);
+  
     } catch (error) {
       console.error(
         'Could not start show:',
         error
       );
-
+  
       setStarting(false);
     }
   }
+  
 
   /*
    * Stop the show.
