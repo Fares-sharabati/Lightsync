@@ -7,20 +7,25 @@ import { db } from '../firebase/config';
 import { getLightStateAtTime, getNextLightEvent, type LightTimeline } from '../lightSync/timeline';
 
 type TorchConstraints = MediaTrackConstraintSet & { torch?: boolean };
+const SCREEN_LIGHT_COLOR = import.meta.env.VITE_SCREEN_LIGHT_COLOR || '#071B3A';
 
 function detectDevice() {
   const ua = navigator.userAgent;
-  if (/iPhone|iPod/.test(ua)) return 'iPhone';
-  if (/iPad/.test(ua)) return 'iPad';
+  if (/iPad|iPhone|iPod/.test(ua)) return 'iPhone/iPad';
   if (/Android/.test(ua)) return 'Android';
-  return /Windows/.test(ua) ? 'Windows' : /Mac/.test(ua) ? 'Mac' : 'Other';
+  if (/Windows Phone/.test(ua)) return 'Windows Phone';
+  if (/Macintosh|Mac OS X/.test(ua)) return 'Mac';
+  if (/Windows/.test(ua)) return 'Windows';
+  if (/Linux/.test(ua)) return 'Linux';
+  return 'Other';
 }
 function detectBrowser() {
   const ua = navigator.userAgent;
-  if (/CriOS|Chrome\//.test(ua) && !/Edg\//.test(ua)) return 'Chrome';
-  if (/FxiOS|Firefox\//.test(ua)) return 'Firefox';
   if (/Edg\//.test(ua)) return 'Edge';
-  if (/Safari\//.test(ua)) return 'Safari';
+  if (/OPR\//.test(ua)) return 'Opera';
+  if (/Chrome\//.test(ua) && !/Edg\//.test(ua)) return 'Chrome';
+  if (/Safari\//.test(ua) && !/Chrome\//.test(ua)) return 'Safari';
+  if (/Firefox\//.test(ua)) return 'Firefox';
   return 'Other';
 }
 
@@ -121,5 +126,7 @@ export default function Join() {
   if (!event || !eventId) return <main className="light-page"><div className="light-content"><div className="light-logo">LIGHTSYNC</div><p>Show not found.</p><button className="button button-secondary" onClick={() => navigate('/')}>Back</button></div></main>;
   if (!joined) return <main className="light-page"><div className="light-content"><div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div><p className="light-description">Join the audience light show.</p><button className="light-join-button" onClick={() => void joinShow()}>JOIN SHOW</button>{error && <p className="light-error">{error}</p>}</div></main>;
   const running = event.status === 'running';
-  return <main className="light-page" style={{ background: lightState ? '#fff' : '#08080c', color: lightState ? '#08080c' : '#fff' }}><div className="light-content"><div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div><div className="light-status">CONNECTED</div>{running ? <><div className="show-live-text">SHOW LIVE</div><div style={{ fontSize: '4rem', marginTop: 30 }}>{lightState ? 'ON' : 'OFF'}</div><p className="waiting-description">Your flashlight is synchronized with the show.</p></> : <><div className="connected-icon">✓</div><div className="waiting-message">READY</div><p className="waiting-description">Waiting for the organizer.</p></>}</div></main>;
+  const activeBackground = lightState ? SCREEN_LIGHT_COLOR : '#08080c';
+  const activeText = lightState ? '#050505' : '#fff';
+  return <main className="light-page" style={{ background: activeBackground, color: activeText, transition: 'background-color .08s linear, color .08s linear' }}><div className="light-content"><div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div><div className="light-status">CONNECTED</div>{running ? <><div className="show-live-text">SHOW LIVE</div><div style={{ fontSize: '4rem', marginTop: 30 }}>{lightState ? 'ON' : 'OFF'}</div><p className="waiting-description">Your flashlight and screen are synchronized with the show.</p></> : <><div className="connected-icon">✓</div><div className="waiting-message">READY</div><p className="waiting-description">Waiting for the organizer.</p></>}</div></main>;
 }
