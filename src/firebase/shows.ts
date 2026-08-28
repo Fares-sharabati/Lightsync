@@ -39,9 +39,15 @@ export function watchOrganizerShows(organizerId: string, callback: (shows: Show[
 }
 
 export async function updateShow(showId: string, changes: Partial<Omit<Show, 'id' | 'organizerId'>>) {
-  const updates: Record<string, unknown> = { [`shows/${showId}`]: changes };
-  const publicChanges: Record<string, unknown> = {};
-  for (const key of ['name', 'date', 'venue', 'status', 'showStartTime', 'lightTimeline']) if (key in changes) publicChanges[key] = (changes as Record<string, unknown>)[key];
-  if (Object.keys(publicChanges).length) updates[`publicShows/${showId}`] = publicChanges;
+  // IMPORTANT: Firebase's multi-location update() replaces whatever value
+  // already exists at each given path rather than merging into it. Writing
+  // `{ [`shows/${showId}`]: changes }` would therefore overwrite the WHOLE
+  // show node with just `changes`, deleting organizerId/name/date/venue/
+  // createdAt — which then fails the `.validate` rule requiring those fields
+  // and makes the write silently fail. To do a real partial update we must
+  // target each changed field's own leaf path.
+  const updates: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(changes)) updates[`shows/${showId}/${key}`] = value;
+  for (const key of ['name', 'date', 'venue', 'status', 'showStartTime', 'lightTimeline']) if (key in changes) updates[`publicShows/${showId}/${key}`] = (changes as Record<string, unknown>)[key];
   await update(ref(db), updates);
 }
