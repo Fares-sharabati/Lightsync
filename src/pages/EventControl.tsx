@@ -75,19 +75,31 @@ export default function EventControl() {
     audio.addEventListener('timeupdate', () => setSongCurrentTime(audio.currentTime));
     audio.addEventListener('ended', () => setSongCurrentTime(audio.duration));
     audioRef.current = audio;
-    setSongFile(file); setSongName(file.name); setSongUrl(url); setGeneratedTimeline(null); setAnalysisMessage(''); setCountdown(null); setSongCurrentTime(0); setSongDuration(0);
+    setSongFile(file);
+    setSongName(file.name);
+    setSongUrl(url);
+    setGeneratedTimeline(null);
+    setAnalysisMessage('');
+    setCountdown(null);
+    setSongCurrentTime(0);
+    setSongDuration(0);
   }
 
   async function analyzeSong() {
     if (!songFile) return setAnalysisMessage('Please select an audio file first.');
-    setAnalyzing(true); setAnalysisMessage('Analyzing music...');
+    setAnalyzing(true);
+    setAnalysisMessage('Analyzing music...');
     try {
       const analysis = await analyzeAudioFile(songFile);
       setGeneratedTimeline(generateLightTimeline(analysis.beats));
       setAnalysisMessage(`Analysis complete — ${analysis.beats.length} beats detected.`);
     } catch (error) {
-      console.error(error); setGeneratedTimeline(null); setAnalysisMessage('Could not analyze this audio file.');
-    } finally { setAnalyzing(false); }
+      console.error(error);
+      setGeneratedTimeline(null);
+      setAnalysisMessage('Could not analyze this audio file.');
+    } finally {
+      setAnalyzing(false);
+    }
   }
 
   async function startShow() {
@@ -96,15 +108,12 @@ export default function EventControl() {
       setAnalysisMessage(!generatedTimeline ? 'Analyze the song before starting the show.' : 'Please select the song again.');
       return;
     }
-    setStarting(true); setAnalysisMessage('');
+    setStarting(true);
+    setAnalysisMessage('');
     if (startTimerRef.current !== null) window.clearTimeout(startTimerRef.current);
     if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current);
 
     try {
-      // Start the media element immediately from the Start Show click. This is
-      // the reliable way to satisfy autoplay policies. We use volume=0 rather
-      // than muted so the browser treats it as normal media playback. At the
-      // scheduled show time we seek to 0 and restore the audible volume.
       audio.pause();
       audio.currentTime = 0;
       audio.volume = 0;
@@ -127,8 +136,6 @@ export default function EventControl() {
       const delay = Math.max(0, startTime - Date.now());
       startTimerRef.current = window.setTimeout(() => {
         startTimerRef.current = null;
-        // The media is already playing with volume 0. Seek to the exact song
-        // beginning and make it audible. No second play() call is required.
         audio.currentTime = 0;
         audio.volume = 1;
         setSongCurrentTime(0);
@@ -139,44 +146,107 @@ export default function EventControl() {
       audio.volume = 1;
       setCountdown(null);
       setAnalysisMessage(error instanceof Error && error.name === 'NotAllowedError'
-        ? 'The browser blocked audio playback. Press the Play button in the audio preview once, stop it, then press Start Show again.'
+        ? 'Audio was blocked. Press Play once in the browser audio player, then try Start Show again.'
         : 'Could not start the show. Check the selected audio file and try again.');
-    } finally { setStarting(false); }
+    } finally {
+      setStarting(false);
+    }
   }
 
   async function stopShow() {
     if (!eventId) return;
     if (startTimerRef.current !== null) window.clearTimeout(startTimerRef.current);
     if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current);
-    startTimerRef.current = null; countdownTimerRef.current = null; setCountdown(null);
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current.volume = 1; audioRef.current.currentTime = 0; }
-    setSongCurrentTime(0); setAnalysisMessage('Stopping show...');
+    startTimerRef.current = null;
+    countdownTimerRef.current = null;
+    setCountdown(null);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.volume = 1;
+      audioRef.current.currentTime = 0;
+    }
+    setSongCurrentTime(0);
+    setAnalysisMessage('Stopping show...');
     try {
       await updateShow(eventId, { status: 'waiting', showStartTime: null });
       setAnalysisMessage('Show stopped. Ready for another start.');
     } catch (error) {
-      console.error(error); setAnalysisMessage('Could not stop the show. Check the Firebase rules and organizer account.');
+      console.error(error);
+      setAnalysisMessage('Could not stop the show. Check the Firebase rules and organizer account.');
     }
   }
 
-  if (!loaded) return <main className="page"><div className="card" style={{ maxWidth: 600, margin: '80px auto', textAlign: 'center' }}>Loading show...</div></main>;
-  if (!event || !eventId) return <main className="page"><div className="card" style={{ maxWidth: 600, margin: '80px auto', textAlign: 'center' }}><h2>Show not found</h2><button className="button button-secondary" onClick={() => navigate('/admin')}>Back to Dashboard</button></div></main>;
+  if (!loaded) return <main className="ls-shell"><div className="ls-card ls-event-loading">Loading show...</div></main>;
+  if (!event || !eventId) return <main className="ls-shell"><div className="ls-card ls-event-loading"><h2>Show not found</h2><button className="ls-button ls-secondary" onClick={() => navigate('/admin')}>BACK TO DASHBOARD</button></div></main>;
 
   const running = event.status === 'running';
   const joinUrl = `${PUBLIC_APP_URL}/join/${eventId}`;
   const startDisabled = starting || running || !songFile || !generatedTimeline;
   const stopDisabled = starting || (!running && countdown === null);
+  const progress = songDuration > 0 ? Math.min(100, Math.max(0, (songCurrentTime / songDuration) * 100)) : 0;
 
   return (
-    <main className="page">
-      <header className="page-header"><div><p className="eyebrow">LIGHTSYNC EVENT</p><h1>{event.name}</h1><p className="event-id">Show ID: {eventId}</p><p className="muted">{event.venue} · {event.date}</p></div><button type="button" className="button button-secondary" onClick={() => navigate('/admin')}>Back</button></header>
-      <section className="event-control-grid">
-        <div className="card qr-card"><p className="eyebrow">JOIN THE SHOW</p><h2>Scan to Join</h2><div className="qr-wrapper"><QRCodeSVG value={joinUrl} size={280} bgColor="#fff" fgColor="#000" level="H" /></div><p className="qr-instruction">Scan this QR code with your phone.</p></div>
-        <div className="card control-card"><p className="eyebrow">AUDIENCE</p><div className="connected-number">{participantCount}</div><p className="connected-label">Connected Phones</p><hr /><p className="eyebrow">MUSIC</p><input type="file" accept="audio/*,.mp3,.mpeg,.m4a,.wav,.ogg,.webm,.aac,.flac" onChange={chooseSong} />{songName && <p className="song-selected">✓ {songName}</p>}{songUrl && <audio controls preload="metadata" src={songUrl} style={{ width: '100%', marginTop: 12 }} />}<div className="song-progress" aria-label="Song progress" style={{ marginTop: 10 }}><div style={{ height: 4, background: '#222', borderRadius: 99, overflow: 'hidden' }}><div style={{ height: '100%', width: `${songDuration > 0 ? Math.min(100, (songCurrentTime / songDuration) * 100) : 0}%`, background: 'var(--accent, #fff)', transition: 'width .15s linear' }} /></div><div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 12, color: '#888' }}><span>{formatTime(songCurrentTime)}</span><span>{formatTime(songDuration)}</span></div></div><button type="button" className="button button-secondary" onClick={analyzeSong} disabled={!songFile || analyzing}>{analyzing ? 'Analyzing...' : 'Analyze Song'}</button>{analysisMessage && <p className="muted">{analysisMessage}</p>}{generatedTimeline && <p className="song-selected">✓ Light timeline ready</p>}<hr /><p className="eyebrow">SHOW CONTROL</p><p className="muted">Music plays locally on the organizer's computer. Phones receive only synchronized light instructions.</p>{countdown !== null && <div className="event-status-large">STARTING IN {countdown}</div>}<div className="control-actions"><button type="button" className="button button-primary control-button" onClick={startShow} disabled={startDisabled}>{starting ? 'Starting...' : 'Start Show'}</button><button type="button" className="button button-secondary control-button" onClick={stopShow} disabled={stopDisabled}>Stop Show</button></div><div className="event-status-large"><span className="status-dot" />{running ? 'SHOW RUNNING' : 'WAITING'}</div></div>
+    <main className="ls-shell ls-event-shell">
+      <header className="ls-header ls-event-header">
+        <div>
+          <div className="ls-brand">LIGHTSYNC</div>
+          <p className="ls-eyebrow">EVENT CONTROL</p>
+        </div>
+        <button type="button" className="ls-button ls-secondary" onClick={() => navigate('/admin')}>BACK TO SHOWS</button>
+      </header>
+
+      <section className="ls-event-titlebar">
+        <div>
+          <p className="ls-eyebrow">LIVE SHOW</p>
+          <h1>{event.name}</h1>
+          <p className="ls-muted">{event.venue} · {event.date}</p>
+        </div>
+        <div className={`ls-live-pill ${running ? 'is-running' : ''}`}><span />{running ? 'SHOW RUNNING' : 'WAITING'}</div>
+      </section>
+
+      <section className="ls-show-id-card">
+        <div><span className="ls-eyebrow">SHOW ID</span><strong>{eventId}</strong></div>
+        <button type="button" className="ls-copy-id" onClick={() => void navigator.clipboard?.writeText(eventId)}>COPY ID</button>
+      </section>
+
+      <section className="ls-event-grid">
+        <div className="ls-card ls-qr-card">
+          <div className="ls-section-title"><div><p className="ls-eyebrow">AUDIENCE ACCESS</p><h2>Scan to Join</h2></div></div>
+          <div className="ls-qr-frame"><div className="ls-qr-corner" /><QRCodeSVG value={joinUrl} size={270} bgColor="#ffffff" fgColor="#050505" level="H" /></div>
+          <p className="ls-qr-url">{joinUrl}</p>
+          <p className="ls-muted ls-qr-help">Point your phone camera at the code to join this show.</p>
+        </div>
+
+        <div className="ls-card ls-audience-card">
+          <p className="ls-eyebrow">LIVE AUDIENCE</p>
+          <div className="ls-audience-number">{participantCount}</div>
+          <div className="ls-audience-label">CONNECTED PHONES</div>
+          <div className="ls-audience-indicator"><span /> Live connection count</div>
+        </div>
+
+        <div className="ls-card ls-music-card">
+          <div className="ls-section-title"><div><p className="ls-eyebrow">MUSIC & TIMELINE</p><h2>Show soundtrack</h2></div></div>
+          <label className="ls-upload"><span>{songFile ? 'CHANGE SONG' : 'SELECT SONG'}</span><input type="file" accept="audio/*,.mp3,.mpeg,.m4a,.wav,.ogg,.webm,.aac,.flac" onChange={chooseSong} /></label>
+          {songName && <div className="ls-song-name"><span className="ls-song-icon">♪</span><div><strong>{songName}</strong><small>{generatedTimeline ? 'Light timeline ready' : 'Ready to analyze'}</small></div></div>}
+          <div className="ls-song-progress" aria-label="Song progress">
+            <div className="ls-progress-track"><div className="ls-progress-fill" style={{ width: `${progress}%` }} /></div>
+            <div className="ls-time-row"><span>{formatTime(songCurrentTime)}</span><span>{formatTime(songDuration)}</span></div>
+          </div>
+          <button type="button" className="ls-button ls-secondary ls-full-button" onClick={analyzeSong} disabled={!songFile || analyzing}>{analyzing ? 'ANALYZING...' : 'ANALYZE SONG'}</button>
+          {analysisMessage && <p className={`ls-analysis-message ${generatedTimeline ? 'is-ready' : ''}`}>{analysisMessage}</p>}
+          {generatedTimeline && <div className="ls-ready-badge">✓ LIGHT TIMELINE READY</div>}
+        </div>
+
+        <div className="ls-card ls-control-card">
+          <div className="ls-section-title"><div><p className="ls-eyebrow">SHOW CONTROL</p><h2>{countdown !== null ? `Starting in ${countdown}` : running ? 'Show is live' : 'Ready when you are'}</h2></div></div>
+          <p className="ls-muted">The soundtrack stays on this computer. Phones receive only synchronized light instructions.</p>
+          <div className="ls-control-actions">
+            <button type="button" className="ls-button ls-primary ls-control-main" onClick={startShow} disabled={startDisabled}>{starting ? 'STARTING...' : 'START SHOW'}</button>
+            <button type="button" className="ls-button ls-stop" onClick={stopShow} disabled={stopDisabled}>STOP SHOW</button>
+          </div>
+          <p className="ls-stop-note">STOP SHOW stops the music and ends the synchronized light timeline.</p>
+        </div>
       </section>
     </main>
   );
 }
-
-
-
