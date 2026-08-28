@@ -89,20 +89,65 @@ export default function EventControl() {
     finally { setAnalyzing(false); }
   }
 
+  async function primeAudioForPlayback(audio: HTMLAudioElement) {
+    // Browsers may block a delayed play() unless the media element has first
+    // been started by a real user gesture. Start it muted, then immediately
+    // pause it; the actual audible playback remains scheduled for showStartTime.
+    audio.muted = true;
+    try {
+      await audio.play();
+      audio.pause();
+      audio.currentTime = 0;
+    } finally {
+      audio.muted = false;
+    }
+  }
+
   async function startShow() {
-    if (!eventId || !generatedTimeline || !audioRef.current) { setAnalysisMessage(!generatedTimeline ? 'Analyze the song before starting the show.' : 'Please select the song again.'); return; }
+    const audio = audioRef.current;
+    if (!eventId || !generatedTimeline || !audio) {
+      setAnalysisMessage(!generatedTimeline ? 'Analyze the song before starting the show.' : 'Please select the song again.');
+      return;
+    }
     setStarting(true);
     setAnalysisMessage('');
+    if (startTimerRef.current !== null) window.clearTimeout(startTimerRef.current);
+    if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current);
     try {
+      // Unlock this audio element while we still have the Start Show user gesture.
+      await primeAudioForPlayback(audio);
       const startTime = Date.now() + 5000;
-      audioRef.current.currentTime = 0;
+      audio.currentTime = 0;
       setSongCurrentTime(0);
       await updateShow(eventId, { status: 'running', showStartTime: startTime, lightTimeline: generatedTimeline });
       setCountdown(5);
-      countdownTimerRef.current = window.setInterval(() => setCountdown(current => { if (current === null || current <= 1) { if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current); countdownTimerRef.current = null; return null; } return current - 1; }), 1000);
-      startTimerRef.current = window.setTimeout(async () => { startTimerRef.current = null; try { await audioRef.current?.play(); } catch (error) { console.error(error); setAnalysisMessage('The browser blocked music playback. Click Start Show again.'); } }, Math.max(0, startTime - Date.now()));
-    } catch (error) { console.error(error); setCountdown(null); setAnalysisMessage('Could not start the show. Check the Firebase rules and organizer account.'); }
-    finally { setStarting(false); }
+      countdownTimerRef.current = window.setInterval(() => setCountdown(current => {
+        if (current === null || current <= 1) {
+          if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current);
+          countdownTimerRef.current = null;
+          return null;
+        }
+        return current - 1;
+      }), 1000);
+      const delay = Math.max(0, startTime - Date.now());
+      startTimerRef.current = window.setTimeout(async () => {
+        startTimerRef.current = null;
+        try {
+          audio.currentTime = 0;
+          await audio.play();
+        } catch (error) {
+          console.error('Scheduled audio playback failed:', error);
+          setAnalysisMessage('The show was sent to the phones, but this browser blocked the song. Press the audio preview Play button once, then Stop Show and Start Show again.');
+          await updateShow(eventId, { status: 'waiting', showStartTime: null });
+        }
+      }, delay);
+    } catch (error) {
+      console.error('Could not start show:', error);
+      setCountdown(null);
+      setAnalysisMessage('Could not start the show. Check the Firebase rules and organizer account.');
+    } finally {
+      setStarting(false);
+    }
   }
 
   async function stopShow() {
