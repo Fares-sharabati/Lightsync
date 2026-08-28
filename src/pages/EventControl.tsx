@@ -23,9 +23,7 @@ function getAudioMimeType(file: File) {
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
   const total = Math.floor(seconds);
-  const minutes = Math.floor(total / 60);
-  const secs = total % 60;
-  return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  return `${Math.floor(total / 60)}:${(total % 60).toString().padStart(2, '0')}`;
 }
 
 export default function EventControl() {
@@ -52,8 +50,7 @@ export default function EventControl() {
     if (!eventId) return;
     const stopShowWatch = watchShow(eventId, show => { setEvent(show); setLoaded(true); });
     const stopParticipantsWatch = watchParticipants(eventId, participants => {
-      const active = Object.values(participants).filter((p: ParticipantInfo) => p.connected === true);
-      setParticipantCount(active.length);
+      setParticipantCount(Object.values(participants).filter((p: ParticipantInfo) => p.connected === true).length);
     });
     return () => { stopShowWatch(); stopParticipantsWatch(); };
   }, [eventId]);
@@ -84,23 +81,13 @@ export default function EventControl() {
   async function analyzeSong() {
     if (!songFile) return setAnalysisMessage('Please select an audio file first.');
     setAnalyzing(true); setAnalysisMessage('Analyzing music...');
-    try { const analysis = await analyzeAudioFile(songFile); const timeline = generateLightTimeline(analysis.beats); setGeneratedTimeline(timeline); setAnalysisMessage(`Analysis complete — ${analysis.beats.length} beats detected.`); }
-    catch (error) { console.error(error); setGeneratedTimeline(null); setAnalysisMessage('Could not analyze this audio file.'); }
-    finally { setAnalyzing(false); }
-  }
-
-  async function primeAudioForPlayback(audio: HTMLAudioElement) {
-    // Browsers may block a delayed play() unless the media element has first
-    // been started by a real user gesture. Start it muted, then immediately
-    // pause it; the actual audible playback remains scheduled for showStartTime.
-    audio.muted = true;
     try {
-      await audio.play();
-      audio.pause();
-      audio.currentTime = 0;
-    } finally {
-      audio.muted = false;
-    }
+      const analysis = await analyzeAudioFile(songFile);
+      setGeneratedTimeline(generateLightTimeline(analysis.beats));
+      setAnalysisMessage(`Analysis complete — ${analysis.beats.length} beats detected.`);
+    } catch (error) {
+      console.error(error); setGeneratedTimeline(null); setAnalysisMessage('Could not analyze this audio file.');
+    } finally { setAnalyzing(false); }
   }
 
   async function startShow() {
@@ -109,17 +96,23 @@ export default function EventControl() {
       setAnalysisMessage(!generatedTimeline ? 'Analyze the song before starting the show.' : 'Please select the song again.');
       return;
     }
-    setStarting(true);
-    setAnalysisMessage('');
+    setStarting(true); setAnalysisMessage('');
     if (startTimerRef.current !== null) window.clearTimeout(startTimerRef.current);
     if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current);
+
     try {
-      // Unlock this audio element while we still have the Start Show user gesture.
-      await primeAudioForPlayback(audio);
-      const startTime = Date.now() + 5000;
+      // IMPORTANT: keep the audio element actively playing (muted) during the
+      // countdown. A later audio.play() from setTimeout is not considered a
+      // user gesture by browsers and can be blocked by autoplay policy.
+      audio.pause();
       audio.currentTime = 0;
-      setSongCurrentTime(0);
+      audio.muted = true;
+      await audio.play();
+
+      const startTime = Date.now() + 5000;
       await updateShow(eventId, { status: 'running', showStartTime: startTime, lightTimeline: generatedTimeline });
+
+      setSongCurrentTime(0);
       setCountdown(5);
       countdownTimerRef.current = window.setInterval(() => setCountdown(current => {
         if (current === null || current <= 1) {
@@ -129,25 +122,23 @@ export default function EventControl() {
         }
         return current - 1;
       }), 1000);
+
       const delay = Math.max(0, startTime - Date.now());
-      startTimerRef.current = window.setTimeout(async () => {
+      startTimerRef.current = window.setTimeout(() => {
         startTimerRef.current = null;
-        try {
-          audio.currentTime = 0;
-          await audio.play();
-        } catch (error) {
-          console.error('Scheduled audio playback failed:', error);
-          setAnalysisMessage('The show was sent to the phones, but this browser blocked the song. Press the audio preview Play button once, then Stop Show and Start Show again.');
-          await updateShow(eventId, { status: 'waiting', showStartTime: null });
-        }
+        // The audio has already been playing silently during the countdown.
+        // Reset to the exact beginning at the scheduled start and unmute it.
+        audio.currentTime = 0;
+        audio.muted = false;
+        setSongCurrentTime(0);
       }, delay);
     } catch (error) {
       console.error('Could not start show:', error);
+      audio.pause();
+      audio.muted = false;
       setCountdown(null);
-      setAnalysisMessage('Could not start the show. Check the Firebase rules and organizer account.');
-    } finally {
-      setStarting(false);
-    }
+      setAnalysisMessage('Could not start the show. Make sure the browser allows audio playback and try again.');
+    } finally { setStarting(false); }
   }
 
   async function stopShow() {
@@ -155,16 +146,13 @@ export default function EventControl() {
     if (startTimerRef.current !== null) window.clearTimeout(startTimerRef.current);
     if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current);
     startTimerRef.current = null; countdownTimerRef.current = null; setCountdown(null);
-    audioRef.current?.pause();
-    if (audioRef.current) audioRef.current.currentTime = 0;
-    setSongCurrentTime(0);
-    setAnalysisMessage('Stopping show...');
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.muted = false; audioRef.current.currentTime = 0; }
+    setSongCurrentTime(0); setAnalysisMessage('Stopping show...');
     try {
       await updateShow(eventId, { status: 'waiting', showStartTime: null });
       setAnalysisMessage('Show stopped. Ready for another start.');
     } catch (error) {
-      console.error(error);
-      setAnalysisMessage('Could not stop the show. Check the Firebase rules and organizer account.');
+      console.error(error); setAnalysisMessage('Could not stop the show. Check the Firebase rules and organizer account.');
     }
   }
 
