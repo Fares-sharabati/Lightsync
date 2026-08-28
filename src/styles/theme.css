@@ -173,6 +173,8 @@
      overflow: hidden;
      pointer-events: none;
      color: var(--accent);
+     perspective: 1900px;
+     perspective-origin: 50% 42%;
    }
    
    .hologram-stage::before {
@@ -188,42 +190,74 @@
      );
      opacity: 0.35;
      mix-blend-mode: screen;
+     z-index: 1;
+   }
+   
+   /* Static camera tilt, looking down onto the rotating ring — the
+      "hologram projector" angle. */
+   .hologram-tilt {
+     position: relative;
+     width: min(92vw, 860px);
+     height: min(92vw, 860px);
+     transform-style: preserve-3d;
+     transform: rotateX(20deg);
+   }
+   
+   /* The ring itself spins a full 360° continuously. Each court is a
+      fixed plane inside it, 120° apart, so as the ring turns, one court
+      swings toward the camera while the others swing away. */
+   .hologram-ring {
+     position: absolute;
+     inset: 0;
+     transform-style: preserve-3d;
+     animation: ls-ring-spin 22s linear infinite;
+   }
+   
+   @keyframes ls-ring-spin {
+     from { transform: rotateY(0deg); }
+     to   { transform: rotateY(360deg); }
    }
    
    .hologram-court {
      position: absolute;
-     width: min(72vw, 620px);
-     height: auto;
+     inset: 0;
+     display: flex;
+     align-items: center;
+     justify-content: center;
      opacity: 0;
-     filter: drop-shadow(0 0 22px var(--accent-glow));
-     animation:
-       ls-holo-cycle 24s ease-in-out infinite,
-       ls-holo-drift 11s ease-in-out infinite;
+     filter: drop-shadow(0 0 34px var(--accent-glow)) brightness(1.15);
+     animation: ls-holo-cycle 22s ease-in-out infinite;
    }
    
-   .hologram-court--basketball { animation-delay: 0s, -2s; }
-   .hologram-court--football   { animation-delay: -8s, -6s; }
-   .hologram-court--volleyball { animation-delay: -16s, -1s; }
+   .hologram-court svg { width: 100%; height: auto; }
    
+   /* Each plane sits at its own fixed angle + depth inside the ring, so
+      the ring's rotation physically carries it around in 3D. */
+   .hologram-court--basketball { transform: rotateY(0deg)   translateZ(380px); animation-delay: 0s; }
+   .hologram-court--football   { transform: rotateY(120deg) translateZ(380px); animation-delay: -7.33s; }
+   .hologram-court--volleyball { transform: rotateY(240deg) translateZ(380px); animation-delay: -14.66s; }
+   
+   /* Fades in as its plane approaches the camera, holds, fades out as
+      the ring keeps carrying it around and away. */
    @keyframes ls-holo-cycle {
      0%   { opacity: 0; }
-     3%   { opacity: 0.32; }
-     27%  { opacity: 0.32; }
-     33%  { opacity: 0; }
+     6%   { opacity: 0.6; }
+     27%  { opacity: 0.6; }
+     36%  { opacity: 0; }
      100% { opacity: 0; }
-   }
-   
-   @keyframes ls-holo-drift {
-     0%, 100% { transform: translateX(-22px); }
-     50%      { transform: translateX(22px); }
    }
    
    @media (prefers-reduced-motion: reduce) {
      :root { animation: none; }
-     .hologram-court { animation: none; opacity: 0.18; }
+     .hologram-ring { animation: none; }
+     .hologram-court { animation: none; opacity: 0; }
+     .hologram-court--basketball { opacity: 0.3; }
    }
    
    @media (max-width: 760px) {
      .home-content h1 { font-size: clamp(44px, 15vw, 72px); }
-     .hologram-court { width: 88vw; }
+     .hologram-tilt { width: 94vw; height: 94vw; }
+     .hologram-court--basketball,
+     .hologram-court--football,
+     .hologram-court--volleyball { transform-origin: center; }
    }
