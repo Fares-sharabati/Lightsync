@@ -1,5 +1,8 @@
 {
   "rules": {
+    ".read": false,
+    ".write": false,
+
     "organizers": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
@@ -7,6 +10,7 @@
         ".validate": "newData.hasChildren(['name', 'role']) && newData.child('role').val() === 'organizer'"
       }
     },
+
     "shows": {
       ".read": "auth != null && query.orderByChild === 'organizerId' && query.equalTo === auth.uid",
       ".indexOn": ["organizerId"],
@@ -16,6 +20,7 @@
         ".validate": "newData.hasChildren(['organizerId', 'name', 'date', 'venue', 'status', 'createdAt']) && newData.child('organizerId').val() === auth.uid"
       }
     },
+
     "publicShows": {
       "$showId": {
         ".read": "auth != null && data.exists()",
@@ -23,6 +28,7 @@
         ".validate": "newData.hasChildren(['name', 'date', 'venue', 'status'])"
       }
     },
+
     "showParticipants": {
       "$showId": {
         ".read": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
@@ -33,6 +39,7 @@
         }
       }
     },
+
     "showStats": {
       "$showId": {
         ".read": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
