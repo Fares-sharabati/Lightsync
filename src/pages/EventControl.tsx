@@ -101,12 +101,13 @@ export default function EventControl() {
     if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current);
 
     try {
-      // IMPORTANT: keep the audio element actively playing (muted) during the
-      // countdown. A later audio.play() from setTimeout is not considered a
-      // user gesture by browsers and can be blocked by autoplay policy.
+      // Start the media element immediately from the Start Show click. This is
+      // the reliable way to satisfy autoplay policies. We use volume=0 rather
+      // than muted so the browser treats it as normal media playback. At the
+      // scheduled show time we seek to 0 and restore the audible volume.
       audio.pause();
       audio.currentTime = 0;
-      audio.muted = true;
+      audio.volume = 0;
       await audio.play();
 
       const startTime = Date.now() + 5000;
@@ -126,18 +127,20 @@ export default function EventControl() {
       const delay = Math.max(0, startTime - Date.now());
       startTimerRef.current = window.setTimeout(() => {
         startTimerRef.current = null;
-        // The audio has already been playing silently during the countdown.
-        // Reset to the exact beginning at the scheduled start and unmute it.
+        // The media is already playing with volume 0. Seek to the exact song
+        // beginning and make it audible. No second play() call is required.
         audio.currentTime = 0;
-        audio.muted = false;
+        audio.volume = 1;
         setSongCurrentTime(0);
       }, delay);
     } catch (error) {
       console.error('Could not start show:', error);
       audio.pause();
-      audio.muted = false;
+      audio.volume = 1;
       setCountdown(null);
-      setAnalysisMessage('Could not start the show. Make sure the browser allows audio playback and try again.');
+      setAnalysisMessage(error instanceof Error && error.name === 'NotAllowedError'
+        ? 'The browser blocked audio playback. Press the Play button in the audio preview once, stop it, then press Start Show again.'
+        : 'Could not start the show. Check the selected audio file and try again.');
     } finally { setStarting(false); }
   }
 
@@ -146,7 +149,7 @@ export default function EventControl() {
     if (startTimerRef.current !== null) window.clearTimeout(startTimerRef.current);
     if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current);
     startTimerRef.current = null; countdownTimerRef.current = null; setCountdown(null);
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current.muted = false; audioRef.current.currentTime = 0; }
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.volume = 1; audioRef.current.currentTime = 0; }
     setSongCurrentTime(0); setAnalysisMessage('Stopping show...');
     try {
       await updateShow(eventId, { status: 'waiting', showStartTime: null });
