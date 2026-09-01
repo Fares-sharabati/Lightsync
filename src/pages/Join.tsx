@@ -24,7 +24,27 @@ export default function Join() {
   const nextTimerRef = useRef<number | null>(null);
   const currentLightRef = useRef(false);
 
-  useEffect(() => { if (!eventId) return; return watchPublicShow(eventId, show => { setEvent(show); setLoaded(true); }); }, [eventId]);
+  useEffect(() => {
+    if (!eventId) { setLoaded(true); return; }
+    let unsubscribe: (() => void) | null = null;
+    let cancelled = false;
+    async function connectToShow() {
+      try {
+        await ensureAnonymousAuth();
+        if (cancelled) return;
+        unsubscribe = watchPublicShow(eventId, show => {
+          setEvent(show);
+          setLoaded(true);
+          if (!show) setError('Show not found. Please scan the QR code again.');
+        });
+      } catch (err) {
+        console.error('Could not initialize fan session:', err);
+        if (!cancelled) { setLoaded(true); setError('Could not connect to LightSync. Please refresh and scan the QR code again.'); }
+      }
+    }
+    void connectToShow();
+    return () => { cancelled = true; unsubscribe?.(); };
+  }, [eventId]);
 
   async function setFlash(enabled: boolean) {
     const track = trackRef.current; if (!track || currentLightRef.current === enabled) return;
@@ -53,10 +73,10 @@ export default function Join() {
     } catch (err) { console.error(err); setError(err instanceof Error && err.message.includes('Torch') ? 'This phone/browser does not allow flashlight control. Try the latest Safari or Chrome.' : 'Please allow camera access so LightSync can control your flashlight.'); }
   }
   useEffect(() => { if (!joined || !event) return; if (event.status === 'running' && event.showStartTime && event.lightTimeline) synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline); else { clearNextTimer(); void setFlash(false); } }, [joined, event?.status, event?.showStartTime, event?.lightTimeline]);
-  useEffect(() => () => { clearNextTimer(); if (trackRef.current) { void trackRef.current.applyConstraints({ advanced: [{ torch: false } as TorchConstraints] }).catch(() => {}); trackRef.current.stop(); } }, []);
+  useEffect(() => () => { clearNextTimer(); if (trackRef.current) { void trackRef.current.applyConstraints({ advanced: [{ torch: false } as TorchConstraints]).catch(() => {}); trackRef.current.stop(); } }, []);
 
   if (!loaded) return <main className="light-page"><div className="light-content"><div className="light-logo">LIGHTSYNC</div><p>Loading show...</p></div></main>;
-  if (!event || !eventId) return <main className="light-page"><div className="light-content"><div className="light-logo">LIGHTSYNC</div><p>Show not found.</p><button className="button button-secondary" onClick={() => navigate('/')}>Back</button></div></main>;
+  if (!event || !eventId) return <main className="light-page"><div className="light-content"><div className="light-logo">LIGHTSYNC</div><p>{error || 'Show not found.'}</p><button className="button button-secondary" onClick={() => navigate('/')}>Back</button></div></main>;
   if (!joined) return <main className="light-page"><div className="light-content"><div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div><p className="light-description">Join the audience light show.</p><button className="light-join-button" onClick={() => void joinShow()}>JOIN SHOW</button>{error && <p className="light-error">{error}</p>}</div></main>;
   const running = event.status === 'running'; const screenColor = event.screenLightColor || DEFAULT_SCREEN_LIGHT_COLOR; const activeBackground = lightState ? screenColor : '#08080c'; const activeText = lightState ? '#050505' : '#fff';
   return <main className="light-page" style={{ background: activeBackground, color: activeText, transition: 'background-color .08s linear, color .08s linear' }}><div className="light-content"><div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div><div className="light-status">CONNECTED</div>{running ? <><div className="show-live-text">SHOW LIVE</div><div style={{ fontSize: '4rem', marginTop: 30 }}>{lightState ? 'ON' : 'OFF'}</div><p className="waiting-description">Your flashlight and screen are synchronized with the show.</p></> : <><div className="connected-icon">✓</div><div className="waiting-message">READY</div><p className="waiting-description">Waiting for the organizer.</p></>}</div></main>;
