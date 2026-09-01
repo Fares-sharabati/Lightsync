@@ -7,16 +7,6 @@ import { watchShow, updateShow, type Show } from '../firebase/shows';
 import { watchParticipants, type ParticipantInfo } from '../firebase/participants';
 
 const PUBLIC_APP_URL = (import.meta.env.VITE_PUBLIC_APP_URL || 'https://lightsync-two.vercel.app').replace(/\/$/, '');
-const SCREEN_COLORS = [
-  { name: 'Navy', value: '#071B3A' },
-  { name: 'Blue', value: '#0647FF' },
-  { name: 'Cyan', value: '#00CFFF' },
-  { name: 'Purple', value: '#6D28D9' },
-  { name: 'Red', value: '#E11D48' },
-  { name: 'Green', value: '#00A86B' },
-  { name: 'Yellow', value: '#FFD400' },
-  { name: 'White', value: '#FFFFFF' },
-];
 
 function getAudioMimeType(file: File) { const n = file.name.toLowerCase(); if (n.endsWith('.mp3') || n.endsWith('.mpeg')) return 'audio/mpeg'; if (n.endsWith('.m4a') || n.endsWith('.mp4')) return 'audio/mp4'; if (n.endsWith('.wav')) return 'audio/wav'; if (n.endsWith('.ogg') || n.endsWith('.oga')) return 'audio/ogg'; if (n.endsWith('.webm')) return 'audio/webm'; if (n.endsWith('.aac')) return 'audio/aac'; if (n.endsWith('.flac')) return 'audio/flac'; return file.type || 'audio/mpeg'; }
 function formatTime(seconds: number) { if (!Number.isFinite(seconds) || seconds < 0) return '0:00'; const total = Math.floor(seconds); return `${Math.floor(total / 60)}:${(total % 60).toString().padStart(2, '0')}`; }
@@ -86,9 +76,6 @@ export default function EventControl() {
           </label>
           <input value={customColor} onChange={e => setCustomColor(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') applyCustomColor(); }} aria-label="Custom HEX color" placeholder="#071B3A" maxLength={7} style={{ width: 145, padding: '12px 14px', borderRadius: 12, border: '1px solid var(--line)', background: 'var(--panel)', color: 'var(--ink)', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, outline: 'none' }} />
           <button type="button" className="ls-button ls-secondary" onClick={applyCustomColor}>APPLY HEX</button>
-        </div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
-          {SCREEN_COLORS.map(color => { const active = screenColor.toLowerCase() === color.value.toLowerCase(); return <button key={color.value} type="button" onClick={() => void changeScreenColor(color.value)} aria-label={`Set screen color to ${color.name}`} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 13px', borderRadius: 999, border: active ? '2px solid var(--accent)' : '1px solid var(--line)', background: active ? 'var(--accent-soft)' : 'transparent', color: 'var(--ink)', cursor: 'pointer', fontWeight: 700 }}><span style={{ width: 20, height: 20, borderRadius: '50%', background: color.value, border: color.value === '#FFFFFF' ? '1px solid #777' : 'none', boxShadow: active ? `0 0 16px ${color.value}88` : 'none' }} />{color.name}{active ? ' ✓' : ''}</button>; })}
         </div>
       </div>
     </section>
