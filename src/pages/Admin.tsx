@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAuth } from 'firebase/auth';
 import { createShow, deleteShow, watchOrganizerShows, type Show } from '../firebase/shows';
 import { signInOrganizer } from '../firebase/auth';
 import '../styles/lightsync.css';
 
-const organizerTheme = { '--ls-accent': '#c9cdd2', '--ls-bg': '#050607', '--ls-card': '#0d0f11', '--ls-border': '#292c30', '--ls-text': '#f5f5f5', '--ls-muted': '#9a9da2' } as React.CSSProperties;
+const organizerTheme: CSSProperties = { '--ls-accent': '#c9cdd2', '--ls-bg': '#050607', '--ls-card': '#0d0f11', '--ls-border': '#292c30', '--ls-text': '#f5f5f5', '--ls-muted': '#9a9da2' } as CSSProperties;
 
 export default function Admin() {
   const navigate = useNavigate(); const auth = getAuth();
