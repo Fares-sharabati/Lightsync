@@ -35,7 +35,7 @@ export default function AudienceScreen() {
         <h1>{show.name}</h1>
         <div className="audience-qr-frame">
           <div className="audience-qr-inner">
-            <QRCodeSVG value={joinUrl} size={min(520, Math.min(window.innerWidth * 0.55, window.innerHeight * 0.55))} bgColor="#ffffff" fgColor="#050505" level="H" includeMargin />
+            <QRCodeSVG value={joinUrl} size={600} bgColor="#ffffff" fgColor="#050505" level="H" includeMargin />
           </div>
         </div>
         <h2>SCAN TO JOIN</h2>
@@ -45,5 +45,3 @@ export default function AudienceScreen() {
     </main>
   );
 }
-
-function min(a: number, b: number) { return Math.max(180, Math.floor(Math.min(a, b))); }
