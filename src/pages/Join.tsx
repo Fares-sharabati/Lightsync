@@ -73,7 +73,7 @@ export default function Join() {
     } catch (err) { console.error(err); setError(err instanceof Error && err.message.includes('Torch') ? 'This phone/browser does not allow flashlight control. Try the latest Safari or Chrome.' : 'Please allow camera access so LightSync can control your flashlight.'); }
   }
   useEffect(() => { if (!joined || !event) return; if (event.status === 'running' && event.showStartTime && event.lightTimeline) synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline); else { clearNextTimer(); void setFlash(false); } }, [joined, event?.status, event?.showStartTime, event?.lightTimeline]);
-  useEffect(() => () => { clearNextTimer(); if (trackRef.current) { void trackRef.current.applyConstraints({ advanced: [{ torch: false } as TorchConstraints]).catch(() => {}); trackRef.current.stop(); } }, []);
+  useEffect(() => () => { clearNextTimer(); if (trackRef.current) { void trackRef.current.applyConstraints({ advanced: [{ torch: false } as TorchConstraints] }).catch(() => {}); trackRef.current.stop(); } }, []);
 
   if (!loaded) return <main className="light-page"><div className="light-content"><div className="light-logo">LIGHTSYNC</div><p>Loading show...</p></div></main>;
   if (!event || !eventId) return <main className="light-page"><div className="light-content"><div className="light-logo">LIGHTSYNC</div><p>{error || 'Show not found.'}</p><button className="button button-secondary" onClick={() => navigate('/')}>Back</button></div></main>;
