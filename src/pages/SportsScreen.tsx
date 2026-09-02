@@ -10,32 +10,34 @@ export default function SportsScreen() {
   const [interaction, setInteraction] = useState<SportsInteraction | null>(null);
   const [result, setResult] = useState<SportsResult | null>(null);
 
-  useEffect(() => {
-    if (!eventId) return;
-    return watchPublicShow(eventId, setShow);
-  }, [eventId]);
+  const showId = eventId;
 
   useEffect(() => {
-    if (!eventId) return;
-    return watchSportsScreen(eventId, setScreen);
-  }, [eventId]);
+    if (!showId) return;
+    return watchPublicShow(showId, setShow);
+  }, [showId]);
 
   useEffect(() => {
-    if (!eventId) return;
-    return watchSportsInteractions(eventId, items => {
+    if (!showId) return;
+    return watchSportsScreen(showId, setScreen);
+  }, [showId]);
+
+  useEffect(() => {
+    if (!showId) return;
+    return watchSportsInteractions(showId, items => {
       const interactionId = screen?.activeInteractionId;
       setInteraction(interactionId ? items.find(item => item.id === interactionId) ?? null : null);
     });
-  }, [eventId, screen?.activeInteractionId]);
+  }, [showId, screen?.activeInteractionId]);
 
   useEffect(() => {
     const interactionId = screen?.activeInteractionId;
-    if (!eventId || !interactionId) {
+    if (!showId || !interactionId) {
       setResult(null);
       return;
     }
-    return watchSportsResult(eventId, interactionId, setResult);
-  }, [eventId, screen?.activeInteractionId]);
+    return watchSportsResult(showId, interactionId, setResult);
+  }, [showId, screen?.activeInteractionId]);
 
   const options = Object.entries(interaction?.options ?? {});
   const total = result?.total ?? 0;
