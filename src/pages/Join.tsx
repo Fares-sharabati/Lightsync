@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
 import { onDisconnect, ref, set } from 'firebase/database';
 import { ensureAnonymousAuth } from '../firebase/auth';
 import { watchPublicShow, type PublicShow } from '../firebase/shows';
 import { db } from '../firebase/config';
+import { recordQrScan } from '../firebase/analytics';
 import { getLightStateAtTime, getNextLightEvent, type LightTimeline } from '../lightSync/timeline';
 
 type TorchConstraints = MediaTrackConstraintSet & { torch?: boolean };
 type TorchCapabilities = MediaTrackCapabilities & { torch?: boolean };
-
 const DEFAULT_SCREEN_LIGHT_COLOR = '#071B3A';
 
 function detectDevice(): string { const ua = navigator.userAgent; if (/iPad|iPhone|iPod/.test(ua)) return 'iPhone/iPad'; if (/Android/.test(ua)) return 'Android'; if (/Windows Phone/.test(ua)) return 'Windows Phone'; if (/Macintosh|Mac OS X/.test(ua)) return 'Mac'; if (/Windows/.test(ua)) return 'Windows'; if (/Linux/.test(ua)) return 'Linux'; return 'Other'; }
@@ -25,6 +24,7 @@ export default function Join() {
   const trackRef = useRef<MediaStreamTrack | null>(null);
   const nextTimerRef = useRef<number | null>(null);
   const currentLightRef = useRef(false);
+  const scanRecordedRef = useRef(false);
 
   useEffect(() => {
     if (!eventId) { setLoaded(true); setError('Invalid show link. Please scan the QR code again.'); return; }
@@ -34,11 +34,15 @@ export default function Join() {
     let loadingTimeout: number | null = null;
     async function connectToShow() {
       try {
-        await ensureAnonymousAuth();
+        const user = await ensureAnonymousAuth();
         if (cancelled) return;
         unsubscribe = watchPublicShow(showId, show => {
           if (cancelled) return;
           setEvent(show); setLoaded(true);
+          if (show && !scanRecordedRef.current) {
+            scanRecordedRef.current = true;
+            void recordQrScan(showId, user.uid).catch(err => console.error('Could not record QR scan:', err));
+          }
           if (!show) setError('Show not found. Please scan the QR code again.');
           if (loadingTimeout !== null) window.clearTimeout(loadingTimeout);
         });
@@ -91,5 +95,5 @@ export default function Join() {
   const running = event.status === 'running';
   const screenColor = /^#[0-9a-fA-F]{6}$/.test(event.screenLightColor || '') ? event.screenLightColor! : DEFAULT_SCREEN_LIGHT_COLOR;
   const activeBackground = lightState ? screenColor : '#08080c'; const activeText = lightState ? '#050505' : '#fff';
-  return <main className="light-page" style={{ background: activeBackground, color: activeText, transition: 'background-color .08s linear, color .08s linear' }}><div className="light-content"><div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div><div className="light-status">CONNECTED</div>{running ? <><div className="show-live-text">SHOW LIVE</div><div style={{ fontSize: '4rem', marginTop: 30 }}>{lightState ? 'ON' : 'OFF'}</div><p className="waiting-description">Your flashlight and screen are synchronized with the show.</p></> : <><div className="connected-icon">✓</div><div className="waiting-message">READY</div><p className="waiting-description">Waiting for the organizer.</p></>}</div></main>;
+  return <main className="light-page" style={{ background: activeBackground, color: activeText, transition: 'background-color .08s linear, color .08s linear' }}><div className="light-content"><div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div><div className="light-status">CONNECTED</div>{running ? <><div className="show-live-text">SHOW LIVE</div><div style={{ fontSize: '4rem', marginTop: 30 }}>{lightState ? 'ON' : 'OFF'}</div><p className="waiting-description">Your flashlight and screen are synchronized with the show.</p></> : <><div className="connected-icon">✓</div><div className="waiting-message">{event.status === 'finished' ? 'SHOW FINISHED' : 'READY'}</div><p className="waiting-description">{event.status === 'finished' ? 'This LightSync show has finished.' : 'Waiting for the organizer.'}</p></>}</div></main>;
 }
