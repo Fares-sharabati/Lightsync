@@ -1,4 +1,4 @@
-import { onValue, push, ref, runTransaction, set, type Unsubscribe } from 'firebase/database';
+import { get, onValue, push, ref, runTransaction, set, type Unsubscribe } from 'firebase/database';
 import { db } from './config';
 
 export type ShowStats = { totalScans: number; totalJoined: number; peakConnected: number };
@@ -19,7 +19,13 @@ export async function recordQrScan(showId: string, uid: string) {
   await set(push(ref(db, `scanEvents/${showId}/${uid}`)), { scannedAt: Date.now() });
 }
 
-export async function syncShowStats(showId: string, totalScans: number, totalJoined: number, connected: number) {
+export async function syncShowStats(showId: string, totalScans: number, _totalJoined: number, connected: number) {
+  const participantsSnapshot = await get(ref(db, `showParticipants/${showId}`));
+  let totalJoined = 0;
+  participantsSnapshot.forEach(() => {
+    totalJoined += 1;
+  });
+
   const statsRef = ref(db, `showStats/${showId}`);
   await runTransaction(statsRef, current => {
     const previous = (current ?? {}) as Partial<ShowStats>;
