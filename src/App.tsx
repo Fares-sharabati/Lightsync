@@ -4,6 +4,9 @@ import Admin from './pages/Admin';
 import Join from './pages/Join';
 import EventControl from './pages/EventControl';
 import AudienceScreen from './pages/AudienceScreen';
+import SportsInteractions from './pages/SportsInteractions';
+import SportsScreen from './pages/SportsScreen';
+import SportsFan from './pages/SportsFan';
 
 export default function App() {
   return (
@@ -13,9 +16,12 @@ export default function App() {
         <Route path="/admin" element={<Admin />} />
         <Route path="/admin/show/:eventId" element={<EventControl />} />
         <Route path="/admin/event/:eventId" element={<EventControl />} />
+        <Route path="/admin/event/:eventId/interactions" element={<SportsInteractions />} />
         <Route path="/audience/:eventId" element={<AudienceScreen />} />
+        <Route path="/sports-screen/:eventId" element={<SportsScreen />} />
         <Route path="/join" element={<Join />} />
         <Route path="/join/:eventId" element={<Join />} />
+        <Route path="/join/:eventId/interactions" element={<SportsFan />} />
       </Routes>
     </BrowserRouter>
   );
