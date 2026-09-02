@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import Home from './pages/Home';
 import Admin from './pages/Admin';
 import Join from './pages/Join';
@@ -8,9 +8,23 @@ import SportsInteractions from './pages/SportsInteractions';
 import SportsScreen from './pages/SportsScreen';
 import SportsFan from './pages/SportsFan';
 
+function EventTabs() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const match = location.pathname.match(/^\/admin\/(?:event|show)\/([^/]+)/);
+  if (!match) return null;
+  const eventId = match[1];
+  const sportsActive = location.pathname.endsWith('/interactions');
+  return <nav style={{ position: 'fixed', top: 18, right: 24, zIndex: 50, display: 'flex', gap: 6, padding: 5, border: '1px solid #292c30', borderRadius: 14, background: 'rgba(13,15,17,.94)', backdropFilter: 'blur(12px)' }} aria-label="Event sections">
+    <button className="ls-button ls-secondary" style={{ padding: '9px 14px', borderColor: !sportsActive ? '#d9dde2' : undefined }} onClick={() => navigate(`/admin/event/${eventId}`)}>SHOW</button>
+    <button className="ls-button ls-secondary" style={{ padding: '9px 14px', borderColor: sportsActive ? '#d9dde2' : undefined }} onClick={() => navigate(`/admin/event/${eventId}/interactions`)}>SPORTS</button>
+  </nav>;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
+      <EventTabs />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/admin" element={<Admin />} />
