@@ -10,13 +10,36 @@ export default function SportsScreen() {
   const [interaction, setInteraction] = useState<SportsInteraction | null>(null);
   const [result, setResult] = useState<SportsResult | null>(null);
 
-  useEffect(() => { if (!eventId) return watchPublicShow(eventId, setShow); }, [eventId]);
-  useEffect(() => { if (!eventId) return; return watchSportsScreen(eventId, setScreen); }, [eventId]);
-  useEffect(() => { if (!eventId) return; return watchSportsInteractions(eventId, items => { const id = screen?.activeInteractionId; setInteraction(items.find(item => item.id === id) ?? null); }); }, [eventId, screen?.activeInteractionId]);
-  useEffect(() => { if (!eventId || !screen?.activeInteractionId) { setResult(null); return; } return watchSportsResult(eventId, screen.activeInteractionId, setResult); }, [eventId, screen?.activeInteractionId]);
+  useEffect(() => {
+    if (!eventId) return;
+    return watchPublicShow(eventId, setShow);
+  }, [eventId]);
+
+  useEffect(() => {
+    if (!eventId) return;
+    return watchSportsScreen(eventId, setScreen);
+  }, [eventId]);
+
+  useEffect(() => {
+    if (!eventId) return;
+    return watchSportsInteractions(eventId, items => {
+      const interactionId = screen?.activeInteractionId;
+      setInteraction(interactionId ? items.find(item => item.id === interactionId) ?? null : null);
+    });
+  }, [eventId, screen?.activeInteractionId]);
+
+  useEffect(() => {
+    const interactionId = screen?.activeInteractionId;
+    if (!eventId || !interactionId) {
+      setResult(null);
+      return;
+    }
+    return watchSportsResult(eventId, interactionId, setResult);
+  }, [eventId, screen?.activeInteractionId]);
 
   const options = Object.entries(interaction?.options ?? {});
   const total = result?.total ?? 0;
+
   return <main className="audience-screen" style={{ background: '#050607' }}>
     <section className="audience-content" style={{ width: 'min(94vw, 1400px)', height: '92dvh' }}>
       <div className="audience-brand">LIGHTSYNC</div>
