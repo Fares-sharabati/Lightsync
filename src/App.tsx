@@ -8,6 +8,8 @@ import SportsInteractions from './pages/SportsInteractions';
 import SportsScreen from './pages/SportsScreen';
 import SportsFan from './pages/SportsFan';
 
+const tabStyle = { padding: '9px 14px', border: '1px solid #383c41', borderRadius: 10, background: 'linear-gradient(180deg,#17191c,#0c0d0f)', color: '#dfe2e5', fontFamily: 'Inter,system-ui,sans-serif', fontWeight: 800, letterSpacing: '.04em', cursor: 'pointer' } as const;
+
 function EventTabs() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -16,15 +18,24 @@ function EventTabs() {
   const eventId = match[1];
   const sportsActive = location.pathname.endsWith('/interactions');
   return <nav style={{ position: 'fixed', top: 18, right: 24, zIndex: 50, display: 'flex', gap: 6, padding: 5, border: '1px solid #292c30', borderRadius: 14, background: 'rgba(13,15,17,.94)', backdropFilter: 'blur(12px)' }} aria-label="Event sections">
-    <button className="ls-button ls-secondary" style={{ padding: '9px 14px', borderColor: !sportsActive ? '#d9dde2' : undefined }} onClick={() => navigate(`/admin/event/${eventId}`)}>SHOW</button>
-    <button className="ls-button ls-secondary" style={{ padding: '9px 14px', borderColor: sportsActive ? '#d9dde2' : undefined }} onClick={() => navigate(`/admin/event/${eventId}/interactions`)}>SPORTS</button>
+    <button style={{ ...tabStyle, borderColor: !sportsActive ? '#d9dde2' : '#383c41' }} onClick={() => navigate(`/admin/event/${eventId}`)}>SHOW</button>
+    <button style={{ ...tabStyle, borderColor: sportsActive ? '#d9dde2' : '#383c41' }} onClick={() => navigate(`/admin/event/${eventId}/interactions`)}>SPORTS</button>
   </nav>;
+}
+
+function FanSportsTab() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const match = location.pathname.match(/^\/join\/([^/]+)$/);
+  if (!match) return null;
+  return <button onClick={() => navigate(`/join/${match[1]}/interactions`)} style={{ position: 'fixed', top: 18, right: 18, zIndex: 50, ...tabStyle }}>SPORTS</button>;
 }
 
 export default function App() {
   return (
     <BrowserRouter>
       <EventTabs />
+      <FanSportsTab />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/admin" element={<Admin />} />
