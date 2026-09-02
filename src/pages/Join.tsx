@@ -3,6 +3,7 @@ import { onDisconnect, ref, set } from 'firebase/database';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ensureAnonymousAuth } from '../firebase/auth';
 import { watchPublicShow, type PublicShow } from '../firebase/shows';
+import { watchSportsGame, getSportsLightColor, type SportsGame } from '../firebase/sportsGame';
 import { db } from '../firebase/config';
 import { recordQrScan } from '../firebase/analytics';
 import { getLightStateAtTime, getNextLightEvent, type LightTimeline } from '../lightSync/timeline';
@@ -18,6 +19,7 @@ export default function Join() {
   const navigate = useNavigate();
   const { eventId } = useParams();
   const [event, setEvent] = useState<PublicShow | null>(null);
+  const [sportsGame, setSportsGame] = useState<SportsGame | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [joined, setJoined] = useState(false);
   const [error, setError] = useState('');
@@ -31,6 +33,7 @@ export default function Join() {
     if (!eventId) { setLoaded(true); setError('Invalid show link. Please scan the QR code again.'); return; }
     const showId = eventId;
     let unsubscribe: (() => void) | null = null;
+    let unsubscribeGame: (() => void) | null = null;
     let cancelled = false;
     let loadingTimeout: number | null = null;
     async function connectToShow() {
@@ -40,23 +43,19 @@ export default function Join() {
         unsubscribe = watchPublicShow(showId, show => {
           if (cancelled) return;
           setEvent(show); setLoaded(true);
-          if (show && !scanRecordedRef.current) {
-            scanRecordedRef.current = true;
-            void recordQrScan(showId, user.uid).catch(err => console.error('Could not record QR scan:', err));
-          }
+          if (show && !scanRecordedRef.current) { scanRecordedRef.current = true; void recordQrScan(showId, user.uid).catch(err => console.error('Could not record QR scan:', err)); }
           if (!show) setError('Show not found. Please scan the QR code again.');
           if (loadingTimeout !== null) window.clearTimeout(loadingTimeout);
         });
+        unsubscribeGame = watchSportsGame(showId, setSportsGame);
       } catch (err) {
         console.error('Could not initialize fan session:', err);
         if (!cancelled) { setLoaded(true); setError('Could not connect to LightSync. Please refresh and scan the QR code again.'); }
       }
     }
-    loadingTimeout = window.setTimeout(() => {
-      if (!cancelled) { setLoaded(current => { if (!current) setError('The show is taking too long to load. Please scan the QR code again.'); return true; }); }
-    }, 10000);
+    loadingTimeout = window.setTimeout(() => { if (!cancelled) setLoaded(current => { if (!current) setError('The show is taking too long to load. Please scan the QR code again.'); return true; }); }, 10000);
     void connectToShow();
-    return () => { cancelled = true; unsubscribe?.(); if (loadingTimeout !== null) window.clearTimeout(loadingTimeout); };
+    return () => { cancelled = true; unsubscribe?.(); unsubscribeGame?.(); if (loadingTimeout !== null) window.clearTimeout(loadingTimeout); };
   }, [eventId]);
 
   async function setFlash(enabled: boolean) {
@@ -94,7 +93,8 @@ export default function Join() {
   if (!event || !eventId) return <main className="light-page"><div className="light-content"><div className="light-logo">LIGHTSYNC</div><p>{error || 'Show not found.'}</p><button className="button button-secondary" onClick={() => navigate('/')}>Back</button></div></main>;
   if (!joined) return <main className="light-page"><div className="light-content"><div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div><p className="light-description">Join the audience light show.</p><button className="light-join-button" onClick={() => void joinShow()}>JOIN SHOW</button>{error && <p className="light-error">{error}</p>}</div></main>;
   const running = event.status === 'running';
-  const screenColor = /^#[0-9a-fA-F]{6}$/.test(event.screenLightColor || '') ? event.screenLightColor! : DEFAULT_SCREEN_LIGHT_COLOR;
+  const teamColor = getSportsLightColor(sportsGame);
+  const screenColor = /^#[0-9a-fA-F]{6}$/.test(teamColor) && sportsGame ? teamColor : (/^#[0-9a-fA-F]{6}$/.test(event.screenLightColor || '') ? event.screenLightColor! : DEFAULT_SCREEN_LIGHT_COLOR);
   const activeBackground = lightState ? screenColor : '#08080c'; const activeText = lightState ? '#050505' : '#fff';
-  return <main className="light-page" style={{ background: activeBackground, color: activeText, transition: 'background-color .08s linear, color .08s linear' }}><div className="light-content"><div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div><div className="light-status">CONNECTED</div>{running ? <><div className="show-live-text">SHOW LIVE</div><div style={{ fontSize: '4rem', marginTop: 30 }}>{lightState ? 'ON' : 'OFF'}</div><p className="waiting-description">Your flashlight and screen are synchronized with the show.</p></> : <><div className="connected-icon">✓</div><div className="waiting-message">{event.status === 'finished' ? 'SHOW FINISHED' : 'READY'}</div><p className="waiting-description">{event.status === 'finished' ? 'This LightSync show has finished.' : 'Waiting for the organizer.'}</p></>}</div></main>;
+  return <main className="light-page" style={{ background: activeBackground, color: activeText, transition: 'background-color .08s linear, color .08s linear' }}><div className="light-content"><div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div>{sportsGame && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 10, fontSize: 14, fontWeight: 800, opacity: .9 }}>{sportsGame.homeTeam.logoUrl && <img src={sportsGame.homeTeam.logoUrl} alt="" style={{ width: 28, height: 28, objectFit: 'contain' }} />}<span>{sportsGame.homeTeam.name}</span><span>vs</span><span>{sportsGame.awayTeam.name}</span>{sportsGame.awayTeam.logoUrl && <img src={sportsGame.awayTeam.logoUrl} alt="" style={{ width: 28, height: 28, objectFit: 'contain' }} />}</div>}<div className="light-status">CONNECTED</div>{running ? <><div className="show-live-text">SHOW LIVE</div><div style={{ fontSize: '4rem', marginTop: 30 }}>{lightState ? 'ON' : 'OFF'}</div><p className="waiting-description">Your flashlight and screen are synchronized with the show.</p></> : <><div className="connected-icon">✓</div><div className="waiting-message">{event.status === 'finished' ? 'SHOW FINISHED' : 'READY'}</div><p className="waiting-description">{event.status === 'finished' ? 'This LightSync show has finished.' : 'Waiting for the organizer.'}</p></>}</div></main>;
 }
