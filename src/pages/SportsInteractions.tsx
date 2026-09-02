@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ensureOrganizerAuth } from '../firebase/auth';
 import { createSportsInteraction, closeSportsInteraction, publishSportsResult, publishSportsScreen, watchSportsInteractions, watchSportsResponses, type SportsInteraction } from '../firebase/sports';
 
 const TEMPLATES = [
@@ -54,7 +53,6 @@ export default function SportsInteractions() {
     if (type === 'poll' && labels.length < 2) return setMessage('Add at least two options.');
     setBusy(true); setMessage('');
     try {
-      await ensureOrganizerAuth();
       const optionMap: Record<string, string> = {};
       labels.forEach((label, index) => { optionMap[`option_${index + 1}`] = label; });
       const id = await createSportsInteraction(eventId, { type, question: question.trim(), status: 'open', options: optionMap, createdAt: Date.now(), displayOnScreen: false, screenMode: type === 'poll' ? 'percentages' : 'question' });
@@ -63,9 +61,7 @@ export default function SportsInteractions() {
     } catch (error) { console.error(error); setMessage('Could not create the interaction.'); } finally { setBusy(false); }
   }
 
-  function useTemplate(template: typeof TEMPLATES[number]) {
-    setQuestion(template.question); setOptions(template.options.join('\n')); setSelected(null); setMessage('');
-  }
+  function useTemplate(template: typeof TEMPLATES[number]) { setQuestion(template.question); setOptions(template.options.join('\n')); setSelected(null); setMessage(''); }
 
   async function closeSelected() {
     if (!eventId || !selected) return;
