@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ensureAnonymousAuth } from '../firebase/auth';
 import { watchPublicShow, type PublicShow } from '../firebase/shows';
 import { watchSportsGame, getSportsLightColor, type SportsGame } from '../firebase/sportsGame';
+import { watchSportsInteractions, submitSportsResponse, type SportsInteraction } from '../firebase/sports';
 import { db } from '../firebase/config';
 import { recordQrScan } from '../firebase/analytics';
 import { getLightStateAtTime, getNextLightEvent, type LightTimeline } from '../lightSync/timeline';
@@ -20,10 +21,15 @@ export default function Join() {
   const { eventId } = useParams();
   const [event, setEvent] = useState<PublicShow | null>(null);
   const [sportsGame, setSportsGame] = useState<SportsGame | null>(null);
+  const [activeInteraction, setActiveInteraction] = useState<SportsInteraction | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [joined, setJoined] = useState(false);
   const [error, setError] = useState('');
   const [lightState, setLightState] = useState(false);
+  const [selectedOption, setSelectedOption] = useState('');
+  const [answer, setAnswer] = useState('');
+  const [interactionMessage, setInteractionMessage] = useState('');
+  const [sendingResponse, setSendingResponse] = useState(false);
   const trackRef = useRef<MediaStreamTrack | null>(null);
   const nextTimerRef = useRef<number | null>(null);
   const currentLightRef = useRef(false);
@@ -34,6 +40,7 @@ export default function Join() {
     const showId = eventId;
     let unsubscribe: (() => void) | null = null;
     let unsubscribeGame: (() => void) | null = null;
+    let unsubscribeInteractions: (() => void) | null = null;
     let cancelled = false;
     let loadingTimeout: number | null = null;
     async function connectToShow() {
@@ -48,6 +55,9 @@ export default function Join() {
           if (loadingTimeout !== null) window.clearTimeout(loadingTimeout);
         });
         unsubscribeGame = watchSportsGame(showId, setSportsGame);
+        unsubscribeInteractions = watchSportsInteractions(showId, items => {
+          setActiveInteraction(items.find(item => item.status === 'open') ?? null);
+        });
       } catch (err) {
         console.error('Could not initialize fan session:', err);
         if (!cancelled) { setLoaded(true); setError('Could not connect to LightSync. Please refresh and scan the QR code again.'); }
@@ -55,8 +65,14 @@ export default function Join() {
     }
     loadingTimeout = window.setTimeout(() => { if (!cancelled) setLoaded(current => { if (!current) setError('The show is taking too long to load. Please scan the QR code again.'); return true; }); }, 10000);
     void connectToShow();
-    return () => { cancelled = true; unsubscribe?.(); unsubscribeGame?.(); if (loadingTimeout !== null) window.clearTimeout(loadingTimeout); };
+    return () => { cancelled = true; unsubscribe?.(); unsubscribeGame?.(); unsubscribeInteractions?.(); if (loadingTimeout !== null) window.clearTimeout(loadingTimeout); };
   }, [eventId]);
+
+  useEffect(() => {
+    setSelectedOption('');
+    setAnswer('');
+    setInteractionMessage('');
+  }, [activeInteraction?.id]);
 
   async function setFlash(enabled: boolean) {
     const track = trackRef.current; if (!track || currentLightRef.current === enabled) return;
@@ -86,6 +102,19 @@ export default function Join() {
     } catch (err) { console.error(err); setError(err instanceof Error && err.message.includes('Torch') ? 'This phone/browser does not allow flashlight control. Try the latest Safari or Chrome.' : 'Please allow camera access so LightSync can control your flashlight.'); }
   }
 
+  async function submitInteraction() {
+    if (!eventId || !activeInteraction || sendingResponse) return;
+    const uid = (await ensureAnonymousAuth()).uid;
+    if (activeInteraction.type === 'poll' && !selectedOption) { setInteractionMessage('Choose an answer first.'); return; }
+    if (activeInteraction.type === 'question' && !answer.trim()) { setInteractionMessage('Enter an answer first.'); return; }
+    setInteractionMessage(''); setSendingResponse(true);
+    try {
+      await submitSportsResponse(eventId, activeInteraction.id, uid, activeInteraction.type === 'poll' ? { optionId: selectedOption } : { answer: answer.trim().slice(0, 200) });
+      setInteractionMessage('Answer submitted.');
+    } catch (err) { console.error(err); setInteractionMessage('Could not submit your answer. Please try again.'); }
+    finally { setSendingResponse(false); }
+  }
+
   useEffect(() => { if (!joined || !event) return; if (event.status === 'running' && event.showStartTime && event.lightTimeline) synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline); else { clearNextTimer(); void setFlash(false); } }, [joined, event?.status, event?.showStartTime, event?.lightTimeline]);
   useEffect(() => () => { clearNextTimer(); if (trackRef.current) { void trackRef.current.applyConstraints({ advanced: [{ torch: false } as TorchConstraints] }).catch(() => {}); trackRef.current.stop(); } }, []);
 
@@ -96,5 +125,5 @@ export default function Join() {
   const teamColor = getSportsLightColor(sportsGame);
   const screenColor = /^#[0-9a-fA-F]{6}$/.test(event.screenLightColor || '') ? event.screenLightColor! : (/^#[0-9a-fA-F]{6}$/.test(teamColor) && sportsGame ? teamColor : DEFAULT_SCREEN_LIGHT_COLOR);
   const activeBackground = lightState ? screenColor : '#08080c'; const activeText = lightState ? '#050505' : '#fff';
-  return <main className="light-page" style={{ background: activeBackground, color: activeText, transition: 'background-color .08s linear, color .08s linear' }}><div className="light-content"><div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div>{sportsGame && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 10, fontSize: 14, fontWeight: 800, opacity: .9 }}><span>{sportsGame.homeTeam.name}</span><span>vs</span><span>{sportsGame.awayTeam.name}</span></div>}<div className="light-status">CONNECTED</div>{running ? <><div className="show-live-text">SHOW LIVE</div><div style={{ fontSize: '4rem', marginTop: 30 }}>{lightState ? 'ON' : 'OFF'}</div><p className="waiting-description">Your flashlight and screen are synchronized with the show.</p></> : <><div className="connected-icon">&check;</div><div className="waiting-message">{event.status === 'finished' ? 'SHOW FINISHED' : 'READY'}</div><p className="waiting-description">{event.status === 'finished' ? 'This LightSync show has finished.' : 'Waiting for the organizer.'}</p></>}</div></main>;
+  return <main className="light-page" style={{ background: activeBackground, color: activeText, transition: 'background-color .08s linear, color .08s linear' }}><div className="light-content"><div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div>{sportsGame && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 10, fontSize: 14, fontWeight: 800, opacity: .9 }}><span>{sportsGame.homeTeam.name}</span><span>vs</span><span>{sportsGame.awayTeam.name}</span></div>}<div className="light-status">CONNECTED</div>{running ? <><div className="show-live-text">SHOW LIVE</div><div style={{ fontSize: '4rem', marginTop: 30 }}>{lightState ? 'ON' : 'OFF'}</div><p className="waiting-description">Your flashlight and screen are synchronized with the show.</p>{activeInteraction && <section style={{ width: '100%', marginTop: 28, padding: 20, borderRadius: 20, background: lightState ? 'rgba(255,255,255,.82)' : 'rgba(255,255,255,.08)', color: lightState ? '#050505' : '#fff', backdropFilter: 'blur(10px)' }}><div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1.5, opacity: .7, marginBottom: 8 }}>{activeInteraction.type === 'poll' ? 'LIVE POLL' : 'LIVE QUESTION'}</div><div style={{ fontSize: 20, fontWeight: 900, lineHeight: 1.25 }}>{activeInteraction.question}</div>{activeInteraction.type === 'poll' ? <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>{Object.entries(activeInteraction.options ?? {}).map(([id, label]) => <button key={id} type="button" onClick={() => setSelectedOption(id)} style={{ width: '100%', padding: '13px 16px', borderRadius: 12, border: selectedOption === id ? '3px solid currentColor' : '1px solid rgba(127,127,127,.35)', background: selectedOption === id ? 'rgba(127,127,127,.18)' : 'transparent', color: 'inherit', fontWeight: 800, cursor: 'pointer' }}>{label}{selectedOption === id ? ' ✓' : ''}</button>)}</div> : <textarea value={answer} onChange={e => setAnswer(e.target.value)} maxLength={200} placeholder="Type your answer..." rows={4} style={{ width: '100%', marginTop: 16, boxSizing: 'border-box', borderRadius: 12, padding: 14, fontSize: 16, resize: 'vertical' }} />}{interactionMessage === 'Answer submitted.' ? <div style={{ marginTop: 14, fontWeight: 900 }}>{interactionMessage}</div> : <button type="button" className="light-join-button" style={{ marginTop: 14 }} disabled={sendingResponse} onClick={() => void submitInteraction()}>{sendingResponse ? 'SUBMITTING...' : 'SUBMIT ANSWER'}</button>}{interactionMessage && interactionMessage !== 'Answer submitted.' && <p className="light-error">{interactionMessage}</p>}</section>}</> : <><div className="connected-icon">&check;</div><div className="waiting-message">{event.status === 'finished' ? 'SHOW FINISHED' : 'READY'}</div><p className="waiting-description">{event.status === 'finished' ? 'This LightSync show has finished.' : 'Waiting for the organizer.'}</p>{activeInteraction && <section style={{ width: '100%', marginTop: 28, padding: 20, borderRadius: 20, background: 'rgba(255,255,255,.08)' }}><div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1.5, opacity: .7 }}>LIVE INTERACTION</div><div style={{ marginTop: 8, fontSize: 19, fontWeight: 900 }}>{activeInteraction.question}</div><p style={{ marginTop: 10, opacity: .75 }}>The organizer has opened an interaction. You can answer when the show is live.</p></section>}</>}</div></main>;
 }
