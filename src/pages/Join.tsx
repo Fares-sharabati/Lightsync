@@ -55,9 +55,7 @@ export default function Join() {
           if (loadingTimeout !== null) window.clearTimeout(loadingTimeout);
         });
         unsubscribeGame = watchSportsGame(showId, setSportsGame);
-        unsubscribeInteractions = watchSportsInteractions(showId, items => {
-          setActiveInteraction(items.find(item => item.status === 'open') ?? null);
-        });
+        unsubscribeInteractions = watchSportsInteractions(showId, items => setActiveInteraction(items.find(item => item.status === 'open') ?? null));
       } catch (err) {
         console.error('Could not initialize fan session:', err);
         if (!cancelled) { setLoaded(true); setError('Could not connect to LightSync. Please refresh and scan the QR code again.'); }
@@ -68,11 +66,7 @@ export default function Join() {
     return () => { cancelled = true; unsubscribe?.(); unsubscribeGame?.(); unsubscribeInteractions?.(); if (loadingTimeout !== null) window.clearTimeout(loadingTimeout); };
   }, [eventId]);
 
-  useEffect(() => {
-    setSelectedOption('');
-    setAnswer('');
-    setInteractionMessage('');
-  }, [activeInteraction?.id]);
+  useEffect(() => { setSelectedOption(''); setAnswer(''); setInteractionMessage(''); setSendingResponse(false); }, [activeInteraction?.id]);
 
   async function setFlash(enabled: boolean) {
     const track = trackRef.current; if (!track || currentLightRef.current === enabled) return;
@@ -110,7 +104,7 @@ export default function Join() {
     setInteractionMessage(''); setSendingResponse(true);
     try {
       await submitSportsResponse(eventId, activeInteraction.id, uid, activeInteraction.type === 'poll' ? { optionId: selectedOption } : { answer: answer.trim().slice(0, 200) });
-      setInteractionMessage('Answer submitted.');
+      setInteractionMessage('Answer submitted ✓');
     } catch (err) { console.error(err); setInteractionMessage('Could not submit your answer. Please try again.'); }
     finally { setSendingResponse(false); }
   }
@@ -121,9 +115,43 @@ export default function Join() {
   if (!loaded) return <main className="light-page"><div className="light-content"><div className="light-logo">LIGHTSYNC</div><p>Loading show...</p></div></main>;
   if (!event || !eventId) return <main className="light-page"><div className="light-content"><div className="light-logo">LIGHTSYNC</div><p>{error || 'Show not found.'}</p><button className="button button-secondary" onClick={() => navigate('/')}>Back</button></div></main>;
   if (!joined) return <main className="light-page"><div className="light-content"><div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div><p className="light-description">Join the audience light show.</p><button className="light-join-button" onClick={() => void joinShow()}>JOIN SHOW</button>{error && <p className="light-error">{error}</p>}</div></main>;
+
   const running = event.status === 'running';
   const teamColor = getSportsLightColor(sportsGame);
   const screenColor = /^#[0-9a-fA-F]{6}$/.test(event.screenLightColor || '') ? event.screenLightColor! : (/^#[0-9a-fA-F]{6}$/.test(teamColor) && sportsGame ? teamColor : DEFAULT_SCREEN_LIGHT_COLOR);
-  const activeBackground = lightState ? screenColor : '#08080c'; const activeText = lightState ? '#050505' : '#fff';
-  return <main className="light-page" style={{ background: activeBackground, color: activeText, transition: 'background-color .08s linear, color .08s linear' }}><div className="light-content"><div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div>{sportsGame && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 10, fontSize: 14, fontWeight: 800, opacity: .9 }}><span>{sportsGame.homeTeam.name}</span><span>vs</span><span>{sportsGame.awayTeam.name}</span></div>}<div className="light-status">CONNECTED</div>{running ? <><div className="show-live-text">SHOW LIVE</div><div style={{ fontSize: '4rem', marginTop: 30 }}>{lightState ? 'ON' : 'OFF'}</div><p className="waiting-description">Your flashlight and screen are synchronized with the show.</p>{activeInteraction && <section style={{ width: '100%', marginTop: 28, padding: 20, borderRadius: 20, background: lightState ? 'rgba(255,255,255,.82)' : 'rgba(255,255,255,.08)', color: lightState ? '#050505' : '#fff', backdropFilter: 'blur(10px)' }}><div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1.5, opacity: .7, marginBottom: 8 }}>{activeInteraction.type === 'poll' ? 'LIVE POLL' : 'LIVE QUESTION'}</div><div style={{ fontSize: 20, fontWeight: 900, lineHeight: 1.25 }}>{activeInteraction.question}</div>{activeInteraction.type === 'poll' ? <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>{Object.entries(activeInteraction.options ?? {}).map(([id, label]) => <button key={id} type="button" onClick={() => setSelectedOption(id)} style={{ width: '100%', padding: '13px 16px', borderRadius: 12, border: selectedOption === id ? '3px solid currentColor' : '1px solid rgba(127,127,127,.35)', background: selectedOption === id ? 'rgba(127,127,127,.18)' : 'transparent', color: 'inherit', fontWeight: 800, cursor: 'pointer' }}>{label}{selectedOption === id ? ' ✓' : ''}</button>)}</div> : <textarea value={answer} onChange={e => setAnswer(e.target.value)} maxLength={200} placeholder="Type your answer..." rows={4} style={{ width: '100%', marginTop: 16, boxSizing: 'border-box', borderRadius: 12, padding: 14, fontSize: 16, resize: 'vertical' }} />}{interactionMessage === 'Answer submitted.' ? <div style={{ marginTop: 14, fontWeight: 900 }}>{interactionMessage}</div> : <button type="button" className="light-join-button" style={{ marginTop: 14 }} disabled={sendingResponse} onClick={() => void submitInteraction()}>{sendingResponse ? 'SUBMITTING...' : 'SUBMIT ANSWER'}</button>}{interactionMessage && interactionMessage !== 'Answer submitted.' && <p className="light-error">{interactionMessage}</p>}</section>}</> : <><div className="connected-icon">&check;</div><div className="waiting-message">{event.status === 'finished' ? 'SHOW FINISHED' : 'READY'}</div><p className="waiting-description">{event.status === 'finished' ? 'This LightSync show has finished.' : 'Waiting for the organizer.'}</p>{activeInteraction && <section style={{ width: '100%', marginTop: 28, padding: 20, borderRadius: 20, background: 'rgba(255,255,255,.08)' }}><div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1.5, opacity: .7 }}>LIVE INTERACTION</div><div style={{ marginTop: 8, fontSize: 19, fontWeight: 900 }}>{activeInteraction.question}</div><p style={{ marginTop: 10, opacity: .75 }}>The organizer has opened an interaction. You can answer when the show is live.</p></section>}</>}</div></main>;
+  const activeBackground = lightState ? screenColor : '#08080c';
+  const activeText = lightState ? '#050505' : '#fff';
+  const interactionCardBackground = lightState ? 'rgba(255,255,255,.9)' : 'rgba(255,255,255,.08)';
+  const interactionCardText = lightState ? '#050505' : '#fff';
+
+  return <main className="light-page" style={{ background: activeBackground, color: activeText, transition: 'background-color .08s linear, color .08s linear' }}>
+    <div className="light-content" style={{ maxWidth: 520, width: '100%', boxSizing: 'border-box', padding: '28px 20px' }}>
+      <div className="light-logo">LIGHTSYNC</div>
+      <div className="light-event-name">{event.name}</div>
+      {sportsGame && <div style={{ marginTop: 10, fontSize: 14, fontWeight: 800, opacity: .85 }}>{sportsGame.homeTeam.name} <span style={{ opacity: .55, margin: '0 7px' }}>VS</span> {sportsGame.awayTeam.name}</div>}
+      <div className="light-status" style={{ marginTop: 12 }}>{running ? 'SHOW LIVE' : event.status === 'finished' ? 'SHOW FINISHED' : 'CONNECTED'}</div>
+
+      {running ? <>
+        <div style={{ fontSize: '3.5rem', fontWeight: 900, marginTop: 26 }}>{lightState ? 'ON' : 'OFF'}</div>
+        <p className="waiting-description" style={{ marginTop: 4 }}>Your flashlight is synchronized with the show.</p>
+      </> : <>
+        <div className="waiting-message" style={{ marginTop: 28 }}>{event.status === 'finished' ? 'SHOW FINISHED' : 'READY'}</div>
+        <p className="waiting-description">{event.status === 'finished' ? 'This LightSync show has finished.' : 'Stay here. The organizer will start the show.'}</p>
+      </>}
+
+      {activeInteraction && event.status !== 'finished' && <section style={{ width: '100%', marginTop: 26, padding: 22, borderRadius: 22, background: interactionCardBackground, color: interactionCardText, backdropFilter: 'blur(12px)', boxSizing: 'border-box', boxShadow: '0 10px 30px rgba(0,0,0,.16)', textAlign: 'left' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} /><span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1.5, opacity: .65 }}>{activeInteraction.type === 'poll' ? 'LIVE POLL' : 'LIVE QUESTION'}</span></div>
+        <div style={{ fontSize: 21, fontWeight: 900, lineHeight: 1.25 }}>{activeInteraction.question}</div>
+
+        {activeInteraction.type === 'poll' ? <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>
+          {Object.entries(activeInteraction.options ?? {}).map(([id, label]) => <button key={id} type="button" disabled={sendingResponse || interactionMessage.startsWith('Answer submitted')} onClick={() => { setSelectedOption(id); setInteractionMessage(''); }} style={{ width: '100%', minHeight: 50, padding: '12px 15px', borderRadius: 14, border: selectedOption === id ? '3px solid currentColor' : '1px solid rgba(127,127,127,.35)', background: selectedOption === id ? 'rgba(127,127,127,.2)' : 'rgba(127,127,127,.06)', color: 'inherit', fontWeight: 800, fontSize: 15, textAlign: 'left', cursor: sendingResponse ? 'default' : 'pointer' }}><span style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>{label}</span><span>{selectedOption === id ? '✓' : '○'}</span></span></button>)}
+        </div> : <textarea value={answer} onChange={e => { setAnswer(e.target.value); setInteractionMessage(''); }} maxLength={200} placeholder="Type your answer..." rows={4} style={{ width: '100%', marginTop: 18, boxSizing: 'border-box', borderRadius: 14, border: '1px solid rgba(127,127,127,.35)', padding: 14, fontSize: 16, resize: 'vertical', background: 'rgba(127,127,127,.06)', color: 'inherit' }} />}
+
+        {!interactionMessage.startsWith('Answer submitted') && <button type="button" className="light-join-button" style={{ width: '100%', marginTop: 14 }} disabled={sendingResponse} onClick={() => void submitInteraction()}>{sendingResponse ? 'SUBMITTING...' : activeInteraction.type === 'poll' ? 'SUBMIT VOTE' : 'SUBMIT ANSWER'}</button>}
+        {interactionMessage && <div style={{ marginTop: 12, fontSize: 14, fontWeight: 800, textAlign: 'center', color: interactionMessage.startsWith('Could not') || interactionMessage.startsWith('Choose') || interactionMessage.startsWith('Enter') ? '#ef4444' : 'inherit' }}>{interactionMessage}</div>}
+      </section>}
+
+      {error && <p className="light-error" style={{ marginTop: 16 }}>{error}</p>}
+    </div>
+  </main>;
 }
