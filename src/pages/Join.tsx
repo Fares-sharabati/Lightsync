@@ -36,6 +36,7 @@ export default function Join() {
 
   useEffect(() => {
     if (!eventId) { setLoaded(true); setError('Invalid show link.'); return; }
+    const showId = eventId;
     let cancelled = false;
     let stopShow: (() => void) | undefined;
     let stopGame: (() => void) | undefined;
@@ -44,15 +45,15 @@ export default function Join() {
       try {
         const user = await ensureAnonymousAuth();
         if (cancelled) return;
-        stopShow = watchPublicShow(eventId, show => {
+        stopShow = watchPublicShow(showId, show => {
           if (cancelled) return;
           setEvent(show); setLoaded(true);
-          if (show && !scanRecordedRef.current) { scanRecordedRef.current = true; void recordQrScan(eventId, user.uid).catch(console.error); }
+          if (show && !scanRecordedRef.current) { scanRecordedRef.current = true; void recordQrScan(showId, user.uid).catch(console.error); }
           if (!show) setError('Show not found.');
         });
-        stopGame = watchSportsGame(eventId, setGame);
+        stopGame = watchSportsGame(showId, setGame);
         // Polls/questions are their own realtime channel. Never depend on show.status.
-        stopInteractions = watchSportsInteractions(eventId, items => {
+        stopInteractions = watchSportsInteractions(showId, items => {
           const open = items.find(item => item.status === 'open');
           setActiveInteraction(open ?? null);
         });
