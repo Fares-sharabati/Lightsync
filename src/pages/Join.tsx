@@ -55,10 +55,7 @@ export default function Join() {
           if (loadingTimeout !== null) window.clearTimeout(loadingTimeout);
         });
         unsubscribeGame = watchSportsGame(showId, setSportsGame);
-        unsubscribeInteractions = watchSportsInteractions(showId, items => {
-          // Always show the newest OPEN interaction, regardless of whether the light show is running.
-          setActiveInteraction(items.find(item => item.status === 'open') ?? null);
-        });
+        unsubscribeInteractions = watchSportsInteractions(showId, items => setActiveInteraction(items.find(item => item.status === 'open') ?? null));
       } catch (err) {
         console.error('Could not initialize fan session:', err);
         if (!cancelled) { setLoaded(true); setError('Could not connect to LightSync. Please refresh and scan the QR code again.'); }
@@ -119,7 +116,6 @@ export default function Join() {
   if (!event || !eventId) return <main className="light-page"><div className="light-content"><div className="light-logo">LIGHTSYNC</div><p>{error || 'Show not found.'}</p><button className="button button-secondary" onClick={() => navigate('/')}>Back</button></div></main>;
 
   const homeColor = sportsGame?.homeTeam.primaryColor && /^#[0-9a-fA-F]{6}$/.test(sportsGame.homeTeam.primaryColor) ? sportsGame.homeTeam.primaryColor : '#2563EB';
-  const awayColor = sportsGame?.awayTeam.primaryColor && /^#[0-9a-fA-F]{6}$/.test(sportsGame.awayTeam.primaryColor) ? sportsGame.awayTeam.primaryColor : '#FFFFFF';
   const running = event.status === 'running';
   const teamColor = getSportsLightColor(sportsGame);
   const screenColor = /^#[0-9a-fA-F]{6}$/.test(event.screenLightColor || '') ? event.screenLightColor! : (/^#[0-9a-fA-F]{6}$/.test(teamColor) && sportsGame ? teamColor : DEFAULT_SCREEN_LIGHT_COLOR);
