@@ -38,15 +38,39 @@ export default function SportsInteractions({ embedded = false }: Props) {
 
   if (!eventId) return null;
   const content = <div style={{ display: 'grid', gap: 16 }}>
-    {!embedded && game && <section className="ls-card"><p className="ls-eyebrow">SPORTS EVENT · {game.sport.toUpperCase()}</p><h2 style={{ margin: '5px 0' }}>{game.homeTeam.name} <span className="ls-muted">vs</span> {game.awayTeam.name}</h2></section>}
-    <section className="ls-card"><div className="ls-section-title"><div><p className="ls-eyebrow">AUDIENCE INTERACTIONS</p><h2>Engage the crowd</h2></div>{embedded && <button className="ls-button ls-secondary" onClick={openBigScreen}>OPEN BIG SCREEN ↗</button>}</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, .85fr) minmax(320px, 1.15fr)', gap: 18, marginTop: 18 }}>
-        <div><p className="ls-muted">Quick questions</p><div style={{ display: 'grid', gap: 8, marginTop: 10 }}>{TEMPLATES.map(template => <button key={template.label} className="ls-button ls-secondary" onClick={() => useTemplate(template)} style={{ textAlign: 'left' }}>{template.label}</button>)}</div><div style={{ marginTop: 18 }}><label className="ls-eyebrow">CUSTOM QUESTION</label><input value={question} onChange={e => setQuestion(e.target.value)} placeholder="Ask the audience..." style={{ width: '100%', padding: 12, borderRadius: 12, border: '1px solid var(--line)', background: 'var(--panel)', color: 'var(--ink)', marginTop: 8, boxSizing: 'border-box' }} /><label className="ls-eyebrow" style={{ display: 'block', marginTop: 12 }}>OPTIONS — ONE PER LINE</label><textarea value={options} onChange={e => setOptions(e.target.value)} rows={4} style={{ width: '100%', padding: 12, borderRadius: 12, border: '1px solid var(--line)', background: 'var(--panel)', color: 'var(--ink)', marginTop: 8, resize: 'vertical', boxSizing: 'border-box' }} /><div style={{ display: 'flex', gap: 8, marginTop: 10 }}><button className="ls-button ls-primary" disabled={busy} onClick={() => void create('poll')}>OPEN POLL</button><button className="ls-button ls-secondary" disabled={busy} onClick={() => void create('question')}>OPEN QUESTION</button></div></div></div>
-        <div><p className="ls-muted">Live interactions</p><div style={{ display: 'grid', gap: 8, marginTop: 10 }}>{items.length === 0 && <div className="ls-empty">No interactions yet.</div>}{items.map(item => <button key={item.id} onClick={() => setSelected(item)} style={{ textAlign: 'left', padding: 13, borderRadius: 12, border: `1px solid ${selected?.id === item.id ? 'var(--ls-accent, #fff)' : 'var(--line)'}`, background: 'var(--panel)', color: 'var(--ink)', cursor: 'pointer' }}><strong>{item.question}</strong><div className="ls-muted" style={{ marginTop: 4 }}>{item.status.toUpperCase()} · {item.type.toUpperCase()}</div></button>)}</div>{selected && <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--line)' }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><strong>{total} RESPONSES</strong><button className="ls-button ls-stop" disabled={busy || selected.status === 'closed'} onClick={() => void closeSelected()}>CLOSE</button></div>{selected.type === 'poll' && <div style={{ marginTop: 14 }}>{Object.entries(selected.options ?? {}).map(([id, label]) => { const count = counts[id] ?? 0; const pct = total ? Math.round(count / total * 100) : 0; return <div key={id} style={{ marginBottom: 11 }}><div style={{ display: 'flex', justifyContent: 'space-between' }}><span>{label}</span><strong>{pct}% · {count}</strong></div><div style={{ height: 7, background: 'var(--line)', borderRadius: 99, overflow: 'hidden', marginTop: 5 }}><div style={{ width: `${pct}%`, height: '100%', background: 'var(--ls-accent, #d9dde2)' }} /></div></div>})}</div>}</div>}{message && <p className="ls-muted" style={{ marginTop: 10 }}>{message}</p>}</div>
+    {!embedded && game && <section className="ls-card"><p className="ls-eyebrow">SPORTS EVENT Â· {game.sport.toUpperCase()}</p><h2 style={{ margin: '5px 0' }}>{game.homeTeam.name} <span className="ls-muted">vs</span> {game.awayTeam.name}</h2></section>}
+    <section className="ls-card">
+      <div className="ls-section-title"><div><p className="ls-eyebrow">AUDIENCE INTERACTIONS</p><h2>Engage the crowd</h2></div>{embedded && <button className="ls-button ls-secondary" onClick={openBigScreen}>OPEN BIG SCREEN â†—</button>}</div>
+
+      <div className="ls-interact-grid">
+        <div>
+          <p className="ls-muted">Quick questions</p>
+          <div className="ls-template-list">{TEMPLATES.map(template => <button key={template.label} className="ls-template-chip" onClick={() => useTemplate(template)}><span className="ls-swatch-dot" />{template.label}</button>)}</div>
+          <div className="ls-custom-question">
+            <label className="ls-field-label">CUSTOM QUESTION</label>
+            <input className="ls-question-input" value={question} onChange={e => setQuestion(e.target.value)} placeholder="Ask the audience..." />
+            <label className="ls-field-label" style={{ marginTop: 12 }}>OPTIONS â€” ONE PER LINE</label>
+            <textarea className="ls-textarea" value={options} onChange={e => setOptions(e.target.value)} rows={4} />
+            <div className="ls-interact-actions"><button className="ls-button ls-primary" disabled={busy} onClick={() => void create('poll')}>OPEN POLL</button><button className="ls-button ls-secondary" disabled={busy} onClick={() => void create('question')}>OPEN QUESTION</button></div>
+          </div>
+        </div>
+
+        <div>
+          <p className="ls-muted">Live interactions</p>
+          <div className="ls-interaction-list">
+            {items.length === 0 && <div className="ls-empty">No interactions yet.</div>}
+            {items.map(item => <button key={item.id} className={`ls-interaction-item ${selected?.id === item.id ? 'is-selected' : ''}`} onClick={() => setSelected(item)}><strong>{item.question}</strong><div className="ls-muted ls-interaction-meta">{item.status.toUpperCase()} Â· {item.type.toUpperCase()}</div></button>)}
+          </div>
+          {selected && <div className="ls-interaction-detail">
+            <div className="ls-interaction-detail-head"><strong>{total} RESPONSES</strong><button className="ls-button ls-stop" disabled={busy || selected.status === 'closed'} onClick={() => void closeSelected()}>CLOSE</button></div>
+            {selected.type === 'poll' && <div style={{ marginTop: 14 }}>{Object.entries(selected.options ?? {}).map(([id, label]) => { const count = counts[id] ?? 0; const pct = total ? Math.round(count / total * 100) : 0; return <div key={id} className="ls-option-row"><div className="ls-option-row-top"><span>{label}</span><strong>{pct}% Â· {count}</strong></div><div className="ls-option-track"><div className="ls-option-fill" style={{ width: `${pct}%` }} /></div></div>; })}</div>}
+          </div>}
+          {message && <p className="ls-muted" style={{ marginTop: 10 }}>{message}</p>}
+        </div>
       </div>
     </section>
   </div>;
 
   if (embedded) return content;
-  return <main className="ls-shell" style={{ minHeight: '100vh', padding: 24 }}><header className="ls-header"><div><div className="ls-brand">LIGHTSYNC</div><p className="ls-eyebrow">SPORTS INTERACTIONS</p></div><div style={{ display: 'flex', gap: 10 }}><button className="ls-button ls-primary" onClick={openBigScreen}>OPEN BIG SCREEN ↗</button><button className="ls-button ls-secondary" onClick={() => navigate(`/admin/event/${eventId}`)}>BACK TO EVENT</button></div></header><div style={{ maxWidth: 1200, margin: '0 auto' }}>{content}</div></main>;
+  return <main className="ls-shell" style={{ minHeight: '100vh', padding: 24 }}><header className="ls-header"><div><div className="ls-brand">LIGHTSYNC</div><p className="ls-eyebrow">SPORTS INTERACTIONS</p></div><div style={{ display: 'flex', gap: 10 }}><button className="ls-button ls-primary" onClick={openBigScreen}>OPEN BIG SCREEN â†—</button><button className="ls-button ls-secondary" onClick={() => navigate(`/admin/event/${eventId}`)}>BACK TO EVENT</button></div></header><div style={{ maxWidth: 1200, margin: '0 auto' }}>{content}</div></main>;
 }

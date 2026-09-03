@@ -56,9 +56,20 @@
    @media (max-width:760px){.home-content h1{font-size:clamp(44px,15vw,72px)}.audience-screen{padding:10px}.audience-content h1{max-width:90vw}}
    @media(prefers-reduced-motion:reduce){:root{animation:none}.arena-dots{animation:none}.arena-beam{animation:none}}
    
-   /* ---------- ORGANIZER UI: FIXED METALLIC SILVER + BLACK ---------- */
-   .ls-shell { --accent:#c9cdd2;--accent-strong:#f4f5f7;--accent-glow:rgba(201,205,210,.28);--accent-soft:rgba(201,205,210,.10);--bg:#050607;--panel:#0d0f11;--line:#292c30;--ink:#f5f5f5;--ink-dim:#9a9da2; }
-   .ls-shell .ls-button.ls-primary,.ls-shell .ls-button.ls-control-main{background:linear-gradient(135deg,#f4f5f7 0%,#aeb3b8 42%,#6f747a 100%);color:#08090a;border-color:#e1e4e7;box-shadow:0 10px 28px rgba(255,255,255,.10),inset 0 1px 0 rgba(255,255,255,.75)}
-   .ls-shell .ls-button.ls-primary:hover:not(:disabled),.ls-shell .ls-button.ls-control-main:hover:not(:disabled){filter:brightness(1.08);box-shadow:0 12px 34px rgba(255,255,255,.16),inset 0 1px 0 rgba(255,255,255,.85)}
+   /* ---------- ORGANIZER UI: DARK BASE + LIVE TEAM-COLOR ACCENT ---------- */
+   /* --ls-accent (home team primary) and --ls-accent-2 (away team primary) are set inline
+      per-page from the sports game data. Everything below reacts to them instead of a
+      fixed color, so the whole dashboard visibly "syncs" to whichever match is open. */
+   .ls-shell { background:
+       radial-gradient(1100px 620px at 12% -8%, color-mix(in srgb, var(--ls-accent) 16%, transparent), transparent 60%),
+       radial-gradient(1100px 620px at 92% 108%, color-mix(in srgb, var(--ls-accent-2) 14%, transparent), transparent 60%),
+       var(--ls-bg); background-attachment:fixed; }
+   .ls-shell .ls-button.ls-primary,.ls-shell .ls-button.ls-control-main{background:linear-gradient(135deg,var(--ls-accent) 0%,color-mix(in srgb,var(--ls-accent) 65%,var(--ls-accent-2) 35%) 100%);color:#08090a;border-color:color-mix(in srgb,var(--ls-accent) 55%,#fff 45%);box-shadow:0 10px 28px color-mix(in srgb,var(--ls-accent) 30%,transparent),inset 0 1px 0 rgba(255,255,255,.55);text-shadow:0 1px 0 rgba(255,255,255,.2)}
+   .ls-shell .ls-button.ls-primary:hover:not(:disabled),.ls-shell .ls-button.ls-control-main:hover:not(:disabled){filter:brightness(1.1);box-shadow:0 12px 34px color-mix(in srgb,var(--ls-accent) 40%,transparent),inset 0 1px 0 rgba(255,255,255,.7)}
    .ls-shell .ls-button.ls-secondary,.ls-shell .ls-copy-id{border-color:#383c41;background:linear-gradient(180deg,#17191c,#0c0d0f);color:#dfe2e5}
-   .ls-shell .ls-button.ls-secondary:hover:not(:disabled),.ls-shell .ls-copy-id:hover{border-color:#aeb3b8;color:#fff}.ls-shell .ls-eyebrow{color:#c9cdd2}.ls-shell .ls-live-pill.is-running,.ls-shell .ls-audience-indicator span{background:#d8dadd;box-shadow:0 0 12px rgba(255,255,255,.45)}.ls-shell .ls-progress-fill{background:linear-gradient(90deg,#747a80,#f2f3f4,#9da2a7)}.ls-shell .ls-ready-badge{border-color:#4a4e53;background:rgba(255,255,255,.05);color:#e4e6e8}.ls-shell .ls-stop{border-color:#3b3d40}
+   .ls-shell .ls-button.ls-secondary:hover:not(:disabled),.ls-shell .ls-copy-id:hover{border-color:var(--ls-accent);color:#fff}
+   .ls-shell .ls-eyebrow{color:var(--ls-accent)}
+   .ls-shell .ls-live-pill.is-running,.ls-shell .ls-audience-indicator span{background:var(--ls-accent);box-shadow:0 0 12px color-mix(in srgb,var(--ls-accent) 55%,transparent)}
+   .ls-shell .ls-progress-fill{background:linear-gradient(90deg,var(--ls-accent),color-mix(in srgb,var(--ls-accent) 40%,#fff 60%),var(--ls-accent-2))}
+   .ls-shell .ls-ready-badge{border-color:color-mix(in srgb,var(--ls-accent) 45%,#3a3d41 55%);background:color-mix(in srgb,var(--ls-accent) 10%,transparent);color:#e4e6e8}
+   .ls-shell .ls-stop{border-color:#3b3d40}
