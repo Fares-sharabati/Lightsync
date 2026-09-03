@@ -1,5 +1,5 @@
 /* ============================================================
-   LIGHTSYNC — GLOBAL THEME
+   LIGHTSYNC - GLOBAL THEME
    ============================================================ */
    @import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
    @property --hue { syntax:'<number>'; inherits:true; initial-value:355; }
@@ -12,9 +12,9 @@
    .home-page{display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}.home-content{position:relative;z-index:2;max-width:680px;margin:0 auto}.home-content h1{font-size:clamp(56px,12vw,128px);line-height:.92;margin:0 0 18px}.tagline{color:var(--ink-dim);font-size:18px;margin:0 0 44px}.home-actions{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
    
    /* ============================================================
-      ARENA HOLOGRAM — flat, layered, slow-moving: full-bleed dots
+      ARENA HOLOGRAM - flat, layered, slow-moving: full-bleed dots
       plus a few soft diagonal light beams drifting sideways. No
-      court marks (removed on request). No 3D transforms — those
+      court marks (removed on request). No 3D transforms - those
       distort a flat SVG into a warped parallelogram.
       ============================================================ */
    .hologram-stage{position:absolute;inset:0;z-index:1;overflow:hidden;pointer-events:none;color:var(--accent)}
@@ -27,7 +27,7 @@
    .hologram-stage::after{content:'';position:absolute;inset:-15%;background-image:radial-gradient(circle,rgba(255,255,255,.5) 1px,transparent 1.4px),radial-gradient(circle,rgba(255,255,255,.3) 1px,transparent 1.3px);background-size:180px 180px,110px 110px;background-position:0 0,55px 70px;opacity:.35;z-index:0}
    
    /* soft diagonal light beams, each drifting sideways slowly and
-      independently — this is the "light moving through the arena" */
+      independently - this is the "light moving through the arena" */
    .arena-beam{position:absolute;top:-30%;height:160%;width:120px;background:linear-gradient(180deg,transparent,var(--accent) 45%,var(--accent) 55%,transparent);opacity:.16;filter:blur(6px);mix-blend-mode:screen;animation:ls-beam-drift 50s ease-in-out infinite}
    .arena-beam--1{left:6%;   transform:rotate(-18deg); animation-duration:46s}
    .arena-beam--2{left:32%;  transform:rotate(-16deg); animation-duration:58s; animation-delay:-12s; width:90px; opacity:.13}
@@ -61,15 +61,15 @@
       per-page from the sports game data. Everything below reacts to them instead of a
       fixed color, so the whole dashboard visibly "syncs" to whichever match is open. */
    .ls-shell { background:
-       radial-gradient(1100px 620px at 12% -8%, color-mix(in srgb, var(--ls-accent) 16%, transparent), transparent 60%),
-       radial-gradient(1100px 620px at 92% 108%, color-mix(in srgb, var(--ls-accent-2) 14%, transparent), transparent 60%),
+       radial-gradient(1100px 620px at 12% -8%, color-mix(in srgb, var(--ls-accent) 6%, transparent), transparent 60%),
+       radial-gradient(1100px 620px at 92% 108%, color-mix(in srgb, var(--ls-accent-2) 5%, transparent), transparent 60%),
        var(--ls-bg); background-attachment:fixed; }
-   .ls-shell .ls-button.ls-primary,.ls-shell .ls-button.ls-control-main{background:linear-gradient(135deg,var(--ls-accent) 0%,color-mix(in srgb,var(--ls-accent) 65%,var(--ls-accent-2) 35%) 100%);color:#08090a;border-color:color-mix(in srgb,var(--ls-accent) 55%,#fff 45%);box-shadow:0 10px 28px color-mix(in srgb,var(--ls-accent) 30%,transparent),inset 0 1px 0 rgba(255,255,255,.55);text-shadow:0 1px 0 rgba(255,255,255,.2)}
-   .ls-shell .ls-button.ls-primary:hover:not(:disabled),.ls-shell .ls-button.ls-control-main:hover:not(:disabled){filter:brightness(1.1);box-shadow:0 12px 34px color-mix(in srgb,var(--ls-accent) 40%,transparent),inset 0 1px 0 rgba(255,255,255,.7)}
+   .ls-shell .ls-button.ls-primary,.ls-shell .ls-button.ls-control-main{background:color-mix(in srgb,var(--ls-accent) 78%,#fff 22%);color:#0a0a0a;border-color:color-mix(in srgb,var(--ls-accent) 45%,#3a3d41 55%);box-shadow:0 4px 14px color-mix(in srgb,var(--ls-accent) 14%,transparent)}
+   .ls-shell .ls-button.ls-primary:hover:not(:disabled),.ls-shell .ls-button.ls-control-main:hover:not(:disabled){filter:brightness(1.05);box-shadow:0 6px 18px color-mix(in srgb,var(--ls-accent) 18%,transparent)}
    .ls-shell .ls-button.ls-secondary,.ls-shell .ls-copy-id{border-color:#383c41;background:linear-gradient(180deg,#17191c,#0c0d0f);color:#dfe2e5}
    .ls-shell .ls-button.ls-secondary:hover:not(:disabled),.ls-shell .ls-copy-id:hover{border-color:var(--ls-accent);color:#fff}
    .ls-shell .ls-eyebrow{color:var(--ls-accent)}
-   .ls-shell .ls-live-pill.is-running,.ls-shell .ls-audience-indicator span{background:var(--ls-accent);box-shadow:0 0 12px color-mix(in srgb,var(--ls-accent) 55%,transparent)}
+   .ls-shell .ls-live-pill.is-running,.ls-shell .ls-audience-indicator span{background:var(--ls-accent);box-shadow:0 0 6px color-mix(in srgb,var(--ls-accent) 30%,transparent)}
    .ls-shell .ls-progress-fill{background:linear-gradient(90deg,var(--ls-accent),color-mix(in srgb,var(--ls-accent) 40%,#fff 60%),var(--ls-accent-2))}
    .ls-shell .ls-ready-badge{border-color:color-mix(in srgb,var(--ls-accent) 45%,#3a3d41 55%);background:color-mix(in srgb,var(--ls-accent) 10%,transparent);color:#e4e6e8}
    .ls-shell .ls-stop{border-color:#3b3d40}

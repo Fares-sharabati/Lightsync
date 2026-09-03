@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type Dispatch, type SetStateAction } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAuth } from 'firebase/auth';
-import { createShow, deleteShow, watchOrganizerShows, type Show } from '../firebase/shows';
+import { createShow, deleteShow, updateShow, watchOrganizerShows, type Show } from '../firebase/shows';
 import { signInOrganizer } from '../firebase/auth';
 import { saveSportsGame, type SportsTeam } from '../firebase/sportsGame';
 import '../styles/lightsync.css';
@@ -33,14 +33,15 @@ export default function Admin() {
     try {
       const id = await createShow(auth.currentUser.uid, { name: `${home.name.trim()} vs ${away.name.trim()}`, date, venue });
       await saveSportsGame(id, { sport, homeTeam: { ...home, name: home.name.trim() }, awayTeam: { ...away, name: away.name.trim() }, lightTeam, customLightColor });
+      await updateShow(id, { screenLightColor: lightColor });
       setDate(''); setVenue(''); setHome(blankTeam('')); setAway(blankTeam('')); setSport('Basketball'); setLightTeam('home'); setCustomLightColor('#FFFFFF');
       navigate(`/admin/event/${id}`);
     } catch (error) { console.error(error); setMessage(error instanceof Error ? error.message : 'Could not create the sports event.'); } finally { setCreating(false); }
   }
 
   async function handleDelete(show: Show) {
-    if (!auth.currentUser || deletingId) return; if (!window.confirm(`Delete â€œ${show.name}â€?\n\nThis permanently removes the event and audience data.`)) return;
-    setDeletingId(show.id); setMessage(''); try { await deleteShow(show.id); setMessage(`â€œ${show.name}â€ was deleted.`); } catch (error) { console.error(error); setMessage(error instanceof Error ? error.message : 'Could not delete the event.'); } finally { setDeletingId(null); }
+    if (!auth.currentUser || deletingId) return; if (!window.confirm(`Delete "${show.name}"?\n\nThis permanently removes the event and audience data.`)) return;
+    setDeletingId(show.id); setMessage(''); try { await deleteShow(show.id); setMessage(`"${show.name}" was deleted.`); } catch (error) { console.error(error); setMessage(error instanceof Error ? error.message : 'Could not delete the event.'); } finally { setDeletingId(null); }
   }
 
   if (!authenticated) return <main className="ls-shell" style={baseTheme}><section className="ls-auth-card"><div className="ls-brand">LIGHTSYNC</div><p className="ls-eyebrow">ORGANIZER ACCESS</p><h1>Control the crowd.</h1><p className="ls-muted">Sports event control for LightSync.</p><input className="ls-input" type="email" placeholder="Organizer email" value={email} onChange={e => setEmail(e.target.value)} /><input className="ls-input" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && void login()} /><button className="ls-button ls-primary" onClick={() => void login()}>ENTER DASHBOARD</button>{message && <p className="ls-error">{message}</p>}</section></main>;
@@ -81,14 +82,14 @@ export default function Admin() {
 
       <div className="ls-light-grid">
         <div className="ls-light-option"><span>PHONE LIGHT TEAM</span><select className="ls-input" value={lightTeam} onChange={e => setLightTeam(e.target.value as 'home' | 'away' | 'custom')}><option value="home">Home team primary</option><option value="away">Away team primary</option><option value="custom">Custom</option></select></div>
-        <div className="ls-light-option"><span>CUSTOM LIGHT COLOR</span><input type="color" value={customLightColor} disabled={lightTeam !== 'custom'} onChange={e => setCustomLightColor(e.target.value.toUpperCase())} style={{ display: 'block', width: '100%', height: 40, marginTop: 2, borderRadius: 8, border: '1px solid #262626', background: 'transparent', cursor: lightTeam === 'custom' ? 'pointer' : 'not-allowed' }} /></div>
-        <div className="ls-light-option"><span>RESULT</span><div className="ls-color-preview" style={{ background: lightColor }}>{lightColor}</div></div>
+        <div className="ls-light-option"><span>CUSTOM LIGHT COLOR</span><label className={`ls-swatch-field ${lightTeam !== 'custom' ? 'is-disabled' : ''}`}><input type="color" value={customLightColor} disabled={lightTeam !== 'custom'} onChange={e => setCustomLightColor(e.target.value.toUpperCase())} /><div><span>{lightTeam === 'custom' ? 'TAP TO PICK' : 'ENABLE CUSTOM'}</span><b>{customLightColor}</b></div></label></div>
+        <div className="ls-light-option"><span>RESULT</span><div className="ls-swatch-field" style={{ cursor: 'default' }}><span className="ls-swatch-dot" style={{ '--side-color': lightColor, width: 30, height: 30 } as CSSProperties} /><div><span>APPLIED</span><b>{lightColor}</b></div></div></div>
       </div>
 
       <button className="ls-button ls-primary" style={{ marginTop: 18, width: '100%' }} disabled={creating} onClick={() => void handleCreate()}>{creating ? 'CREATING...' : '+ CREATE SPORTS EVENT'}</button>
       {message && <p className="ls-error">{message}</p>}
     </section>
 
-    <section className="ls-card"><div className="ls-section-title"><div><p className="ls-eyebrow">YOUR SPORTS EVENTS</p><h2>Matches</h2></div><span className="ls-count">{shows.length}</span></div>{shows.length === 0 ? <div className="ls-empty">No sports events yet.</div> : <div className="ls-show-list">{shows.map(show => <div className="ls-show-row" key={show.id}><button className="ls-show-main" style={{ flex: 1, border: 0, background: 'transparent', color: 'inherit', cursor: 'pointer', textAlign: 'left', padding: '17px' }} onClick={() => navigate(`/admin/event/${show.id}`)}><div><strong>{show.name}</strong><span>{show.venue} Â· {show.date}</span></div><div><span className={`ls-status ls-${show.status}`}>{show.status}</span><b>â†’</b></div></button><button className="ls-delete-show" style={{ marginRight: 10, border: '1px solid #45494e', background: '#111315', color: '#c9cdd2', borderRadius: 8, padding: '8px 10px', fontSize: 10, fontWeight: 800, letterSpacing: '.08em', cursor: 'pointer' }} onClick={() => void handleDelete(show)} disabled={deletingId === show.id}>{deletingId === show.id ? 'DELETINGâ€¦' : 'DELETE'}</button></div>)}</div>}</section>
+    <section className="ls-card"><div className="ls-section-title"><div><p className="ls-eyebrow">YOUR SPORTS EVENTS</p><h2>Matches</h2></div><span className="ls-count">{shows.length}</span></div>{shows.length === 0 ? <div className="ls-empty">No sports events yet.</div> : <div className="ls-show-list">{shows.map(show => <div className="ls-show-row" key={show.id}><button className="ls-show-main" style={{ flex: 1, border: 0, background: 'transparent', color: 'inherit', cursor: 'pointer', textAlign: 'left', padding: '17px' }} onClick={() => navigate(`/admin/event/${show.id}`)}><div><strong>{show.name}</strong><span>{show.venue} &middot; {show.date}</span></div><div><span className={`ls-status ls-${show.status}`}>{show.status}</span><b>&rarr;</b></div></button><button className="ls-delete-show" style={{ marginRight: 10, border: '1px solid #45494e', background: '#111315', color: '#c9cdd2', borderRadius: 8, padding: '8px 10px', fontSize: 10, fontWeight: 800, letterSpacing: '.08em', cursor: 'pointer' }} onClick={() => void handleDelete(show)} disabled={deletingId === show.id}>{deletingId === show.id ? 'DELETING...' : 'DELETE'}</button></div>)}</div>}</section>
   </main>;
 }
