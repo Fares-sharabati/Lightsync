@@ -54,8 +54,16 @@ export async function createSportsInteraction(showId: string, interaction: Omit<
   return id;
 }
 
+export async function openSportsInteraction(showId: string, interactionId: string) {
+  await update(ref(db, `sportsInteractions/${showId}/${interactionId}`), {
+    status: 'open',
+    closedAt: null,
+    displayOnScreen: true,
+  });
+}
+
 export async function closeSportsInteraction(showId: string, interactionId: string) {
-  await update(ref(db, `sportsInteractions/${showId}/${interactionId}`), { status: 'closed', closedAt: Date.now() });
+  await update(ref(db, `sportsInteractions/${showId}/${interactionId}`), { status: 'closed', closedAt: Date.now(), displayOnScreen: false });
 }
 
 export async function publishSportsScreen(showId: string, activeInteractionId: string | null, displayMode: SportsScreenState['displayMode']) {
