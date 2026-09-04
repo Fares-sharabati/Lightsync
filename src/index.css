@@ -1,8 +1,36 @@
-/* Participant Light Screen */
+/* Global sizing */
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+}
 
+html {
+  box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+}
+
+body {
+  overflow-x: hidden;
+  background: #050507;
+}
+
+/* Participant Light Screen */
 .light-page {
   position: fixed;
   inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 100dvh;
 
   display: flex;
   align-items: center;
