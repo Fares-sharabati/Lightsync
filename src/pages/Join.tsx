@@ -104,7 +104,7 @@ export default function Join() {
     try {
       const uid = (await ensureAnonymousAuth()).uid;
       await submitSportsResponse(eventId, activeInteraction.id, uid, activeInteraction.type === 'poll' ? { optionId: selectedOption } : { answer: answer.trim().slice(0, 200) });
-      setMessage('Answer submitted \u2713');
+      setMessage('Answer submitted ✓');
     } catch (err) { console.error(err); setMessage('Could not submit your answer. Please try again.'); }
     finally { setSending(false); }
   }
@@ -128,7 +128,7 @@ export default function Join() {
   const interactionCard = activeInteraction ? <section style={card}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 10px #22c55e' }} /><span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1.5, opacity: .75 }}>{activeInteraction.type === 'poll' ? 'LIVE POLL' : 'LIVE QUESTION'}</span></div>
     <div style={{ fontSize: 21, fontWeight: 900, lineHeight: 1.25 }}>{activeInteraction.question}</div>
-    {activeInteraction.type === 'poll' ? <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>{Object.entries(activeInteraction.options ?? {}).map(([id, label]) => <button key={id} type="button" disabled={sending || message.startsWith('Answer submitted')} onClick={() => { setSelectedOption(id); setMessage(''); }} style={{ width: '100%', minHeight: 52, padding: '12px 15px', borderRadius: 14, border: selectedOption === id ? `3px solid ${uiColor}` : '1px solid rgba(255,255,255,.24)', background: selectedOption === id ? uiColor : 'rgba(255,255,255,.08)', color: '#fff', fontWeight: 800, fontSize: 15, textAlign: 'left' }}><span style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>{label}</span><span>{selectedOption === id ? '\u2713' : '\u25CB'}</span></span></button>)}</div> : <textarea value={answer} onChange={e => { setAnswer(e.target.value); setMessage(''); }} maxLength={200} placeholder="Type your answer..." rows={4} style={{ width: '100%', marginTop: 18, boxSizing: 'border-box', borderRadius: 14, border: '1px solid rgba(255,255,255,.24)', padding: 14, fontSize: 16, resize: 'vertical', background: 'rgba(255,255,255,.08)', color: '#fff' }} />}
+    {activeInteraction.type === 'poll' ? <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>{Object.entries(activeInteraction.options ?? {}).map(([id, label]) => <button key={id} type="button" disabled={sending || message.startsWith('Answer submitted')} onClick={() => { setSelectedOption(id); setMessage(''); }} style={{ width: '100%', minHeight: 52, padding: '12px 15px', borderRadius: 14, border: selectedOption === id ? `3px solid ${uiColor}` : '1px solid rgba(255,255,255,.24)', background: selectedOption === id ? uiColor : 'rgba(255,255,255,.08)', color: '#fff', fontWeight: 800, fontSize: 15, textAlign: 'left' }}><span style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>{label}</span><span>{selectedOption === id ? '✓' : '○'}</span></span></button>)}</div> : <textarea value={answer} onChange={e => { setAnswer(e.target.value); setMessage(''); }} maxLength={200} placeholder="Type your answer..." rows={4} style={{ width: '100%', marginTop: 18, boxSizing: 'border-box', borderRadius: 14, border: '1px solid rgba(255,255,255,.24)', padding: 14, fontSize: 16, resize: 'vertical', background: 'rgba(255,255,255,.08)', color: '#fff' }} />}
     {!message.startsWith('Answer submitted') && <button type="button" disabled={sending} onClick={() => void submitInteraction()} style={{ width: '100%', marginTop: 14, minHeight: 50, border: 0, borderRadius: 14, background: uiColor, color: '#fff', fontWeight: 900, fontSize: 15, opacity: sending ? .65 : 1 }}>{sending ? 'SUBMITTING...' : activeInteraction.type === 'poll' ? 'SUBMIT VOTE' : 'SUBMIT ANSWER'}</button>}
     {message && <div style={{ marginTop: 12, fontSize: 14, fontWeight: 800, textAlign: 'center', color: message.startsWith('Could not') ? '#fca5a5' : '#fff' }}>{message}</div>}
   </section> : null;
@@ -143,18 +143,12 @@ export default function Join() {
     {interactionCard}
   </div></main>;
 
-  // During an ON beat, turn the entire web page into the screen flash.
-  // No cards, text, margins or content remain visible, so the whole viewport emits the selected color.
-  if (running && lightState) {
-    return <main className="light-page" aria-label="LightSync full screen flash" style={{ position: 'fixed', inset: 0, width: '100vw', height: '100vh', minHeight: '100dvh', padding: 0, margin: 0, display: 'block', background: flashColor, color: '#000', overflow: 'hidden' }} />;
-  }
-
-  return <main className="light-page" style={{ background: '#08080c', color: '#fff' }}><div className="light-content" style={{ maxWidth: 520, width: '100%', boxSizing: 'border-box', padding: '28px 20px' }}>
+  return <main className="light-page" style={{ background: lightState ? flashColor : '#08080c', color: '#fff', transition: 'background-color .08s linear' }}><div className="light-content" style={{ maxWidth: 520, width: '100%', boxSizing: 'border-box', padding: '28px 20px' }}>
     <div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div>
     {game && <div style={{ marginTop: 10, fontSize: 14, fontWeight: 800, opacity: .85 }}>{game.homeTeam.name} <span style={{ opacity: .55, margin: '0 7px' }}>VS</span> {game.awayTeam.name}</div>}
-    <div className="light-status" style={{ marginTop: 12 }}>{running ? 'SHOW LIVE' : 'SYSTEM RUNNING'}</div>
+    <div className="light-status" style={{ marginTop: 12, background: lightState ? 'rgba(0,0,0,.18)' : undefined }}>{running ? 'SHOW LIVE' : 'SYSTEM RUNNING'}</div>
     {!running && <><div style={{ fontSize: '2rem', fontWeight: 900, marginTop: 28 }}>FLASHLIGHT SHOW WILL START SOON</div><p className="waiting-description" style={{ marginTop: 8 }}>Stay connected. The organizer can start the light show at any time.</p></>}
-    {running && <><div style={{ fontSize: '3.5rem', fontWeight: 900, marginTop: 26 }}>OFF</div><p className="waiting-description" style={{ marginTop: 4 }}>Your flashlight is synchronized with the show.</p></>}
+    {running && <><div style={{ fontSize: '3.5rem', fontWeight: 900, marginTop: 26, color: lightState ? '#050505' : '#fff' }}>{lightState ? 'ON' : 'OFF'}</div><p className="waiting-description" style={{ marginTop: 4, color: lightState ? 'rgba(0,0,0,.7)' : undefined }}>Your flashlight is synchronized with the show.</p></>}
     {interactionCard}
     {error && <p className="light-error" style={{ marginTop: 16 }}>{error}</p>}
   </div></main>;
