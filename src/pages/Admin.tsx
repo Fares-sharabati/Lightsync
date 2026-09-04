@@ -20,8 +20,6 @@ export default function Admin() {
   useEffect(() => auth.onAuthStateChanged(user => setAuthenticated(!!user && !user.isAnonymous)), [auth]);
   useEffect(() => { if (!authenticated || !auth.currentUser) return; return watchOrganizerShows(auth.currentUser.uid, setShows); }, [authenticated, auth]);
 
-  // Both team colors drive the theme: home is the primary accent, away is the
-  // secondary accent used for gradients, VS banners, and poll comparisons.
   const theme = useMemo(() => ({ ...baseTheme, '--ls-accent': home.primaryColor || '#FFFFFF', '--ls-accent-2': away.primaryColor || home.primaryColor || '#FFFFFF' }) as CSSProperties, [home.primaryColor, away.primaryColor]);
   const lightColor = lightTeam === 'away' ? away.primaryColor : lightTeam === 'custom' ? customLightColor : home.primaryColor;
 
@@ -33,15 +31,17 @@ export default function Admin() {
     try {
       const id = await createShow(auth.currentUser.uid, { name: `${home.name.trim()} vs ${away.name.trim()}`, date, venue });
       await saveSportsGame(id, { sport, homeTeam: { ...home, name: home.name.trim() }, awayTeam: { ...away, name: away.name.trim() }, lightTeam, customLightColor });
-      await updateShow(id, { screenLightColor: lightColor });
+      // The creation-time choice defines the phone UI identity. The live screen flash
+      // starts with the same color but can later be changed independently by the organizer.
+      await updateShow(id, { phoneUiColor: lightColor, screenLightColor: lightColor });
       setDate(''); setVenue(''); setHome(blankTeam('')); setAway(blankTeam('')); setSport('Basketball'); setLightTeam('home'); setCustomLightColor('#FFFFFF');
       navigate(`/admin/event/${id}`);
     } catch (error) { console.error(error); setMessage(error instanceof Error ? error.message : 'Could not create the sports event.'); } finally { setCreating(false); }
   }
 
   async function handleDelete(show: Show) {
-    if (!auth.currentUser || deletingId) return; if (!window.confirm(`Delete "${show.name}"?\n\nThis permanently removes the event and audience data.`)) return;
-    setDeletingId(show.id); setMessage(''); try { await deleteShow(show.id); setMessage(`"${show.name}" was deleted.`); } catch (error) { console.error(error); setMessage(error instanceof Error ? error.message : 'Could not delete the event.'); } finally { setDeletingId(null); }
+    if (!auth.currentUser || deletingId) return; if (!window.confirm(`Delete \"${show.name}\"?\n\nThis permanently removes the event and audience data.`)) return;
+    setDeletingId(show.id); setMessage(''); try { await deleteShow(show.id); setMessage(`\"${show.name}\" was deleted.`); } catch (error) { console.error(error); setMessage(error instanceof Error ? error.message : 'Could not delete the event.'); } finally { setDeletingId(null); }
   }
 
   if (!authenticated) return <main className="ls-shell" style={baseTheme}><section className="ls-auth-card"><div className="ls-brand">LIGHTSYNC</div><p className="ls-eyebrow">ORGANIZER ACCESS</p><h1>Control the crowd.</h1><p className="ls-muted">Sports event control for LightSync.</p><input className="ls-input" type="email" placeholder="Organizer email" value={email} onChange={e => setEmail(e.target.value)} /><input className="ls-input" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && void login()} /><button className="ls-button ls-primary" onClick={() => void login()}>ENTER DASHBOARD</button>{message && <p className="ls-error">{message}</p>}</section></main>;
@@ -59,37 +59,15 @@ export default function Admin() {
 
   return <main className="ls-shell" style={theme}>
     <header className="ls-header"><div><div className="ls-brand">LIGHTSYNC</div><p className="ls-eyebrow">SPORTS CONTROL</p></div><button className="ls-button ls-secondary" onClick={() => navigate('/')}>HOME</button></header>
-
     <section className="ls-hero-grid"><div><p className="ls-eyebrow">SPORTS EVENT CONTROL</p><h1>Synchronize the audience.</h1><p className="ls-muted">Create a match, choose its colors, then control the music and audience interactions from one event page.</p></div><div className="ls-orbit"><div className="ls-arena" style={{ borderColor: home.primaryColor }}><span style={{ color: home.primaryColor }}>LIGHTSYNC</span></div></div></section>
-
-    <section className="ls-card">
-      <div className="ls-section-title"><div><p className="ls-eyebrow">NEW SPORTS EVENT</p><h2>Create a match</h2></div></div>
-
-      <div className="ls-form-grid">
-        <input className="ls-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
-        <input className="ls-input" placeholder="Venue" value={venue} onChange={e => setVenue(e.target.value)} />
-        <select className="ls-input" value={sport} onChange={e => setSport(e.target.value)}><option>Basketball</option><option>Football</option><option>Volleyball</option><option>Handball</option><option>Other</option></select>
-      </div>
-
-      <div className="ls-matchup" style={{ marginBottom: 4 }}>
-        <div className="ls-matchup-side" style={{ '--side-color': home.primaryColor } as CSSProperties}><strong>{home.name.trim() || 'Home Team'}</strong><small>HOME</small></div>
-        <div className="ls-matchup-vs">VS</div>
-        <div className="ls-matchup-side" style={{ '--side-color': away.primaryColor } as CSSProperties}><strong>{away.name.trim() || 'Away Team'}</strong><small>AWAY</small></div>
-      </div>
+    <section className="ls-card"><div className="ls-section-title"><div><p className="ls-eyebrow">NEW SPORTS EVENT</p><h2>Create a match</h2></div></div>
+      <div className="ls-form-grid"><input className="ls-input" type="date" value={date} onChange={e => setDate(e.target.value)} /><input className="ls-input" placeholder="Venue" value={venue} onChange={e => setVenue(e.target.value)} /><select className="ls-input" value={sport} onChange={e => setSport(e.target.value)}><option>Basketball</option><option>Football</option><option>Volleyball</option><option>Handball</option><option>Other</option></select></div>
+      <div className="ls-matchup" style={{ marginBottom: 4 }}><div className="ls-matchup-side" style={{ '--side-color': home.primaryColor } as CSSProperties}><strong>{home.name.trim() || 'Home Team'}</strong><small>HOME</small></div><div className="ls-matchup-vs">VS</div><div className="ls-matchup-side" style={{ '--side-color': away.primaryColor } as CSSProperties}><strong>{away.name.trim() || 'Away Team'}</strong><small>AWAY</small></div></div>
       <p className="ls-muted" style={{ marginTop: 10, fontSize: 12 }}>The event name is automatically created as Home Team vs Away Team.</p>
-
       <div className="ls-team-grid">{teamFields('home', home, setHome)}{teamFields('away', away, setAway)}</div>
-
-      <div className="ls-light-grid">
-        <div className="ls-light-option"><span>PHONE LIGHT TEAM</span><select className="ls-input" value={lightTeam} onChange={e => setLightTeam(e.target.value as 'home' | 'away' | 'custom')}><option value="home">Home team primary</option><option value="away">Away team primary</option><option value="custom">Custom</option></select></div>
-        <div className="ls-light-option"><span>CUSTOM LIGHT COLOR</span><label className={`ls-swatch-field ${lightTeam !== 'custom' ? 'is-disabled' : ''}`}><input type="color" value={customLightColor} disabled={lightTeam !== 'custom'} onChange={e => setCustomLightColor(e.target.value.toUpperCase())} /><div><span>{lightTeam === 'custom' ? 'TAP TO PICK' : 'ENABLE CUSTOM'}</span><b>{customLightColor}</b></div></label></div>
-        <div className="ls-light-option"><span>RESULT</span><div className="ls-swatch-field" style={{ cursor: 'default' }}><span className="ls-swatch-dot" style={{ '--side-color': lightColor, width: 30, height: 30 } as CSSProperties} /><div><span>APPLIED</span><b>{lightColor}</b></div></div></div>
-      </div>
-
-      <button className="ls-button ls-primary" style={{ marginTop: 18, width: '100%' }} disabled={creating} onClick={() => void handleCreate()}>{creating ? 'CREATING...' : '+ CREATE SPORTS EVENT'}</button>
-      {message && <p className="ls-error">{message}</p>}
+      <div className="ls-light-grid"><div className="ls-light-option"><span>PHONE LIGHT TEAM</span><select className="ls-input" value={lightTeam} onChange={e => setLightTeam(e.target.value as 'home' | 'away' | 'custom')}><option value="home">Home team primary</option><option value="away">Away team primary</option><option value="custom">Custom</option></select></div><div className="ls-light-option"><span>CUSTOM LIGHT COLOR</span><label className={`ls-swatch-field ${lightTeam !== 'custom' ? 'is-disabled' : ''}`}><input type="color" value={customLightColor} disabled={lightTeam !== 'custom'} onChange={e => setCustomLightColor(e.target.value.toUpperCase())} /><div><span>{lightTeam === 'custom' ? 'TAP TO PICK' : 'ENABLE CUSTOM'}</span><b>{customLightColor}</b></div></label></div><div className="ls-light-option"><span>RESULT</span><div className="ls-swatch-field" style={{ cursor: 'default' }}><span className="ls-swatch-dot" style={{ '--side-color': lightColor, width: 30, height: 30 } as CSSProperties} /><div><span>APPLIED</span><b>{lightColor}</b></div></div></div></div>
+      <button className="ls-button ls-primary" style={{ marginTop: 18, width: '100%' }} disabled={creating} onClick={() => void handleCreate()}>{creating ? 'CREATING...' : '+ CREATE SPORTS EVENT'}</button>{message && <p className="ls-error">{message}</p>}
     </section>
-
     <section className="ls-card"><div className="ls-section-title"><div><p className="ls-eyebrow">YOUR SPORTS EVENTS</p><h2>Matches</h2></div><span className="ls-count">{shows.length}</span></div>{shows.length === 0 ? <div className="ls-empty">No sports events yet.</div> : <div className="ls-show-list">{shows.map(show => <div className="ls-show-row" key={show.id}><button className="ls-show-main" style={{ flex: 1, border: 0, background: 'transparent', color: 'inherit', cursor: 'pointer', textAlign: 'left', padding: '17px' }} onClick={() => navigate(`/admin/event/${show.id}`)}><div><strong>{show.name}</strong><span>{show.venue} &middot; {show.date}</span></div><div><span className={`ls-status ls-${show.status}`}>{show.status}</span><b>&rarr;</b></div></button><button className="ls-delete-show" style={{ marginRight: 10, border: '1px solid #45494e', background: '#111315', color: '#c9cdd2', borderRadius: 8, padding: '8px 10px', fontSize: 10, fontWeight: 800, letterSpacing: '.08em', cursor: 'pointer' }} onClick={() => void handleDelete(show)} disabled={deletingId === show.id}>{deletingId === show.id ? 'DELETING...' : 'DELETE'}</button></div>)}</div>}</section>
   </main>;
 }
