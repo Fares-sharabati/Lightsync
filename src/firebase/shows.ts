@@ -19,7 +19,7 @@ export async function createShow(organizerId: string, input: CreateShowInput) {
   await set(showRef, show);
   try {
     await set(ref(db, `publicShows/${showId}`), { name: show.name, date: show.date, venue: show.venue, kind: 'sports', status: show.status, showStartTime: null, lightTimeline: null, screenLightColor: show.screenLightColor, phoneUiColor: show.phoneUiColor });
-    await set(ref(db, `showStats/${showId}`), { totalScans: 0, totalJoined: 0, peakConnected: 0 });
+    await set(ref(db, `showStats/${showId}`), { totalJoined: 0, peakConnected: 0 });
   } catch (error) {
     try { await set(showRef, null); } catch { /* preserve the original error */ }
     throw error;

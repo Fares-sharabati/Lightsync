@@ -16,12 +16,16 @@ export default function Admin() {
   const [lightTeam, setLightTeam] = useState<'home' | 'away' | 'custom'>('home'); const [customLightColor, setCustomLightColor] = useState('#FFFFFF');
   const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [creating, setCreating] = useState(false); const [deletingId, setDeletingId] = useState<string | null>(null); const [message, setMessage] = useState('');
   const [authenticated, setAuthenticated] = useState(!!auth.currentUser && !auth.currentUser.isAnonymous);
+  const [search, setSearch] = useState(''); const [showFinished, setShowFinished] = useState(false);
 
   useEffect(() => auth.onAuthStateChanged(user => setAuthenticated(!!user && !user.isAnonymous)), [auth]);
   useEffect(() => { if (!authenticated || !auth.currentUser) return; return watchOrganizerShows(auth.currentUser.uid, setShows); }, [authenticated, auth]);
 
   const theme = useMemo(() => ({ ...baseTheme, '--ls-accent': home.primaryColor || '#FFFFFF', '--ls-accent-2': away.primaryColor || home.primaryColor || '#FFFFFF' }) as CSSProperties, [home.primaryColor, away.primaryColor]);
   const lightColor = lightTeam === 'away' ? away.primaryColor : lightTeam === 'custom' ? customLightColor : home.primaryColor;
+  const filteredShows = useMemo(() => { const term = search.trim().toLowerCase(); return term ? shows.filter(show => show.name.toLowerCase().includes(term) || show.venue.toLowerCase().includes(term)) : shows; }, [shows, search]);
+  const upcomingShows = useMemo(() => filteredShows.filter(show => show.status !== 'finished').sort((a, b) => a.date.localeCompare(b.date)), [filteredShows]);
+  const finishedShows = useMemo(() => filteredShows.filter(show => show.status === 'finished').sort((a, b) => b.date.localeCompare(a.date)), [filteredShows]);
 
   async function login() { try { setMessage(''); await signInOrganizer(email.trim(), password); } catch (error) { console.error(error); setMessage('Login failed. Check your organizer email and password.'); } }
 
@@ -57,6 +61,8 @@ export default function Admin() {
     </div>
   );
 
+  const renderShowRow = (show: Show) => <div className="ls-show-row" key={show.id}><button className="ls-show-main" style={{ flex: 1, border: 0, background: 'transparent', color: 'inherit', cursor: 'pointer', textAlign: 'left', padding: '17px' }} onClick={() => navigate(`/admin/event/${show.id}`)}><div><strong>{show.name}</strong><span>{show.venue} &middot; {show.date}</span></div><div><span className={`ls-status ls-${show.status}`}>{show.status}</span><b>&rarr;</b></div></button><button className="ls-delete-show" style={{ marginRight: 10, border: '1px solid #45494e', background: '#111315', color: '#c9cdd2', borderRadius: 8, padding: '8px 10px', fontSize: 10, fontWeight: 800, letterSpacing: '.08em', cursor: 'pointer' }} onClick={() => void handleDelete(show)} disabled={deletingId === show.id}>{deletingId === show.id ? 'DELETING...' : 'DELETE'}</button></div>;
+
   return <main className="ls-shell" style={theme}>
     <header className="ls-header"><div><div className="ls-brand">LIGHTSYNC</div><p className="ls-eyebrow">SPORTS CONTROL</p></div><button className="ls-button ls-secondary" onClick={() => navigate('/')}>HOME</button></header>
     <section className="ls-hero-grid"><div><p className="ls-eyebrow">SPORTS EVENT CONTROL</p><h1>Synchronize the audience.</h1><p className="ls-muted">Create a match, choose its colors, then control the music and audience interactions from one event page.</p></div><div className="ls-orbit"><div className="ls-arena" style={{ borderColor: home.primaryColor }}><span style={{ color: home.primaryColor }}>LIGHTSYNC</span></div></div></section>
@@ -68,6 +74,17 @@ export default function Admin() {
       <div className="ls-light-grid"><div className="ls-light-option"><span>PHONE LIGHT TEAM</span><select className="ls-input" value={lightTeam} onChange={e => setLightTeam(e.target.value as 'home' | 'away' | 'custom')}><option value="home">Home team primary</option><option value="away">Away team primary</option><option value="custom">Custom</option></select></div><div className="ls-light-option"><span>CUSTOM LIGHT COLOR</span><label className={`ls-swatch-field ${lightTeam !== 'custom' ? 'is-disabled' : ''}`}><input type="color" value={customLightColor} disabled={lightTeam !== 'custom'} onChange={e => setCustomLightColor(e.target.value.toUpperCase())} /><div><span>{lightTeam === 'custom' ? 'TAP TO PICK' : 'ENABLE CUSTOM'}</span><b>{customLightColor}</b></div></label></div><div className="ls-light-option"><span>RESULT</span><div className="ls-swatch-field" style={{ cursor: 'default' }}><span className="ls-swatch-dot" style={{ '--side-color': lightColor, width: 30, height: 30 } as CSSProperties} /><div><span>APPLIED</span><b>{lightColor}</b></div></div></div></div>
       <button className="ls-button ls-primary" style={{ marginTop: 18, width: '100%' }} disabled={creating} onClick={() => void handleCreate()}>{creating ? 'CREATING...' : '+ CREATE SPORTS EVENT'}</button>{message && <p className="ls-error">{message}</p>}
     </section>
-    <section className="ls-card"><div className="ls-section-title"><div><p className="ls-eyebrow">YOUR SPORTS EVENTS</p><h2>Matches</h2></div><span className="ls-count">{shows.length}</span></div>{shows.length === 0 ? <div className="ls-empty">No sports events yet.</div> : <div className="ls-show-list">{shows.map(show => <div className="ls-show-row" key={show.id}><button className="ls-show-main" style={{ flex: 1, border: 0, background: 'transparent', color: 'inherit', cursor: 'pointer', textAlign: 'left', padding: '17px' }} onClick={() => navigate(`/admin/event/${show.id}`)}><div><strong>{show.name}</strong><span>{show.venue} &middot; {show.date}</span></div><div><span className={`ls-status ls-${show.status}`}>{show.status}</span><b>&rarr;</b></div></button><button className="ls-delete-show" style={{ marginRight: 10, border: '1px solid #45494e', background: '#111315', color: '#c9cdd2', borderRadius: 8, padding: '8px 10px', fontSize: 10, fontWeight: 800, letterSpacing: '.08em', cursor: 'pointer' }} onClick={() => void handleDelete(show)} disabled={deletingId === show.id}>{deletingId === show.id ? 'DELETING...' : 'DELETE'}</button></div>)}</div>}</section>
+    <section className="ls-card">
+      <div className="ls-section-title"><div><p className="ls-eyebrow">YOUR SPORTS EVENTS</p><h2>Matches</h2></div><span className="ls-count">{shows.length}</span></div>
+      {shows.length > 0 && <input className="ls-input" style={{ marginBottom: 18 }} placeholder="Search by team or venue..." value={search} onChange={e => setSearch(e.target.value)} />}
+      {shows.length === 0 ? <div className="ls-empty">No sports events yet.</div> : <>
+        {upcomingShows.length === 0 && finishedShows.length === 0 && <div className="ls-empty">No events match "{search}".</div>}
+        {upcomingShows.length > 0 && <div className="ls-show-list">{upcomingShows.map(show => renderShowRow(show))}</div>}
+        {finishedShows.length > 0 && <div style={{ marginTop: upcomingShows.length > 0 ? 22 : 0 }}>
+          <button type="button" className="ls-button ls-secondary" style={{ width: '100%', marginBottom: showFinished ? 10 : 0 }} onClick={() => setShowFinished(value => !value)}>{showFinished ? 'HIDE' : 'SHOW'} {finishedShows.length} FINISHED EVENT{finishedShows.length === 1 ? '' : 'S'} {showFinished ? '\u25B2' : '\u25BC'}</button>
+          {showFinished && <div className="ls-show-list">{finishedShows.map(show => renderShowRow(show))}</div>}
+        </div>}
+      </>}
+    </section>
   </main>;
 }
