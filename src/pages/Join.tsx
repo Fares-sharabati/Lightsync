@@ -129,7 +129,6 @@ export default function Join() {
   if (!event || !eventId) return <main className="light-page"><div className="light-content"><div className="light-logo">LIGHTSYNC</div><p>{error || 'Show not found.'}</p><button className="button button-secondary" onClick={() => navigate('/')}>Back</button></div></main>;
 
   const uiColor = event.phoneUiColor && /^#[0-9a-fA-F]{6}$/.test(event.phoneUiColor) ? event.phoneUiColor : (game?.lightTeam === 'away' ? game.awayTeam.primaryColor : game?.lightTeam === 'custom' ? game.customLightColor : game?.homeTeam.primaryColor) || '#2563EB';
-  // Live screen flash color is intentionally independent from the phone's event branding.
   const flashColor = event.screenLightColor && /^#[0-9a-fA-F]{6}$/.test(event.screenLightColor) ? event.screenLightColor : uiColor;
   const running = event.status === 'running';
   const uiBackground = `linear-gradient(145deg, ${uiColor} 0%, ${uiColor}CC 38%, #08080c 100%)`;
@@ -153,12 +152,18 @@ export default function Join() {
     {interactionCard}
   </div></main>;
 
-  return <main className="light-page" style={{ background: lightState ? flashColor : '#08080c', color: lightState ? '#050505' : '#fff', transition: 'background-color .08s linear, color .08s linear' }}><div className="light-content" style={{ maxWidth: 520, width: '100%', boxSizing: 'border-box', padding: '28px 20px' }}>
+  // During an ON beat, turn the entire web page into the screen flash.
+  // No cards, text, margins or content remain visible, so the whole viewport emits the selected color.
+  if (running && lightState) {
+    return <main className="light-page" aria-label="LightSync full screen flash" style={{ position: 'fixed', inset: 0, width: '100vw', height: '100vh', minHeight: '100dvh', padding: 0, margin: 0, display: 'block', background: flashColor, color: '#000', overflow: 'hidden' }} />;
+  }
+
+  return <main className="light-page" style={{ background: '#08080c', color: '#fff' }}><div className="light-content" style={{ maxWidth: 520, width: '100%', boxSizing: 'border-box', padding: '28px 20px' }}>
     <div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div>
     {game && <div style={{ marginTop: 10, fontSize: 14, fontWeight: 800, opacity: .85 }}>{game.homeTeam.name} <span style={{ opacity: .55, margin: '0 7px' }}>VS</span> {game.awayTeam.name}</div>}
     <div className="light-status" style={{ marginTop: 12 }}>{running ? 'SHOW LIVE' : 'SYSTEM RUNNING'}</div>
     {!running && <><div style={{ fontSize: '2rem', fontWeight: 900, marginTop: 28 }}>FLASHLIGHT SHOW WILL START SOON</div><p className="waiting-description" style={{ marginTop: 8 }}>Stay connected. The organizer can start the light show at any time.</p></>}
-    {running && <><div style={{ fontSize: '3.5rem', fontWeight: 900, marginTop: 26 }}>{lightState ? 'ON' : 'OFF'}</div><p className="waiting-description" style={{ marginTop: 4 }}>Your flashlight is synchronized with the show.</p></>}
+    {running && <><div style={{ fontSize: '3.5rem', fontWeight: 900, marginTop: 26 }}>OFF</div><p className="waiting-description" style={{ marginTop: 4 }}>Your flashlight is synchronized with the show.</p></>}
     {interactionCard}
     {error && <p className="light-error" style={{ marginTop: 16 }}>{error}</p>}
   </div></main>;
