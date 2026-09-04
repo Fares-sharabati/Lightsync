@@ -24,6 +24,7 @@ export default function Join() {
   const [answer, setAnswer] = useState('');
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [submittedInteractionId, setSubmittedInteractionId] = useState<string | null>(null);
   const trackRef = useRef<MediaStreamTrack | null>(null);
   const nextTimerRef = useRef<number | null>(null);
   const currentLightRef = useRef(false);
@@ -58,7 +59,10 @@ export default function Join() {
     return () => { cancelled = true; stopShow?.(); stopGame?.(); stopInteractions?.(); };
   }, [eventId]);
 
-  useEffect(() => { setSelectedOption(''); setAnswer(''); setMessage(''); setSending(false); }, [activeInteraction?.id]);
+  useEffect(() => {
+    setSelectedOption(''); setAnswer(''); setMessage(''); setSending(false);
+    setSubmittedInteractionId(null);
+  }, [activeInteraction?.id]);
 
   function clearNextTimer() { if (nextTimerRef.current !== null) window.clearTimeout(nextTimerRef.current); nextTimerRef.current = null; }
   async function setFlash(enabled: boolean) {
@@ -100,11 +104,15 @@ export default function Join() {
     if (!eventId || !activeInteraction || sending) return;
     if (activeInteraction.type === 'poll' && !selectedOption) { setMessage('Choose an answer first.'); return; }
     if (activeInteraction.type === 'question' && !answer.trim()) { setMessage('Enter an answer first.'); return; }
+    const interactionId = activeInteraction.id;
     setSending(true); setMessage('');
     try {
       const uid = (await ensureAnonymousAuth()).uid;
-      await submitSportsResponse(eventId, activeInteraction.id, uid, activeInteraction.type === 'poll' ? { optionId: selectedOption } : { answer: answer.trim().slice(0, 200) });
+      await submitSportsResponse(eventId, interactionId, uid, activeInteraction.type === 'poll' ? { optionId: selectedOption } : { answer: answer.trim().slice(0, 200) });
+      setSubmittedInteractionId(interactionId);
       setMessage('Answer submitted ✓');
+      setSelectedOption('');
+      setAnswer('');
     } catch (err) { console.error(err); setMessage('Could not submit your answer. Please try again.'); }
     finally { setSending(false); }
   }
@@ -122,18 +130,18 @@ export default function Join() {
   const uiColor = event.phoneUiColor && /^#[0-9a-fA-F]{6}$/.test(event.phoneUiColor) ? event.phoneUiColor : getSportsLightColor(game);
   const flashColor = event.screenLightColor && /^#[0-9a-fA-F]{6}$/.test(event.screenLightColor) ? event.screenLightColor : uiColor;
   const running = event.status === 'running';
+  const interactionVisible = !!activeInteraction && submittedInteractionId !== activeInteraction.id;
   const uiBackground = `linear-gradient(145deg, ${uiColor} 0%, ${uiColor}CC 38%, #08080c 100%)`;
-  const card = { width: '100%', marginTop: 22, padding: 20, borderRadius: 22, background: 'rgba(0,0,0,.30)', color: '#fff', border: '1px solid rgba(255,255,255,.22)', backdropFilter: 'blur(14px)', boxSizing: 'border-box' as const, textAlign: 'left' as const };
 
-  const interactionCard = activeInteraction ? <section style={card}>
+  const interactionCard = interactionVisible ? <section style={{ width: '100%', marginTop: 22, padding: 20, borderRadius: 22, background: 'rgba(0,0,0,.30)', color: '#fff', border: '1px solid rgba(255,255,255,.22)', backdropFilter: 'blur(14px)', boxSizing: 'border-box' as const, textAlign: 'left' as const }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 10px #22c55e' }} /><span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1.5, opacity: .75 }}>{activeInteraction.type === 'poll' ? 'LIVE POLL' : 'LIVE QUESTION'}</span></div>
     <div style={{ fontSize: 21, fontWeight: 900, lineHeight: 1.25 }}>{activeInteraction.question}</div>
-    {activeInteraction.type === 'poll' ? <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>{Object.entries(activeInteraction.options ?? {}).map(([id, label]) => <button key={id} type="button" disabled={sending || message.startsWith('Answer submitted')} onClick={() => { setSelectedOption(id); setMessage(''); }} style={{ width: '100%', minHeight: 52, padding: '12px 15px', borderRadius: 14, border: selectedOption === id ? `3px solid ${uiColor}` : '1px solid rgba(255,255,255,.24)', background: selectedOption === id ? uiColor : 'rgba(255,255,255,.08)', color: '#fff', fontWeight: 800, fontSize: 15, textAlign: 'left' }}><span style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>{label}</span><span>{selectedOption === id ? '✓' : '○'}</span></span></button>)}</div> : <textarea value={answer} onChange={e => { setAnswer(e.target.value); setMessage(''); }} maxLength={200} placeholder="Type your answer..." rows={4} style={{ width: '100%', marginTop: 18, boxSizing: 'border-box', borderRadius: 14, border: '1px solid rgba(255,255,255,.24)', padding: 14, fontSize: 16, resize: 'vertical', background: 'rgba(255,255,255,.08)', color: '#fff' }} />}
-    {!message.startsWith('Answer submitted') && <button type="button" disabled={sending} onClick={() => void submitInteraction()} style={{ width: '100%', marginTop: 14, minHeight: 50, border: 0, borderRadius: 14, background: uiColor, color: '#fff', fontWeight: 900, fontSize: 15, opacity: sending ? .65 : 1 }}>{sending ? 'SUBMITTING...' : activeInteraction.type === 'poll' ? 'SUBMIT VOTE' : 'SUBMIT ANSWER'}</button>}
+    {activeInteraction.type === 'poll' ? <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>{Object.entries(activeInteraction.options ?? {}).map(([id, label]) => <button key={id} type="button" disabled={sending} onClick={() => { setSelectedOption(id); setMessage(''); }} style={{ width: '100%', minHeight: 52, padding: '12px 15px', borderRadius: 14, border: selectedOption === id ? `3px solid ${uiColor}` : '1px solid rgba(255,255,255,.24)', background: selectedOption === id ? uiColor : 'rgba(255,255,255,.08)', color: '#fff', fontWeight: 800, fontSize: 15, textAlign: 'left' }}><span style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>{label}</span><span>{selectedOption === id ? '✓' : '○'}</span></span></button>)}</div> : <textarea value={answer} onChange={e => { setAnswer(e.target.value); setMessage(''); }} maxLength={200} placeholder="Type your answer..." rows={4} style={{ width: '100%', marginTop: 18, boxSizing: 'border-box', borderRadius: 14, border: '1px solid rgba(255,255,255,.24)', padding: 14, fontSize: 16, resize: 'vertical', background: 'rgba(255,255,255,.08)', color: '#fff' }} />}
+    <button type="button" disabled={sending} onClick={() => void submitInteraction()} style={{ width: '100%', marginTop: 14, minHeight: 50, border: 0, borderRadius: 14, background: uiColor, color: '#fff', fontWeight: 900, fontSize: 15, opacity: sending ? .65 : 1 }}>{sending ? 'SUBMITTING...' : activeInteraction.type === 'poll' ? 'SUBMIT VOTE' : 'SUBMIT ANSWER'}</button>
     {message && <div style={{ marginTop: 12, fontSize: 14, fontWeight: 800, textAlign: 'center', color: message.startsWith('Could not') ? '#fca5a5' : '#fff' }}>{message}</div>}
   </section> : null;
 
-  if (!joined) return <main className="light-page" style={{ background: uiBackground, color: '#fff', minHeight: '100vh' }}><div className="light-content" style={{ maxWidth: 520, width: '100%', boxSizing: 'border-box', padding: '30px 20px' }}>
+  if (!joined) return <main className="light-page" style={{ background: uiBackground, color: '#fff', minHeight: '100dvh', width: '100vw', overflowX: 'hidden' }}><div className="light-content" style={{ maxWidth: 520, width: '100%', boxSizing: 'border-box', padding: '30px 20px' }}>
     <div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div>
     {game && <div style={{ marginTop: 10, fontSize: 14, fontWeight: 800, opacity: .9 }}>{game.homeTeam.name} <span style={{ opacity: .55, margin: '0 7px' }}>VS</span> {game.awayTeam.name}</div>}
     <div className="light-status" style={{ marginTop: 12 }}>SYSTEM RUNNING</div>
@@ -143,7 +151,7 @@ export default function Join() {
     {interactionCard}
   </div></main>;
 
-  return <main className="light-page" style={{ background: lightState ? flashColor : '#08080c', color: '#fff', transition: 'background-color .08s linear' }}><div className="light-content" style={{ maxWidth: 520, width: '100%', boxSizing: 'border-box', padding: '28px 20px' }}>
+  return <main className="light-page" style={{ background: lightState ? flashColor : '#08080c', color: lightState ? '#050505' : '#fff', transition: 'background-color .08s linear', minHeight: '100dvh', width: '100vw', overflowX: 'hidden' }}><div className="light-content" style={{ maxWidth: 520, width: '100%', boxSizing: 'border-box', padding: '28px 20px' }}>
     <div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div>
     {game && <div style={{ marginTop: 10, fontSize: 14, fontWeight: 800, opacity: .85 }}>{game.homeTeam.name} <span style={{ opacity: .55, margin: '0 7px' }}>VS</span> {game.awayTeam.name}</div>}
     <div className="light-status" style={{ marginTop: 12, background: lightState ? 'rgba(0,0,0,.18)' : undefined }}>{running ? 'SHOW LIVE' : 'SYSTEM RUNNING'}</div>
