@@ -1,4 +1,70 @@
-/* Mobile participant branding overrides */
+/* LightSync mobile participant experience */
+.light-page {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  position: relative;
+  overflow-x: hidden;
+}
+.light-page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% -10%, rgba(255,255,255,.20), transparent 38%), linear-gradient(180deg, rgba(255,255,255,.03), transparent 35%);
+  mix-blend-mode: screen;
+}
+.light-content { position: relative; z-index: 1; }
 .light-logo {
   color: #ffffff !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  letter-spacing: .28em !important;
+  text-shadow: 0 2px 24px rgba(255,255,255,.2);
+}
+.light-event-name {
+  font-size: clamp(28px, 8vw, 42px) !important;
+  line-height: 1.02 !important;
+  font-weight: 950 !important;
+  letter-spacing: -.04em !important;
+  margin-top: 14px !important;
+  text-wrap: balance;
+}
+.light-status {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  border: 1px solid rgba(255,255,255,.25) !important;
+  background: rgba(0,0,0,.24) !important;
+  backdrop-filter: blur(12px) !important;
+  border-radius: 999px !important;
+  padding: 8px 12px !important;
+  font-size: 10px !important;
+  font-weight: 900 !important;
+  letter-spacing: .15em !important;
+}
+.light-status::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #35e47b;
+  box-shadow: 0 0 12px #35e47b;
+}
+.light-description, .waiting-description {
+  color: rgba(255,255,255,.72) !important;
+  line-height: 1.65 !important;
+}
+.light-error {
+  color: #fecaca !important;
+  background: rgba(127,29,29,.25) !important;
+  border: 1px solid rgba(248,113,113,.3) !important;
+  border-radius: 14px !important;
+  padding: 12px 14px !important;
+}
+
+@media (max-width: 560px) {
+  .light-content { padding-left: 16px !important; padding-right: 16px !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .light-page, .light-page * { transition: none !important; animation: none !important; }
 }
