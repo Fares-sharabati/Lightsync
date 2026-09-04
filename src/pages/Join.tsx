@@ -5,7 +5,6 @@ import { watchPublicShow, type PublicShow } from '../firebase/shows';
 import { watchSportsGame, getSportsLightColor, type SportsGame } from '../firebase/sportsGame';
 import { watchSportsInteractions, submitSportsResponse, type SportsInteraction } from '../firebase/sports';
 import { registerParticipant } from '../firebase/participants';
-import { recordQrScan } from '../firebase/analytics';
 import { getLightStateAtTime, getNextLightEvent, type LightTimeline } from '../lightSync/timeline';
 
 type TorchConstraints = MediaTrackConstraintSet & { torch?: boolean };
@@ -28,7 +27,6 @@ export default function Join() {
   const trackRef = useRef<MediaStreamTrack | null>(null);
   const nextTimerRef = useRef<number | null>(null);
   const currentLightRef = useRef(false);
-  const scanRecordedRef = useRef(false);
 
   useEffect(() => {
     if (!eventId) { setLoaded(true); setError('Invalid show link.'); return; }
@@ -39,12 +37,11 @@ export default function Join() {
     let stopInteractions: (() => void) | undefined;
     async function connect() {
       try {
-        const user = await ensureAnonymousAuth();
+        await ensureAnonymousAuth();
         if (cancelled) return;
         stopShow = watchPublicShow(showId, show => {
           if (cancelled) return;
           setEvent(show); setLoaded(true);
-          if (show && !scanRecordedRef.current) { scanRecordedRef.current = true; void recordQrScan(showId, user.uid).catch(console.error); }
           if (!show) setError('Show not found.');
         });
         stopGame = watchSportsGame(showId, setGame);
