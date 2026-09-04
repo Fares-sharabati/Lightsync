@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { watchPublicShow, type PublicShow } from '../firebase/shows';
 import { watchSportsInteractions, watchSportsResult, watchSportsScreen, type SportsInteraction, type SportsResult, type SportsScreenState } from '../firebase/sports';
 import { watchSportsGame, type SportsGame } from '../firebase/sportsGame';
+import '../styles/theme.css';
 
 export default function SportsScreen() {
   const { eventId } = useParams();
@@ -34,8 +35,8 @@ export default function SportsScreen() {
   const homeColor = game?.homeTeam.primaryColor || '#FFFFFF';
   const displayMode = interaction ? (screen?.displayMode === 'question' || interaction.type === 'question' ? 'question' : 'results') : 'idle';
 
-  return <main className="audience-screen" style={{ background: '#050607' }}>
-    <section className="audience-content" style={{ width: 'min(94vw, 1400px)', height: '92dvh' }}>
+  return <main className="audience-screen">
+    <section className="audience-content">
       <div className="audience-brand">LIGHTSYNC</div>
       <p className="audience-eyebrow">{show?.name ?? 'LIVE SPORTS'}</p>
       {game && <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 'clamp(14px, 3vw, 36px)', margin: '10px 0 24px', fontWeight: 900 }}><div style={{ borderBottom: `4px solid ${game.homeTeam.primaryColor || '#FFFFFF'}`, paddingBottom: 5 }}>{game.homeTeam.name}</div><span style={{ opacity: .5 }}>VS</span><div style={{ borderBottom: `4px solid ${game.awayTeam.primaryColor || '#FFFFFF'}`, paddingBottom: 5 }}>{game.awayTeam.name}</div></div>}
