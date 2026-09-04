@@ -141,23 +141,44 @@ export default function Join() {
     {message && <div style={{ marginTop: 12, fontSize: 14, fontWeight: 800, textAlign: 'center', color: message.startsWith('Could not') ? '#fca5a5' : '#fff' }}>{message}</div>}
   </section> : null;
 
-  if (!joined) return <main className="light-page" style={{ background: uiBackground, color: '#fff', minHeight: '100dvh', width: '100vw', overflowX: 'hidden' }}><div className="light-content" style={{ maxWidth: 520, width: '100%', boxSizing: 'border-box', padding: '30px 20px' }}>
+  const pageStyle = {
+    color: '#fff',
+    minHeight: '100dvh',
+    width: '100%',
+    minWidth: 0,
+    boxSizing: 'border-box' as const,
+    overflowX: 'hidden' as const,
+  };
+
+  const contentStyle = {
+    width: '100%',
+    maxWidth: 'none',
+    minHeight: '100dvh',
+    boxSizing: 'border-box' as const,
+    padding: '30px max(16px, env(safe-area-inset-left)) 30px max(16px, env(safe-area-inset-right))',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    justifyContent: 'center',
+  };
+
+  if (!joined) return <main className="light-page" style={{ ...pageStyle, background: uiBackground }}><div className="light-content" style={contentStyle}>
     <div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div>
     {game && <div style={{ marginTop: 10, fontSize: 14, fontWeight: 800, opacity: .9 }}>{game.homeTeam.name} <span style={{ opacity: .55, margin: '0 7px' }}>VS</span> {game.awayTeam.name}</div>}
     <div className="light-status" style={{ marginTop: 12 }}>SYSTEM RUNNING</div>
-    <p className="light-description" style={{ marginTop: 18 }}>You are connected to the event. Join to enable your flashlight.</p>
+    <p className="light-description" style={{ marginTop: 18, maxWidth: 520 }}>You are connected to the event. Join to enable your flashlight.</p>
     <button style={{ width: '100%', maxWidth: 360, minHeight: 54, border: 0, borderRadius: 16, background: '#fff', color: uiColor, fontWeight: 900, fontSize: 16 }} onClick={() => void joinShow()}>JOIN SHOW</button>
     {error && <p className="light-error">{error}</p>}
     {interactionCard}
   </div></main>;
 
-  return <main className="light-page" style={{ background: lightState ? flashColor : '#08080c', color: lightState ? '#050505' : '#fff', transition: 'background-color .08s linear', minHeight: '100dvh', width: '100vw', overflowX: 'hidden' }}><div className="light-content" style={{ maxWidth: 520, width: '100%', boxSizing: 'border-box', padding: '28px 20px' }}>
+  return <main className="light-page" style={{ ...pageStyle, background: lightState ? flashColor : '#08080c', color: lightState ? '#050505' : '#fff', transition: 'background-color .08s linear' }}><div className="light-content" style={contentStyle}>
     <div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div>
     {game && <div style={{ marginTop: 10, fontSize: 14, fontWeight: 800, opacity: .85 }}>{game.homeTeam.name} <span style={{ opacity: .55, margin: '0 7px' }}>VS</span> {game.awayTeam.name}</div>}
     <div className="light-status" style={{ marginTop: 12, background: lightState ? 'rgba(0,0,0,.18)' : undefined }}>{running ? 'SHOW LIVE' : 'SYSTEM RUNNING'}</div>
-    {!running && <><div style={{ fontSize: '2rem', fontWeight: 900, marginTop: 28 }}>FLASHLIGHT SHOW WILL START SOON</div><p className="waiting-description" style={{ marginTop: 8 }}>Stay connected. The organizer can start the light show at any time.</p></>}
-    {running && <><div style={{ fontSize: '3.5rem', fontWeight: 900, marginTop: 26, color: lightState ? '#050505' : '#fff' }}>{lightState ? 'ON' : 'OFF'}</div><p className="waiting-description" style={{ marginTop: 4, color: lightState ? 'rgba(0,0,0,.7)' : undefined }}>Your flashlight is synchronized with the show.</p></>}
+    {!running && <><div style={{ fontSize: 'clamp(1.7rem, 8vw, 2.8rem)', fontWeight: 900, marginTop: 28, maxWidth: 720 }}>FLASHLIGHT SHOW WILL START SOON</div><p className="waiting-description" style={{ marginTop: 8, maxWidth: 520 }}>Stay connected. The organizer can start the light show at any time.</p></>}
+    {running && <><div style={{ fontSize: 'clamp(3rem, 16vw, 5rem)', fontWeight: 900, marginTop: 26, color: lightState ? '#050505' : '#fff' }}>{lightState ? 'ON' : 'OFF'}</div><p className="waiting-description" style={{ marginTop: 4, color: lightState ? 'rgba(0,0,0,.7)' : undefined }}>Your flashlight is synchronized with the show.</p></>}
     {interactionCard}
-    {error && <p className="light-error" style={{ marginTop: 16 }}>{error}</p>}
+    {error && <p className="light-error" style={{ marginTop: 16, maxWidth: 520 }}>{error}</p>}
   </div></main>;
 }
