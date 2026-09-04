@@ -5,8 +5,7 @@ import { watchPublicShow, type PublicShow } from '../firebase/shows';
 import { watchSportsGame, type SportsGame } from '../firebase/sportsGame';
 import ArenaHologram from '../components/ArenaHologram';
 import '../styles/theme.css';
-
-const PUBLIC_APP_URL = (import.meta.env.VITE_PUBLIC_APP_URL || 'https://lightsync-two.vercel.app').replace(/\/$/, '');
+import { PUBLIC_APP_URL } from '../constants';
 
 export default function AudienceScreen() {
   const { eventId } = useParams();

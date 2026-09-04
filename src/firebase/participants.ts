@@ -1,4 +1,4 @@
-import { onDisconnect, onValue, ref, set, update, type Unsubscribe } from 'firebase/database';
+import { onDisconnect, onValue, ref, set, type Unsubscribe } from 'firebase/database';
 import { db } from './config';
 
 export type ParticipantInfo = {
@@ -40,10 +40,6 @@ export async function registerParticipant(showId: string, participantId: string)
   await set(participantRef, info);
   await onDisconnect(participantRef).update({ connected: false });
   return participantRef;
-}
-
-export async function setParticipantConnected(showId: string, participantId: string, connected: boolean) {
-  await update(ref(db, `showParticipants/${showId}/${participantId}`), { connected });
 }
 
 export function watchParticipants(showId: string, callback: (participants: Record<string, ParticipantInfo>) => void): Unsubscribe {

@@ -35,19 +35,6 @@ export function getLightStateAtTime(
   return state;
 }
 
-export function getLightEventAtTime(
-  timeline: LightTimeline,
-  position: number
-): LightState | null {
-  if (!timeline.length) return null;
-  let state: LightState = { time: 0, on: false };
-  for (const event of timeline) {
-    if (event.time > position) break;
-    state = event;
-  }
-  return state;
-}
-
 export function getNextLightEvent(
   timeline: LightTimeline,
   position: number

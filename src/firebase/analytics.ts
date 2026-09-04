@@ -19,7 +19,7 @@ export async function recordQrScan(showId: string, uid: string) {
   await set(push(ref(db, `scanEvents/${showId}/${uid}`)), { scannedAt: Date.now() });
 }
 
-export async function syncShowStats(showId: string, totalScans: number, _totalJoined: number, connected: number) {
+export async function syncShowStats(showId: string, totalScans: number, connected: number) {
   const participantsSnapshot = await get(ref(db, `showParticipants/${showId}`));
   let totalJoined = 0;
   participantsSnapshot.forEach(() => {

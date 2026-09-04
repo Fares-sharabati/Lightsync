@@ -5,7 +5,6 @@ import Join from './pages/Join';
 import EventControl from './pages/EventControl';
 import AudienceScreen from './pages/AudienceScreen';
 import SportsScreen from './pages/SportsScreen';
-import SportsFan from './pages/SportsFan';
 
 export default function App() {
   return <BrowserRouter><Routes>
@@ -17,6 +16,5 @@ export default function App() {
     <Route path="/sports-screen/:eventId" element={<SportsScreen />} />
     <Route path="/join" element={<Join />} />
     <Route path="/join/:eventId" element={<Join />} />
-    <Route path="/join/:eventId/interactions" element={<SportsFan />} />
   </Routes></BrowserRouter>;
 }

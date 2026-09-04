@@ -40,8 +40,8 @@ export default function Admin() {
   }
 
   async function handleDelete(show: Show) {
-    if (!auth.currentUser || deletingId) return; if (!window.confirm(`Delete \"${show.name}\"?\n\nThis permanently removes the event and audience data.`)) return;
-    setDeletingId(show.id); setMessage(''); try { await deleteShow(show.id); setMessage(`\"${show.name}\" was deleted.`); } catch (error) { console.error(error); setMessage(error instanceof Error ? error.message : 'Could not delete the event.'); } finally { setDeletingId(null); }
+    if (!auth.currentUser || deletingId) return; if (!window.confirm(`Delete "${show.name}"?\n\nThis permanently removes the event and audience data.`)) return;
+    setDeletingId(show.id); setMessage(''); try { await deleteShow(show.id); setMessage(`"${show.name}" was deleted.`); } catch (error) { console.error(error); setMessage(error instanceof Error ? error.message : 'Could not delete the event.'); } finally { setDeletingId(null); }
   }
 
   if (!authenticated) return <main className="ls-shell" style={baseTheme}><section className="ls-auth-card"><div className="ls-brand">LIGHTSYNC</div><p className="ls-eyebrow">ORGANIZER ACCESS</p><h1>Control the crowd.</h1><p className="ls-muted">Sports event control for LightSync.</p><input className="ls-input" type="email" placeholder="Organizer email" value={email} onChange={e => setEmail(e.target.value)} /><input className="ls-input" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && void login()} /><button className="ls-button ls-primary" onClick={() => void login()}>ENTER DASHBOARD</button>{message && <p className="ls-error">{message}</p>}</section></main>;

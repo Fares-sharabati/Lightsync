@@ -1,19 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { onDisconnect, ref, set } from 'firebase/database';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ensureAnonymousAuth } from '../firebase/auth';
 import { watchPublicShow, type PublicShow } from '../firebase/shows';
-import { watchSportsGame, type SportsGame } from '../firebase/sportsGame';
+import { watchSportsGame, getSportsLightColor, type SportsGame } from '../firebase/sportsGame';
 import { watchSportsInteractions, submitSportsResponse, type SportsInteraction } from '../firebase/sports';
-import { db } from '../firebase/config';
+import { registerParticipant } from '../firebase/participants';
 import { recordQrScan } from '../firebase/analytics';
 import { getLightStateAtTime, getNextLightEvent, type LightTimeline } from '../lightSync/timeline';
 
 type TorchConstraints = MediaTrackConstraintSet & { torch?: boolean };
 type TorchCapabilities = MediaTrackCapabilities & { torch?: boolean };
-
-function detectDevice(): string { const ua = navigator.userAgent; if (/iPad|iPhone|iPod/.test(ua)) return 'iPhone/iPad'; if (/Android/.test(ua)) return 'Android'; if (/Windows Phone/.test(ua)) return 'Windows Phone'; if (/Macintosh|Mac OS X/.test(ua)) return 'Mac'; if (/Windows/.test(ua)) return 'Windows'; if (/Linux/.test(ua)) return 'Linux'; return 'Other'; }
-function detectBrowser(): string { const ua = navigator.userAgent; if (/Edg\//.test(ua)) return 'Edge'; if (/OPR\//.test(ua)) return 'Opera'; if (/Chrome\//.test(ua) && !/Edg\//.test(ua)) return 'Chrome'; if (/Safari\//.test(ua) && !/Chrome\//.test(ua)) return 'Safari'; if (/Firefox\//.test(ua)) return 'Firefox'; return 'Other'; }
 
 export default function Join() {
   const navigate = useNavigate();
@@ -94,9 +90,7 @@ export default function Join() {
       const capabilities = track.getCapabilities?.() as TorchCapabilities | undefined;
       if (!capabilities?.torch) { stream.getTracks().forEach(t => t.stop()); throw new Error('Torch is not supported'); }
       trackRef.current = track;
-      const participantRef = ref(db, `showParticipants/${eventId}/${user.uid}`);
-      await set(participantRef, { connected: true, device: detectDevice(), browser: detectBrowser(), joinedAt: Date.now() });
-      await onDisconnect(participantRef).update({ connected: false });
+      await registerParticipant(eventId, user.uid);
       setJoined(true);
       if (event.status === 'running' && event.showStartTime && event.lightTimeline) synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline);
     } catch (err) {
@@ -128,7 +122,7 @@ export default function Join() {
   if (!loaded) return <main className="light-page"><div className="light-content"><div className="light-logo">LIGHTSYNC</div><p>Loading show...</p></div></main>;
   if (!event || !eventId) return <main className="light-page"><div className="light-content"><div className="light-logo">LIGHTSYNC</div><p>{error || 'Show not found.'}</p><button className="button button-secondary" onClick={() => navigate('/')}>Back</button></div></main>;
 
-  const uiColor = event.phoneUiColor && /^#[0-9a-fA-F]{6}$/.test(event.phoneUiColor) ? event.phoneUiColor : (game?.lightTeam === 'away' ? game.awayTeam.primaryColor : game?.lightTeam === 'custom' ? game.customLightColor : game?.homeTeam.primaryColor) || '#2563EB';
+  const uiColor = event.phoneUiColor && /^#[0-9a-fA-F]{6}$/.test(event.phoneUiColor) ? event.phoneUiColor : getSportsLightColor(game);
   const flashColor = event.screenLightColor && /^#[0-9a-fA-F]{6}$/.test(event.screenLightColor) ? event.screenLightColor : uiColor;
   const running = event.status === 'running';
   const uiBackground = `linear-gradient(145deg, ${uiColor} 0%, ${uiColor}CC 38%, #08080c 100%)`;
