@@ -36,7 +36,7 @@ export default function EventControl() {
 
   if (!loaded) return <main className="ls-shell"><div className="ls-card ls-event-loading">Loading event...</div></main>;
   if (!event || !eventId) return <main className="ls-shell"><div className="ls-card ls-event-loading"><h2>Event not found</h2><button className="ls-button ls-secondary" onClick={() => navigate('/admin')}>BACK TO DASHBOARD</button></div></main>;
-  const running = event.status === 'running'; const joinUrl = `${PUBLIC_APP_URL}/join/${eventId}`; const startDisabled = starting || running || !songFile || !generatedTimeline; const stopDisabled = starting || (!running && countdown === null); const progress = songDuration > 0 ? Math.min(100, Math.max(0, (songCurrentTime / songDuration) * 100)) : 0; const screenColor = /^#[0-9a-fA-F]{6}$/.test(event.screenLightColor || '') ? event.screenLightColor! : (game ? getSportsLightColor(game) : '#FFFFFF');
+  const running = event.status === 'running'; const joinUrl = `${PUBLIC_APP_URL}/join/${eventId}`; const startDisabled = starting || running || !songFile || !generatedTimeline; const stopDisabled = starting || (!running && countdown === null); const screenColor = /^#[0-9a-fA-F]{6}$/.test(event.screenLightColor || '') ? event.screenLightColor! : (game ? getSportsLightColor(game) : '#FFFFFF');
   const homeColor = game?.homeTeam.primaryColor || '#FFFFFF'; const awayColor = game?.awayTeam.primaryColor || homeColor;
 
   return <main className="ls-shell ls-event-shell" style={{ '--ls-accent': homeColor, '--ls-accent-2': awayColor } as React.CSSProperties}>
