@@ -1,14 +1,13 @@
-/* LightSync participant — true viewport-fitted mobile experience */
+/* LightSync participant experience — responsive, no overlays */
 .light-page {
   position: fixed !important;
   inset: 0 !important;
-  width: 100% !important;
+  width: 100vw !important;
   height: 100dvh !important;
   min-height: 100svh !important;
   margin: 0 !important;
   padding: 0 !important;
   overflow: hidden !important;
-  display: block !important;
   isolation: isolate;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-tap-highlight-color: transparent;
@@ -22,163 +21,398 @@
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background:
-    radial-gradient(circle at 50% -12%, rgba(255,255,255,.20), transparent 40%),
-    linear-gradient(180deg, rgba(255,255,255,.04), transparent 45%);
-  mix-blend-mode: screen;
+  background: radial-gradient(circle at 50% 0%, rgba(255,255,255,.16), transparent 38%), linear-gradient(180deg, rgba(255,255,255,.035), transparent 52%);
 }
 
-.light-content {
+.light-shell {
   position: relative !important;
   z-index: 1 !important;
-  width: 100% !important;
-  max-width: none !important;
-  min-width: 0 !important;
+  width: min(100%, 760px) !important;
   height: 100% !important;
   min-height: 0 !important;
-  margin: 0 !important;
-  padding-top: max(18px, env(safe-area-inset-top)) !important;
-  padding-right: max(16px, env(safe-area-inset-right)) !important;
-  padding-bottom: max(18px, env(safe-area-inset-bottom)) !important;
-  padding-left: max(16px, env(safe-area-inset-left)) !important;
-  overflow: hidden !important;
+  margin: 0 auto !important;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)) !important;
+  box-sizing: border-box !important;
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) auto !important;
+  gap: clamp(8px, 1.8vh, 18px) !important;
 }
 
-.light-logo {
+.light-shell-join {
+  grid-template-rows: auto minmax(0, 1fr) auto !important;
+}
+
+.light-header {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.light-brand {
   color: #fff !important;
   font-size: clamp(10px, 2.7vw, 12px) !important;
   font-weight: 950 !important;
   letter-spacing: .30em !important;
-  text-shadow: 0 2px 24px rgba(255,255,255,.20);
-  flex: 0 0 auto;
-}
-
-.light-event-name {
-  width: min(100%, 900px);
-  max-width: 900px;
-  margin-right: auto !important;
-  margin-left: auto !important;
-  overflow-wrap: anywhere;
-  font-size: clamp(26px, 8.5vw, 52px) !important;
-  line-height: 1.02 !important;
-  font-weight: 950 !important;
-  letter-spacing: -.045em !important;
-  text-wrap: balance;
-}
-
-.light-description,
-.waiting-description {
-  width: min(100%, 560px);
-  margin-right: auto !important;
-  margin-left: auto !important;
-  color: rgba(255,255,255,.72) !important;
-  line-height: 1.5 !important;
-  overflow-wrap: anywhere;
+  line-height: 1;
+  text-shadow: 0 2px 24px rgba(255,255,255,.2);
 }
 
 .light-status {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 8px !important;
-  border: 1px solid rgba(255,255,255,.24) !important;
+  gap: 7px !important;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255,255,255,.20) !important;
   background: rgba(0,0,0,.24) !important;
   backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px);
   border-radius: 999px !important;
-  padding: 7px 12px !important;
-  font-size: clamp(9px, 2.5vw, 10px) !important;
+  padding: 7px 10px !important;
+  color: #fff !important;
+  font-size: clamp(8px, 2.4vw, 10px) !important;
   font-weight: 900 !important;
-  letter-spacing: .15em !important;
+  letter-spacing: .13em !important;
+  white-space: nowrap;
 }
 
-.light-status::before {
-  content: '';
-  flex: 0 0 auto;
-  width: 7px;
-  height: 7px;
+.light-status > span {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
   border-radius: 50%;
   background: #35e47b;
-  box-shadow: 0 0 12px #35e47b;
+  box-shadow: 0 0 11px #35e47b;
 }
 
-.light-interaction {
-  position: fixed !important;
-  left: 50% !important;
-  bottom: max(12px, env(safe-area-inset-bottom)) !important;
-  transform: translateX(-50%) !important;
-  z-index: 20 !important;
-  width: min(calc(100vw - 24px), 520px) !important;
-  max-height: min(48dvh, 500px) !important;
+.light-main {
+  min-height: 0;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+  padding: clamp(4px, 1vh, 12px) 0;
+  box-sizing: border-box;
+}
+
+.light-kicker {
+  margin-bottom: clamp(7px, 1.2vh, 12px);
+  color: rgba(255,255,255,.60);
+  font-size: clamp(9px, 2.6vw, 11px);
+  font-weight: 900;
+  letter-spacing: .18em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.light-title {
+  width: 100%;
+  max-width: 680px;
   margin: 0 !important;
-  overflow-y: auto !important;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-  box-shadow: 0 20px 60px rgba(0,0,0,.42);
+  color: inherit;
+  font-size: clamp(25px, 8vw, 58px) !important;
+  line-height: .98 !important;
+  font-weight: 950 !important;
+  letter-spacing: -.05em !important;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 
-.light-interaction button,
-.light-interaction textarea {
+.light-matchup {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: clamp(9px, 1.8vh, 18px);
+  color: rgba(255,255,255,.86);
+  font-size: clamp(11px, 3.2vw, 15px);
+  line-height: 1.2;
+}
+
+.light-matchup span {
+  color: rgba(255,255,255,.38);
+  font-size: .8em;
+  font-weight: 800;
+  padding: 0 3px;
+}
+
+.light-state {
+  margin-top: clamp(10px, 2.2vh, 22px);
+  font-size: clamp(64px, 19vw, 138px);
+  line-height: .78;
+  font-weight: 950;
+  letter-spacing: -.08em;
+}
+
+.light-waiting {
+  width: 100%;
+  max-width: 620px;
+  margin-top: clamp(13px, 2.8vh, 28px);
+  font-size: clamp(25px, 8.2vw, 58px);
+  line-height: .94;
+  font-weight: 950;
+  letter-spacing: -.055em;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.light-copy {
+  width: min(100%, 540px);
+  margin: clamp(8px, 1.8vh, 16px) auto 0 !important;
+  color: rgba(255,255,255,.64) !important;
+  font-size: clamp(12px, 3.4vw, 15px) !important;
+  line-height: 1.4 !important;
+  overflow-wrap: anywhere;
+}
+
+.light-primary-button {
+  width: min(100%, 360px);
+  min-height: clamp(48px, 7vh, 58px);
+  margin-top: clamp(14px, 2.5vh, 24px);
+  border: 0;
+  border-radius: 16px;
+  background: #fff;
+  color: #101218;
+  font: inherit;
+  font-size: clamp(13px, 3.8vw, 16px);
+  font-weight: 950;
+  letter-spacing: .04em;
+  box-shadow: 0 12px 34px rgba(0,0,0,.24);
+  cursor: pointer;
   touch-action: manipulation;
 }
 
-.light-interaction button {
+.light-primary-button:active { transform: scale(.985); }
+
+.light-note {
+  max-width: 440px;
+  margin-top: 10px;
+  color: rgba(255,255,255,.42);
+  font-size: clamp(9px, 2.6vw, 11px);
+  line-height: 1.35;
+}
+
+.light-loading {
+  margin-top: 14px;
+  color: rgba(255,255,255,.7);
+  font-size: 14px;
+  text-align: center;
+}
+
+.light-page-loading .light-shell {
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.light-page-loading .light-primary-button { color: #101218; }
+
+.light-interaction {
+  width: 100%;
+  min-width: 0;
+  max-height: min(38vh, 330px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
+  padding: clamp(12px, 2.2vw, 18px) !important;
+  border: 1px solid rgba(255,255,255,.16) !important;
+  border-radius: clamp(16px, 4vw, 22px) !important;
+  background: rgba(10,11,15,.76) !important;
+  color: #fff !important;
+  box-shadow: 0 14px 44px rgba(0,0,0,.28);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  text-align: left;
+}
+
+.interaction-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 8px;
+  color: rgba(255,255,255,.60);
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: .16em;
+}
+
+.interaction-live-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: #35e47b;
+  box-shadow: 0 0 10px #35e47b;
+}
+
+.interaction-question {
+  font-size: clamp(16px, 4.8vw, 21px);
+  line-height: 1.2;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.interaction-options {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.interaction-option {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 12px;
+  background: rgba(255,255,255,.065);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: left;
+  touch-action: manipulation;
   cursor: pointer;
 }
 
-.light-interaction textarea {
-  font-family: inherit;
+.interaction-option.is-selected {
+  border-color: var(--choice-color, #fff);
+  background: var(--choice-color, #fff);
 }
 
+.choice-mark {
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.28);
+  font-size: 11px;
+}
+
+.interaction-answer {
+  width: 100%;
+  min-height: 82px;
+  margin-top: 12px;
+  padding: 11px;
+  box-sizing: border-box;
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 12px;
+  background: rgba(255,255,255,.065);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  resize: none;
+  outline: none;
+}
+
+.interaction-answer::placeholder { color: rgba(255,255,255,.38); }
+.interaction-answer:focus { border-color: rgba(255,255,255,.42); }
+
+.interaction-submit {
+  width: 100%;
+  min-height: 45px;
+  margin-top: 9px;
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 950;
+  letter-spacing: .03em;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.interaction-submit:disabled,
+.interaction-option:disabled { opacity: .58; cursor: default; }
+
+.interaction-message {
+  margin-top: 8px;
+  color: rgba(255,255,255,.75);
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.interaction-message.is-error { color: #fecaca; }
+
 .light-error {
-  width: min(100%, 560px);
-  margin-right: auto !important;
-  margin-left: auto !important;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 !important;
+  padding: 8px 10px !important;
+  border: 1px solid rgba(248,113,113,.25) !important;
+  border-radius: 10px !important;
+  background: rgba(127,29,29,.24) !important;
   color: #fecaca !important;
-  background: rgba(127,29,29,.25) !important;
-  border: 1px solid rgba(248,113,113,.3) !important;
-  border-radius: 14px !important;
-  padding: 10px 12px !important;
+  font-size: 11px !important;
+  line-height: 1.3 !important;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 430px) {
-  .light-content {
-    padding-right: max(13px, env(safe-area-inset-right)) !important;
-    padding-left: max(13px, env(safe-area-inset-left)) !important;
-  }
-
-  .light-logo { margin-bottom: 14px !important; }
-
-  .light-interaction {
-    width: min(calc(100vw - 20px), 520px) !important;
-    max-height: 52dvh !important;
-    border-radius: 20px !important;
-  }
+  .light-shell { padding-left: max(12px, env(safe-area-inset-left)) !important; padding-right: max(12px, env(safe-area-inset-right)) !important; }
+  .light-interaction { max-height: 34vh; }
 }
 
 @media (max-height: 700px) {
-  .light-content {
-    padding-top: max(12px, env(safe-area-inset-top)) !important;
-    padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
-  }
-
-  .light-logo { margin-bottom: 10px !important; }
-
-  .light-event-name { font-size: clamp(23px, 7.5vw, 38px) !important; }
-
-  .light-interaction {
-    max-height: 46dvh !important;
-    padding: 16px !important;
-  }
+  .light-shell { gap: 5px !important; padding-top: max(9px, env(safe-area-inset-top)) !important; padding-bottom: max(9px, env(safe-area-inset-bottom)) !important; }
+  .light-main { padding-top: 2px; padding-bottom: 2px; }
+  .light-kicker { margin-bottom: 5px; }
+  .light-title { font-size: clamp(22px, 7vw, 42px) !important; }
+  .light-matchup { margin-top: 6px; }
+  .light-state { margin-top: 8px; font-size: clamp(54px, 16vw, 96px); }
+  .light-waiting { margin-top: 9px; font-size: clamp(21px, 6.8vw, 42px); }
+  .light-copy { margin-top: 6px !important; font-size: 11px !important; }
+  .light-primary-button { margin-top: 9px; min-height: 45px; }
+  .light-note { margin-top: 5px; }
+  .light-interaction { max-height: 31vh; padding: 11px !important; }
+  .interaction-question { font-size: 15px; }
+  .interaction-options { margin-top: 8px; gap: 5px; }
+  .interaction-option { min-height: 38px; padding: 7px 10px; font-size: 12px; }
+  .interaction-answer { min-height: 60px; margin-top: 8px; }
+  .interaction-submit { min-height: 39px; margin-top: 7px; }
 }
 
-@media (max-height: 600px) {
-  .light-interaction { max-height: 42dvh !important; }
+@media (max-height: 560px) {
+  .light-shell { gap: 3px !important; }
+  .light-brand { font-size: 9px !important; }
+  .light-status { padding: 5px 8px !important; }
+  .light-kicker { display: none; }
+  .light-title { font-size: clamp(20px, 6vw, 34px) !important; }
+  .light-matchup { margin-top: 4px; font-size: 10px; }
+  .light-state { margin-top: 5px; font-size: clamp(45px, 13vw, 72px); }
+  .light-waiting { margin-top: 5px; font-size: clamp(19px, 5.8vw, 31px); }
+  .light-copy { display: none; }
+  .light-interaction { max-height: 29vh; }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .light-shell { padding-left: max(20px, env(safe-area-inset-left)) !important; padding-right: max(20px, env(safe-area-inset-right)) !important; }
+  .light-main { flex-direction: row; flex-wrap: wrap; align-content: center; justify-content: center; gap: 0 18px; }
+  .light-kicker { width: 100%; }
+  .light-title { width: auto; max-width: 48%; }
+  .light-matchup { width: auto; }
+  .light-state, .light-waiting { margin-top: 0; }
+  .light-copy { width: 100%; }
+  .light-interaction { max-height: 34vh; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .light-page,
-  .light-page * {
-    transition: none !important;
-    animation: none !important;
-  }
+  .light-page, .light-page * { transition: none !important; animation: none !important; }
 }
