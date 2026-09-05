@@ -72,7 +72,7 @@ export default function Admin() {
       <div><strong>{show.name}</strong><span>{show.venue} &middot; {show.date}</span></div>
       <div><span className={`ls-status ls-${show.status}`}>{show.status}</span><b>&rarr;</b></div>
     </button>
-    {show.status !== 'running' && <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 8 }}>
+    {show.status !== 'running' && <div className="ls-show-actions" style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 8 }}>
       <button type="button" onClick={() => void handleStatusChange(show, 'waiting')} disabled={statusUpdatingId === show.id || show.status === 'waiting'} style={{ border: '1px solid #45494e', background: show.status === 'waiting' ? '#24282c' : '#111315', color: '#c9cdd2', borderRadius: 8, padding: '7px 9px', fontSize: 9, fontWeight: 800, letterSpacing: '.06em', cursor: show.status === 'waiting' ? 'default' : 'pointer' }}>WAITING</button>
       <button type="button" onClick={() => void handleStatusChange(show, 'finished')} disabled={statusUpdatingId === show.id || show.status === 'finished'} style={{ border: '1px solid #45494e', background: show.status === 'finished' ? '#24282c' : '#111315', color: '#c9cdd2', borderRadius: 8, padding: '7px 9px', fontSize: 9, fontWeight: 800, letterSpacing: '.06em', cursor: show.status === 'finished' ? 'default' : 'pointer' }}>{statusUpdatingId === show.id ? '...' : 'FINISHED'}</button>
     </div>}
