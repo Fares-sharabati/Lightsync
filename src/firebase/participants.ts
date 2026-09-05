@@ -37,8 +37,11 @@ export async function registerParticipant(showId: string, participantId: string)
     browser: detectBrowser(),
     joinedAt: Date.now(),
   };
-  await set(participantRef, info);
+
+  // Register the server-side disconnect handler before marking the participant online.
+  // This avoids a small race where a connection could disappear before onDisconnect is armed.
   await onDisconnect(participantRef).update({ connected: false });
+  await set(participantRef, info);
   return participantRef;
 }
 
