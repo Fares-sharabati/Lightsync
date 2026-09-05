@@ -73,15 +73,25 @@ export default function Join() {
       currentLightRef.current = enabled; setLightState(enabled);
     } catch (err) { console.error(err); setError('Your browser could not control the flashlight.'); }
   }
-  function scheduleNextEvent(timeline: LightTimeline, start: number) {
+  function scheduleNextEvent(timeline: LightTimeline, start: number, offsetMs: number) {
     clearNextTimer();
-    const next = getNextLightEvent(timeline, Date.now() - start);
+    const now = Date.now();
+    const position = now >= start ? now - start + offsetMs : -1;
+    const next = getNextLightEvent(timeline, position);
     if (!next) return;
-    nextTimerRef.current = window.setTimeout(() => { void setFlash(next.on); scheduleNextEvent(timeline, start); }, Math.max(0, start + next.time - Date.now()));
+    const eventAt = start + Math.max(0, next.time - offsetMs);
+    nextTimerRef.current = window.setTimeout(() => {
+      const currentPosition = Date.now() - start + offsetMs;
+      void setFlash(getLightStateAtTime(timeline, currentPosition));
+      scheduleNextEvent(timeline, start, offsetMs);
+    }, Math.max(0, eventAt - now));
   }
-  function synchronizeShow(start: number, timeline: LightTimeline) {
-    void setFlash(getLightStateAtTime(timeline, Date.now() - start));
-    scheduleNextEvent(timeline, start);
+  function synchronizeShow(start: number, timeline: LightTimeline, offsetSeconds = 0) {
+    const offsetMs = Math.max(0, offsetSeconds) * 1000;
+    const now = Date.now();
+    const position = now >= start ? now - start + offsetMs : -1;
+    void setFlash(position >= 0 ? getLightStateAtTime(timeline, position) : false);
+    scheduleNextEvent(timeline, start, offsetMs);
   }
 
   async function joinShow() {
@@ -98,7 +108,7 @@ export default function Join() {
       trackRef.current = track;
       await registerParticipant(eventId, user.uid);
       setJoined(true);
-      if (event.status === 'running' && event.showStartTime && event.lightTimeline) synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline);
+      if (event.status === 'running' && event.showStartTime && event.lightTimeline) synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline, event.showStartOffset ?? 0);
     } catch (err) {
       console.error(err);
       setError(err instanceof Error && err.message.includes('Torch') ? 'This phone/browser does not allow flashlight control. Try the latest Safari or Chrome.' : 'Please allow camera access so LightSync can control your flashlight.');
@@ -121,9 +131,9 @@ export default function Join() {
 
   useEffect(() => {
     if (!joined || !event) return;
-    if (event.status === 'running' && event.showStartTime && event.lightTimeline) synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline);
+    if (event.status === 'running' && event.showStartTime && event.lightTimeline) synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline, event.showStartOffset ?? 0);
     else { clearNextTimer(); void setFlash(false); }
-  }, [joined, event?.status, event?.showStartTime, event?.lightTimeline]);
+  }, [joined, event?.status, event?.showStartTime, event?.showStartOffset, event?.lightTimeline]);
 
   useEffect(() => () => {
     clearNextTimer();
