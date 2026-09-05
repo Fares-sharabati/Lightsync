@@ -133,9 +133,12 @@ export default function Join() {
   const interactionVisible = !!activeInteraction && submittedInteractionId !== activeInteraction.id;
   const uiBackground = `linear-gradient(145deg, ${uiColor} 0%, ${uiColor}CC 38%, #08080c 100%)`;
 
-  const interactionCard = interactionVisible ? <section style={{ width: '100%', marginTop: 22, padding: 20, borderRadius: 22, background: 'rgba(0,0,0,.30)', color: '#fff', border: '1px solid rgba(255,255,255,.22)', backdropFilter: 'blur(14px)', boxSizing: 'border-box' as const, textAlign: 'left' as const }}>
+  // The interaction is intentionally taken out of the normal document flow.
+  // This keeps the main participant UI perfectly centered on every phone and
+  // lets a poll/question slide up without reserving space or pushing content.
+  const interactionCard = interactionVisible ? <section className="light-interaction" style={{ width: 'min(100%, 520px)', padding: 20, borderRadius: 22, background: 'rgba(0,0,0,.42)', color: '#fff', border: '1px solid rgba(255,255,255,.22)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', boxSizing: 'border-box' as const, textAlign: 'left' as const }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 10px #22c55e' }} /><span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1.5, opacity: .75 }}>{activeInteraction.type === 'poll' ? 'LIVE POLL' : 'LIVE QUESTION'}</span></div>
-    <div style={{ fontSize: 21, fontWeight: 900, lineHeight: 1.25 }}>{activeInteraction.question}</div>
+    <div style={{ fontSize: 'clamp(18px, 5vw, 21px)', fontWeight: 900, lineHeight: 1.25 }}>{activeInteraction.question}</div>
     {activeInteraction.type === 'poll' ? <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>{Object.entries(activeInteraction.options ?? {}).map(([id, label]) => <button key={id} type="button" disabled={sending} onClick={() => { setSelectedOption(id); setMessage(''); }} style={{ width: '100%', minHeight: 52, padding: '12px 15px', borderRadius: 14, border: selectedOption === id ? `3px solid ${uiColor}` : '1px solid rgba(255,255,255,.24)', background: selectedOption === id ? uiColor : 'rgba(255,255,255,.08)', color: '#fff', fontWeight: 800, fontSize: 15, textAlign: 'left' }}><span style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>{label}</span><span>{selectedOption === id ? '✓' : '○'}</span></span></button>)}</div> : <textarea value={answer} onChange={e => { setAnswer(e.target.value); setMessage(''); }} maxLength={200} placeholder="Type your answer..." rows={4} style={{ width: '100%', marginTop: 18, boxSizing: 'border-box', borderRadius: 14, border: '1px solid rgba(255,255,255,.24)', padding: 14, fontSize: 16, resize: 'vertical', background: 'rgba(255,255,255,.08)', color: '#fff' }} />}
     <button type="button" disabled={sending} onClick={() => void submitInteraction()} style={{ width: '100%', marginTop: 14, minHeight: 50, border: 0, borderRadius: 14, background: uiColor, color: '#fff', fontWeight: 900, fontSize: 15, opacity: sending ? .65 : 1 }}>{sending ? 'SUBMITTING...' : activeInteraction.type === 'poll' ? 'SUBMIT VOTE' : 'SUBMIT ANSWER'}</button>
     {message && <div style={{ marginTop: 12, fontSize: 14, fontWeight: 800, textAlign: 'center', color: message.startsWith('Could not') ? '#fca5a5' : '#fff' }}>{message}</div>}
@@ -143,41 +146,44 @@ export default function Join() {
 
   const pageStyle = {
     color: '#fff',
-    minHeight: '100dvh',
     width: '100%',
     minWidth: 0,
+    height: '100dvh',
+    minHeight: '100svh',
     boxSizing: 'border-box' as const,
-    overflowX: 'hidden' as const,
+    overflow: 'hidden' as const,
   };
 
   const contentStyle = {
     width: '100%',
-    maxWidth: 'none',
-    minHeight: '100dvh',
+    maxWidth: '100%',
+    height: '100%',
+    minHeight: 0,
     boxSizing: 'border-box' as const,
-    padding: '30px max(16px, env(safe-area-inset-left)) 30px max(16px, env(safe-area-inset-right))',
+    padding: 'max(18px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))',
     display: 'flex',
     flexDirection: 'column' as const,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden' as const,
   };
 
   if (!joined) return <main className="light-page" style={{ ...pageStyle, background: uiBackground }}><div className="light-content" style={contentStyle}>
     <div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div>
-    {game && <div style={{ marginTop: 10, fontSize: 14, fontWeight: 800, opacity: .9 }}>{game.homeTeam.name} <span style={{ opacity: .55, margin: '0 7px' }}>VS</span> {game.awayTeam.name}</div>}
+    {game && <div style={{ marginTop: 10, fontSize: 'clamp(12px, 3.5vw, 14px)', fontWeight: 800, opacity: .9 }}>{game.homeTeam.name} <span style={{ opacity: .55, margin: '0 7px' }}>VS</span> {game.awayTeam.name}</div>}
     <div className="light-status" style={{ marginTop: 12 }}>SYSTEM RUNNING</div>
     <p className="light-description" style={{ marginTop: 18, maxWidth: 520 }}>You are connected to the event. Join to enable your flashlight.</p>
-    <button style={{ width: '100%', maxWidth: 360, minHeight: 54, border: 0, borderRadius: 16, background: '#fff', color: uiColor, fontWeight: 900, fontSize: 16 }} onClick={() => void joinShow()}>JOIN SHOW</button>
+    <button style={{ width: 'min(100%, 360px)', minHeight: 54, border: 0, borderRadius: 16, background: '#fff', color: uiColor, fontWeight: 900, fontSize: 16 }} onClick={() => void joinShow()}>JOIN SHOW</button>
     {error && <p className="light-error">{error}</p>}
     {interactionCard}
   </div></main>;
 
   return <main className="light-page" style={{ ...pageStyle, background: lightState ? flashColor : '#08080c', color: lightState ? '#050505' : '#fff', transition: 'background-color .08s linear' }}><div className="light-content" style={contentStyle}>
     <div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div>
-    {game && <div style={{ marginTop: 10, fontSize: 14, fontWeight: 800, opacity: .85 }}>{game.homeTeam.name} <span style={{ opacity: .55, margin: '0 7px' }}>VS</span> {game.awayTeam.name}</div>}
+    {game && <div style={{ marginTop: 10, fontSize: 'clamp(12px, 3.5vw, 14px)', fontWeight: 800, opacity: .85 }}>{game.homeTeam.name} <span style={{ opacity: .55, margin: '0 7px' }}>VS</span> {game.awayTeam.name}</div>}
     <div className="light-status" style={{ marginTop: 12, background: lightState ? 'rgba(0,0,0,.18)' : undefined }}>{running ? 'SHOW LIVE' : 'SYSTEM RUNNING'}</div>
-    {!running && <><div style={{ fontSize: 'clamp(1.7rem, 8vw, 2.8rem)', fontWeight: 900, marginTop: 28, maxWidth: 720 }}>FLASHLIGHT SHOW WILL START SOON</div><p className="waiting-description" style={{ marginTop: 8, maxWidth: 520 }}>Stay connected. The organizer can start the light show at any time.</p></>}
-    {running && <><div style={{ fontSize: 'clamp(3rem, 16vw, 5rem)', fontWeight: 900, marginTop: 26, color: lightState ? '#050505' : '#fff' }}>{lightState ? 'ON' : 'OFF'}</div><p className="waiting-description" style={{ marginTop: 4, color: lightState ? 'rgba(0,0,0,.7)' : undefined }}>Your flashlight is synchronized with the show.</p></>}
+    {!running && <><div style={{ fontSize: 'clamp(1.45rem, 7.5vw, 2.8rem)', fontWeight: 900, marginTop: 24, maxWidth: 720, lineHeight: 1.05 }}>FLASHLIGHT SHOW WILL START SOON</div><p className="waiting-description" style={{ marginTop: 8, maxWidth: 520 }}>Stay connected. The organizer can start the light show at any time.</p></>}
+    {running && <><div style={{ fontSize: 'clamp(3rem, 16vw, 5rem)', fontWeight: 900, marginTop: 22, color: lightState ? '#050505' : '#fff' }}>{lightState ? 'ON' : 'OFF'}</div><p className="waiting-description" style={{ marginTop: 4, color: lightState ? 'rgba(0,0,0,.7)' : undefined }}>Your flashlight is synchronized with the show.</p></>}
     {interactionCard}
     {error && <p className="light-error" style={{ marginTop: 16, maxWidth: 520 }}>{error}</p>}
   </div></main>;
