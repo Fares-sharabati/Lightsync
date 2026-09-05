@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ensureAnonymousAuth } from '../firebase/auth';
 import { watchPublicShow, type PublicShow } from '../firebase/shows';
@@ -46,10 +47,7 @@ export default function Join() {
           if (!show) setError('Show not found.');
         });
         stopGame = watchSportsGame(showId, setGame);
-        stopInteractions = watchSportsInteractions(showId, items => {
-          const open = items.find(item => item.status === 'open');
-          setActiveInteraction(open ?? null);
-        });
+        stopInteractions = watchSportsInteractions(showId, items => setActiveInteraction(items.find(item => item.status === 'open') ?? null));
       } catch (err) {
         console.error(err);
         if (!cancelled) { setLoaded(true); setError('Could not connect to LightSync. Please refresh.'); }
@@ -60,16 +58,20 @@ export default function Join() {
   }, [eventId]);
 
   useEffect(() => {
-    setSelectedOption(''); setAnswer(''); setMessage(''); setSending(false);
-    setSubmittedInteractionId(null);
+    setSelectedOption(''); setAnswer(''); setMessage(''); setSending(false); setSubmittedInteractionId(null);
   }, [activeInteraction?.id]);
 
-  function clearNextTimer() { if (nextTimerRef.current !== null) window.clearTimeout(nextTimerRef.current); nextTimerRef.current = null; }
+  function clearNextTimer() {
+    if (nextTimerRef.current !== null) window.clearTimeout(nextTimerRef.current);
+    nextTimerRef.current = null;
+  }
   async function setFlash(enabled: boolean) {
     const track = trackRef.current;
     if (!track || currentLightRef.current === enabled) return;
-    try { await track.applyConstraints({ advanced: [{ torch: enabled } as TorchConstraints] }); currentLightRef.current = enabled; setLightState(enabled); }
-    catch (err) { console.error(err); setError('Your browser could not control the flashlight.'); }
+    try {
+      await track.applyConstraints({ advanced: [{ torch: enabled } as TorchConstraints] });
+      currentLightRef.current = enabled; setLightState(enabled);
+    } catch (err) { console.error(err); setError('Your browser could not control the flashlight.'); }
   }
   function scheduleNextEvent(timeline: LightTimeline, start: number) {
     clearNextTimer();
@@ -77,7 +79,10 @@ export default function Join() {
     if (!next) return;
     nextTimerRef.current = window.setTimeout(() => { void setFlash(next.on); scheduleNextEvent(timeline, start); }, Math.max(0, start + next.time - Date.now()));
   }
-  function synchronizeShow(start: number, timeline: LightTimeline) { void setFlash(getLightStateAtTime(timeline, Date.now() - start)); scheduleNextEvent(timeline, start); }
+  function synchronizeShow(start: number, timeline: LightTimeline) {
+    void setFlash(getLightStateAtTime(timeline, Date.now() - start));
+    scheduleNextEvent(timeline, start);
+  }
 
   async function joinShow() {
     if (!eventId || !event) return;
@@ -109,10 +114,7 @@ export default function Join() {
     try {
       const uid = (await ensureAnonymousAuth()).uid;
       await submitSportsResponse(eventId, interactionId, uid, activeInteraction.type === 'poll' ? { optionId: selectedOption } : { answer: answer.trim().slice(0, 200) });
-      setSubmittedInteractionId(interactionId);
-      setMessage('Answer submitted ✓');
-      setSelectedOption('');
-      setAnswer('');
+      setSubmittedInteractionId(interactionId); setMessage('Response submitted ✓'); setSelectedOption(''); setAnswer('');
     } catch (err) { console.error(err); setMessage('Could not submit your answer. Please try again.'); }
     finally { setSending(false); }
   }
@@ -122,69 +124,47 @@ export default function Join() {
     if (event.status === 'running' && event.showStartTime && event.lightTimeline) synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline);
     else { clearNextTimer(); void setFlash(false); }
   }, [joined, event?.status, event?.showStartTime, event?.lightTimeline]);
-  useEffect(() => () => { clearNextTimer(); if (trackRef.current) { void trackRef.current.applyConstraints({ advanced: [{ torch: false } as TorchConstraints] }).catch(() => {}); trackRef.current.stop(); } }, []);
 
-  if (!loaded) return <main className="light-page"><div className="light-content"><div className="light-logo">LIGHTSYNC</div><p>Loading show...</p></div></main>;
-  if (!event || !eventId) return <main className="light-page"><div className="light-content"><div className="light-logo">LIGHTSYNC</div><p>{error || 'Show not found.'}</p><button className="button button-secondary" onClick={() => navigate('/')}>Back</button></div></main>;
+  useEffect(() => () => {
+    clearNextTimer();
+    if (trackRef.current) {
+      void trackRef.current.applyConstraints({ advanced: [{ torch: false } as TorchConstraints] }).catch(() => {});
+      trackRef.current.stop();
+    }
+  }, []);
+
+  if (!loaded) return <main className="light-page light-page-loading"><div className="light-shell"><div className="light-brand">LIGHTSYNC</div><div className="light-loading">Connecting to show…</div></div></main>;
+  if (!event || !eventId) return <main className="light-page light-page-loading"><div className="light-shell"><div className="light-brand">LIGHTSYNC</div><div className="light-loading">{error || 'Show not found.'}</div><button className="light-primary-button" onClick={() => navigate('/')}>BACK</button></div></main>;
 
   const uiColor = event.phoneUiColor && /^#[0-9a-fA-F]{6}$/.test(event.phoneUiColor) ? event.phoneUiColor : getSportsLightColor(game);
   const flashColor = event.screenLightColor && /^#[0-9a-fA-F]{6}$/.test(event.screenLightColor) ? event.screenLightColor : uiColor;
   const running = event.status === 'running';
   const interactionVisible = !!activeInteraction && submittedInteractionId !== activeInteraction.id;
-  const uiBackground = `linear-gradient(145deg, ${uiColor} 0%, ${uiColor}CC 38%, #08080c 100%)`;
+  const pageBackground = lightState ? flashColor : `radial-gradient(circle at 50% 0%, ${uiColor}55 0%, transparent 42%), linear-gradient(160deg, #101218 0%, #08090d 58%, #050507 100%)`;
 
-  // The interaction is intentionally taken out of the normal document flow.
-  // This keeps the main participant UI perfectly centered on every phone and
-  // lets a poll/question slide up without reserving space or pushing content.
-  const interactionCard = interactionVisible ? <section className="light-interaction" style={{ width: 'min(100%, 520px)', padding: 20, borderRadius: 22, background: 'rgba(0,0,0,.42)', color: '#fff', border: '1px solid rgba(255,255,255,.22)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', boxSizing: 'border-box' as const, textAlign: 'left' as const }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 10px #22c55e' }} /><span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1.5, opacity: .75 }}>{activeInteraction.type === 'poll' ? 'LIVE POLL' : 'LIVE QUESTION'}</span></div>
-    <div style={{ fontSize: 'clamp(18px, 5vw, 21px)', fontWeight: 900, lineHeight: 1.25 }}>{activeInteraction.question}</div>
-    {activeInteraction.type === 'poll' ? <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>{Object.entries(activeInteraction.options ?? {}).map(([id, label]) => <button key={id} type="button" disabled={sending} onClick={() => { setSelectedOption(id); setMessage(''); }} style={{ width: '100%', minHeight: 52, padding: '12px 15px', borderRadius: 14, border: selectedOption === id ? `3px solid ${uiColor}` : '1px solid rgba(255,255,255,.24)', background: selectedOption === id ? uiColor : 'rgba(255,255,255,.08)', color: '#fff', fontWeight: 800, fontSize: 15, textAlign: 'left' }}><span style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>{label}</span><span>{selectedOption === id ? '✓' : '○'}</span></span></button>)}</div> : <textarea value={answer} onChange={e => { setAnswer(e.target.value); setMessage(''); }} maxLength={200} placeholder="Type your answer..." rows={4} style={{ width: '100%', marginTop: 18, boxSizing: 'border-box', borderRadius: 14, border: '1px solid rgba(255,255,255,.24)', padding: 14, fontSize: 16, resize: 'vertical', background: 'rgba(255,255,255,.08)', color: '#fff' }} />}
-    <button type="button" disabled={sending} onClick={() => void submitInteraction()} style={{ width: '100%', marginTop: 14, minHeight: 50, border: 0, borderRadius: 14, background: uiColor, color: '#fff', fontWeight: 900, fontSize: 15, opacity: sending ? .65 : 1 }}>{sending ? 'SUBMITTING...' : activeInteraction.type === 'poll' ? 'SUBMIT VOTE' : 'SUBMIT ANSWER'}</button>
-    {message && <div style={{ marginTop: 12, fontSize: 14, fontWeight: 800, textAlign: 'center', color: message.startsWith('Could not') ? '#fca5a5' : '#fff' }}>{message}</div>}
+  const interactionCard = interactionVisible ? <section className="light-interaction" aria-live="polite">
+    <div className="interaction-header"><span className="interaction-live-dot" /><span>{activeInteraction.type === 'poll' ? 'LIVE POLL' : 'LIVE QUESTION'}</span></div>
+    <div className="interaction-question">{activeInteraction.question}</div>
+    {activeInteraction.type === 'poll' ? <div className="interaction-options">
+      {Object.entries(activeInteraction.options ?? {}).map(([id, label]) => <button key={id} type="button" className={`interaction-option ${selectedOption === id ? 'is-selected' : ''}`} disabled={sending} onClick={() => { setSelectedOption(id); setMessage(''); }} style={selectedOption === id ? ({ '--choice-color': uiColor } as CSSProperties) : undefined}><span>{label}</span><span className="choice-mark">{selectedOption === id ? '✓' : ''}</span></button>)}
+    </div> : <textarea className="interaction-answer" value={answer} onChange={e => { setAnswer(e.target.value); setMessage(''); }} maxLength={200} placeholder="Type your answer…" rows={3} />}
+    <button type="button" className="interaction-submit" disabled={sending} onClick={() => void submitInteraction()} style={{ background: uiColor }}>{sending ? 'SUBMITTING…' : activeInteraction.type === 'poll' ? 'SUBMIT VOTE' : 'SUBMIT ANSWER'}</button>
+    {message && <div className={`interaction-message ${message.startsWith('Could not') ? 'is-error' : ''}`}>{message}</div>}
   </section> : null;
 
-  const pageStyle = {
-    color: '#fff',
-    width: '100%',
-    minWidth: 0,
-    height: '100dvh',
-    minHeight: '100svh',
-    boxSizing: 'border-box' as const,
-    overflow: 'hidden' as const,
-  };
-
-  const contentStyle = {
-    width: '100%',
-    maxWidth: '100%',
-    height: '100%',
-    minHeight: 0,
-    boxSizing: 'border-box' as const,
-    padding: 'max(18px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden' as const,
-  };
-
-  if (!joined) return <main className="light-page" style={{ ...pageStyle, background: uiBackground }}><div className="light-content" style={contentStyle}>
-    <div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div>
-    {game && <div style={{ marginTop: 10, fontSize: 'clamp(12px, 3.5vw, 14px)', fontWeight: 800, opacity: .9 }}>{game.homeTeam.name} <span style={{ opacity: .55, margin: '0 7px' }}>VS</span> {game.awayTeam.name}</div>}
-    <div className="light-status" style={{ marginTop: 12 }}>SYSTEM RUNNING</div>
-    <p className="light-description" style={{ marginTop: 18, maxWidth: 520 }}>You are connected to the event. Join to enable your flashlight.</p>
-    <button style={{ width: 'min(100%, 360px)', minHeight: 54, border: 0, borderRadius: 16, background: '#fff', color: uiColor, fontWeight: 900, fontSize: 16 }} onClick={() => void joinShow()}>JOIN SHOW</button>
-    {error && <p className="light-error">{error}</p>}
-    {interactionCard}
+  if (!joined) return <main className="light-page" style={{ background: pageBackground }}><div className="light-shell light-shell-join">
+    <header className="light-header"><div className="light-brand">LIGHTSYNC</div><div className="light-status"><span /> SYSTEM READY</div></header>
+    <section className="light-main join-main"><div className="light-kicker">YOU’RE CONNECTED</div><h1 className="light-title">{event.name}</h1>{game && <div className="light-matchup"><strong>{game.homeTeam.name}</strong><span>VS</span><strong>{game.awayTeam.name}</strong></div>}<p className="light-copy">Join the show to enable your phone’s flashlight and take part in live audience interactions.</p><button className="light-primary-button" onClick={() => void joinShow()}>JOIN SHOW</button><div className="light-note">Camera permission is used only to control your phone flashlight.</div></section>
+    {interactionCard}{error && <p className="light-error">{error}</p>}
   </div></main>;
 
-  return <main className="light-page" style={{ ...pageStyle, background: lightState ? flashColor : '#08080c', color: lightState ? '#050505' : '#fff', transition: 'background-color .08s linear' }}><div className="light-content" style={contentStyle}>
-    <div className="light-logo">LIGHTSYNC</div><div className="light-event-name">{event.name}</div>
-    {game && <div style={{ marginTop: 10, fontSize: 'clamp(12px, 3.5vw, 14px)', fontWeight: 800, opacity: .85 }}>{game.homeTeam.name} <span style={{ opacity: .55, margin: '0 7px' }}>VS</span> {game.awayTeam.name}</div>}
-    <div className="light-status" style={{ marginTop: 12, background: lightState ? 'rgba(0,0,0,.18)' : undefined }}>{running ? 'SHOW LIVE' : 'SYSTEM RUNNING'}</div>
-    {!running && <><div style={{ fontSize: 'clamp(1.45rem, 7.5vw, 2.8rem)', fontWeight: 900, marginTop: 24, maxWidth: 720, lineHeight: 1.05 }}>FLASHLIGHT SHOW WILL START SOON</div><p className="waiting-description" style={{ marginTop: 8, maxWidth: 520 }}>Stay connected. The organizer can start the light show at any time.</p></>}
-    {running && <><div style={{ fontSize: 'clamp(3rem, 16vw, 5rem)', fontWeight: 900, marginTop: 22, color: lightState ? '#050505' : '#fff' }}>{lightState ? 'ON' : 'OFF'}</div><p className="waiting-description" style={{ marginTop: 4, color: lightState ? 'rgba(0,0,0,.7)' : undefined }}>Your flashlight is synchronized with the show.</p></>}
-    {interactionCard}
-    {error && <p className="light-error" style={{ marginTop: 16, maxWidth: 520 }}>{error}</p>}
-  </div></main>;
+  return <main className={`light-page ${lightState ? 'is-flashing' : ''}`} style={{ background: pageBackground, color: lightState ? '#050505' : '#fff' }}>
+    <div className="light-shell">
+      <header className="light-header"><div className="light-brand">LIGHTSYNC</div><div className="light-status" style={lightState ? { background: 'rgba(0,0,0,.16)' } : undefined}><span /> {running ? 'SHOW LIVE' : 'SYSTEM READY'}</div></header>
+      <section className="light-main"><div className="light-kicker">{running ? 'SYNCED WITH THE ARENA' : 'STAY CONNECTED'}</div><h1 className="light-title">{event.name}</h1>{game && <div className="light-matchup"><strong>{game.homeTeam.name}</strong><span>VS</span><strong>{game.awayTeam.name}</strong></div>}
+        {running ? <><div className="light-state" aria-label={lightState ? 'Flashlight on' : 'Flashlight off'}>{lightState ? 'ON' : 'OFF'}</div><p className="light-copy">Your flashlight is synchronized with the show.</p></> : <><div className="light-waiting">FLASHLIGHT SHOW WILL START SOON</div><p className="light-copy">Stay connected. The organizer can start the light show at any time.</p></>}
+      </section>
+      {interactionCard}{error && <p className="light-error">{error}</p>}
+    </div>
+  </main>;
 }
