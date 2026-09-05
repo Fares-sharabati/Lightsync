@@ -3,7 +3,7 @@ html,
 body,
 #root {
   width: 100%;
-  min-width: 100%;
+  min-width: 0;
   min-height: 100%;
   margin: 0;
   padding: 0;
@@ -11,6 +11,9 @@ body,
 
 html {
   box-sizing: border-box;
+  background: #050507;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 *,
@@ -24,38 +27,47 @@ body {
   background: #050507;
 }
 
-/* Participant Light Screen */
+button,
+textarea,
+input,
+select {
+  font: inherit;
+}
+
+/* Participant Light Screen — owns the complete phone viewport. */
 .light-page {
   position: fixed;
   inset: 0;
-  width: 100vw;
+  width: 100%;
   height: 100dvh;
-  min-height: 100dvh;
+  min-height: 100svh;
+  margin: 0;
+  padding: 0;
 
   display: flex;
-  align-items: center;
-  justify-content: center;
-
-  padding: 24px;
+  align-items: stretch;
+  justify-content: stretch;
 
   color: white;
   background: #050507;
-
   text-align: center;
 
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none;
 }
 
 .light-content {
   width: 100%;
-  max-width: 500px;
+  max-width: none;
+  min-width: 0;
+  min-height: 100%;
 }
 
 .light-logo {
   margin-bottom: 30px;
-
   color: #8d7cff;
-
   font-size: 0.8rem;
   font-weight: 800;
   letter-spacing: 0.25em;
@@ -63,7 +75,6 @@ body {
 
 .light-event-name {
   margin-bottom: 20px;
-
   font-size: clamp(2rem, 8vw, 3.5rem);
   line-height: 1;
   font-weight: 900;
@@ -73,36 +84,27 @@ body {
 .light-description,
 .waiting-description {
   color: #777782;
-
   line-height: 1.6;
 }
 
 .light-join-button {
   margin-top: 24px;
-
   min-width: 220px;
   padding: 18px 28px;
-
   color: white;
   background: #755cff;
-
   border: 0;
   border-radius: 14px;
-
   font-size: 1rem;
   font-weight: 800;
   letter-spacing: 0.05em;
-
   cursor: pointer;
-
   box-shadow: 0 15px 40px rgba(117, 92, 255, 0.3);
-
   transition: transform 0.15s ease, background 0.15s ease;
 }
 
 .light-join-button:hover:not(:disabled) {
   transform: translateY(-2px);
-
   background: #856fff;
 }
 
@@ -115,35 +117,25 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-
   width: 80px;
   height: 80px;
-
   margin: 0 auto 24px;
-
   color: white;
   background: #1c713e;
-
   border-radius: 50%;
-
   font-size: 2.5rem;
   font-weight: 800;
-
   box-shadow: 0 0 50px rgba(84, 220, 126, 0.2);
 }
 
 .light-status {
   display: inline-block;
-
   margin-top: 8px;
   padding: 7px 14px;
-
   color: #8ee8ae;
   background: #102519;
-
   border: 1px solid #1d4930;
   border-radius: 999px;
-
   font-size: 0.7rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -151,13 +143,10 @@ body {
 
 .waiting-message {
   margin-top: 50px;
-
   color: #ffffff;
-
   font-size: clamp(1.5rem, 6vw, 2.5rem);
   font-weight: 900;
   letter-spacing: 0.05em;
-
   animation: waitingPulse 2s ease-in-out infinite;
 }
 
@@ -167,17 +156,11 @@ body {
 
 .light-error {
   margin-bottom: 24px;
-
   color: #ff7777;
 }
 
 @keyframes waitingPulse {
   0%,
-  100% {
-    opacity: 0.5;
-  }
-
-  50% {
-    opacity: 1;
-  }
+  100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }
