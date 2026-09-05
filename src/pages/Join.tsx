@@ -76,10 +76,14 @@ export default function Join() {
   function scheduleNextEvent(timeline: LightTimeline, start: number, offsetMs: number) {
     clearNextTimer();
     const now = Date.now();
-    const position = now >= start ? now - start + offsetMs : -1;
+    if (now < start) {
+      nextTimerRef.current = window.setTimeout(() => synchronizeShow(start, timeline, offsetMs / 1000), Math.max(0, start - now));
+      return;
+    }
+    const position = now - start + offsetMs;
     const next = getNextLightEvent(timeline, position);
     if (!next) return;
-    const eventAt = start + Math.max(0, next.time - offsetMs);
+    const eventAt = start + next.time - offsetMs;
     nextTimerRef.current = window.setTimeout(() => {
       const currentPosition = Date.now() - start + offsetMs;
       void setFlash(getLightStateAtTime(timeline, currentPosition));
