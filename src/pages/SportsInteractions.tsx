@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createSportsInteraction, openSportsInteraction, closeSportsInteraction, publishSportsResult, publishSportsScreen, watchSportsInteractions, watchSportsResponses, type SportsInteraction } from '../firebase/sports';
 import { watchSportsGame, type SportsGame } from '../firebase/sportsGame';
+
 const TEMPLATES = [
   { label: 'Next Song', question: 'Which song should play next?', options: ['Song A', 'Song B', 'Song C'] },
   { label: 'Who Scores First?', question: 'Who will score the next point?', options: ['Home Team', 'Away Team'] },
@@ -11,23 +12,180 @@ const TEMPLATES = [
   { label: 'Within 30 Seconds?', question: 'Will the next score happen within 30 seconds?', options: ['Yes', 'No'] },
   { label: 'Final Score', question: 'What will the final result be?', options: ['Home wins', 'Draw', 'Away wins'] },
 ];
+
 type Props = { embedded?: boolean };
+
 export default function SportsInteractions({ embedded = false }: Props) {
-  const navigate = useNavigate(); const { eventId } = useParams();
-  const [game, setGame] = useState<SportsGame | null>(null); const [items, setItems] = useState<SportsInteraction[]>([]); const [selected, setSelected] = useState<SportsInteraction | null>(null);
-  const [question, setQuestion] = useState(''); const [options, setOptions] = useState('Home Team\nAway Team'); const [busy, setBusy] = useState(false); const [message, setMessage] = useState(''); const [responses, setResponses] = useState<Record<string, { optionId?: string; answer?: string; submittedAt: number }>>({});
-  useEffect(() => { if (!eventId) return; return watchSportsGame(eventId, setGame); }, [eventId]);
-  useEffect(() => { if (!eventId) return; return watchSportsInteractions(eventId, setItems); }, [eventId]);
-  useEffect(() => { if (!eventId || !selected) { setResponses({}); return; } return watchSportsResponses(eventId, selected.id, setResponses); }, [eventId, selected?.id]);
-  useEffect(() => { if (!eventId || !selected) return; const counts: Record<string, number> = {}; const answers: Record<string, string> = {}; Object.entries(responses).forEach(([uid, response]) => { if (response.optionId) counts[response.optionId] = (counts[response.optionId] ?? 0) + 1; if (response.answer) answers[uid] = response.answer; }); void publishSportsResult(eventId, selected.id, { total: Object.keys(responses).length, counts, answers, updatedAt: Date.now() }).catch(error => console.error(error)); }, [eventId, selected, responses]);
-  const counts = useMemo(() => { const value: Record<string, number> = {}; Object.values(responses).forEach(response => { if (response.optionId) value[response.optionId] = (value[response.optionId] ?? 0) + 1; }); return value; }, [responses]);
+  const navigate = useNavigate();
+  const { eventId } = useParams();
+  const [game, setGame] = useState<SportsGame | null>(null);
+  const [items, setItems] = useState<SportsInteraction[]>([]);
+  const [selected, setSelected] = useState<SportsInteraction | null>(null);
+  const [question, setQuestion] = useState('');
+  const [options, setOptions] = useState('Home Team\nAway Team');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [responses, setResponses] = useState<Record<string, { optionId?: string; answer?: string; submittedAt: number }>>({});
+
+  useEffect(() => {
+    if (!eventId) return;
+    return watchSportsGame(eventId, setGame);
+  }, [eventId]);
+
+  useEffect(() => {
+    if (!eventId) return;
+    return watchSportsInteractions(eventId, setItems);
+  }, [eventId]);
+
+  useEffect(() => {
+    if (!eventId || !selected) {
+      setResponses({});
+      return;
+    }
+    return watchSportsResponses(eventId, selected.id, setResponses);
+  }, [eventId, selected?.id]);
+
+  useEffect(() => {
+    if (!eventId || !selected) return;
+    const counts: Record<string, number> = {};
+    Object.values(responses).forEach(response => {
+      if (response.optionId) counts[response.optionId] = (counts[response.optionId] ?? 0) + 1;
+    });
+
+    // Only publish aggregate poll statistics to the public arena node.
+    // Free-text question answers stay under the organizer-protected responses node.
+    void publishSportsResult(eventId, selected.id, {
+      total: Object.keys(responses).length,
+      counts,
+      updatedAt: Date.now(),
+    }).catch(error => console.error(error));
+  }, [eventId, selected, responses]);
+
+  const counts = useMemo(() => {
+    const value: Record<string, number> = {};
+    Object.values(responses).forEach(response => {
+      if (response.optionId) value[response.optionId] = (value[response.optionId] ?? 0) + 1;
+    });
+    return value;
+  }, [responses]);
+
   const total = Object.keys(responses).length;
-  function useTemplate(template: typeof TEMPLATES[number]) { const home = game?.homeTeam.name || 'Home Team'; const away = game?.awayTeam.name || 'Away Team'; setQuestion(template.question.replaceAll('Home Team', home).replaceAll('Away Team', away)); setOptions(template.options.map(value => value.replace('Home Team', home).replace('Away Team', away)).join('\n')); setSelected(null); setMessage(''); }
-  async function create(type: 'poll' | 'question') { if (!eventId || !question.trim()) return setMessage('Enter a question first.'); const labels = options.split('\n').map(value => value.trim()).filter(Boolean); if (type === 'poll' && labels.length < 2) return setMessage('Add at least two options.'); setBusy(true); setMessage(''); try { const optionMap: Record<string, string> = {}; labels.forEach((label, index) => { optionMap[`option_${index + 1}`] = label; }); const id = await createSportsInteraction(eventId, { type, question: question.trim(), status: 'open', options: optionMap, createdAt: Date.now(), displayOnScreen: true, screenMode: type === 'poll' ? 'percentages' : 'question' }); const created: SportsInteraction = { id, type, question: question.trim(), status: 'open', options: optionMap, createdAt: Date.now(), displayOnScreen: true, screenMode: type === 'poll' ? 'percentages' : 'question' }; setSelected(created); setQuestion(''); setMessage(`${type === 'poll' ? 'Poll' : 'Question'} is LIVE on audience phones. It is independent of Start Show.`); } catch (error) { console.error(error); setMessage('Could not create the interaction.'); } finally { setBusy(false); } }
-  async function pushSelected() { if (!eventId || !selected || selected.status === 'open') return; setBusy(true); setMessage(''); try { await openSportsInteraction(eventId, selected.id); await publishSportsScreen(eventId, selected.id, selected.type === 'poll' ? 'results' : 'question'); setSelected({ ...selected, status: 'open', displayOnScreen: true }); setMessage(`${selected.type === 'poll' ? 'Poll' : 'Question'} pushed to the audience.`); } catch (error) { console.error(error); setMessage('Could not push the interaction.'); } finally { setBusy(false); } }
-  async function closeSelected() { if (!eventId || !selected) return; setBusy(true); try { await closeSportsInteraction(eventId, selected.id); await publishSportsScreen(eventId, null, 'idle'); setSelected({ ...selected, status: 'closed', displayOnScreen: false, closedAt: Date.now() }); setMessage('Interaction closed.'); } catch (error) { console.error(error); setMessage('Could not close the interaction.'); } finally { setBusy(false); } }
+
+  function useTemplate(template: typeof TEMPLATES[number]) {
+    const home = game?.homeTeam.name || 'Home Team';
+    const away = game?.awayTeam.name || 'Away Team';
+    setQuestion(template.question.replaceAll('Home Team', home).replaceAll('Away Team', away));
+    setOptions(template.options.map(value => value.replace('Home Team', home).replace('Away Team', away)).join('\n'));
+    setSelected(null);
+    setMessage('');
+  }
+
+  async function create(type: 'poll' | 'question') {
+    if (!eventId || !question.trim()) return setMessage('Enter a question first.');
+    const labels = options.split('\n').map(value => value.trim()).filter(Boolean);
+    if (type === 'poll' && labels.length < 2) return setMessage('Add at least two options.');
+    setBusy(true);
+    setMessage('');
+    try {
+      const optionMap: Record<string, string> = {};
+      labels.forEach((label, index) => {
+        optionMap[`option_${index + 1}`] = label;
+      });
+      const createdAt = Date.now();
+      const id = await createSportsInteraction(eventId, {
+        type,
+        question: question.trim(),
+        status: 'open',
+        options: optionMap,
+        createdAt,
+        displayOnScreen: true,
+        screenMode: type === 'poll' ? 'percentages' : 'question',
+      });
+      const created: SportsInteraction = {
+        id,
+        type,
+        question: question.trim(),
+        status: 'open',
+        options: optionMap,
+        createdAt,
+        displayOnScreen: true,
+        screenMode: type === 'poll' ? 'percentages' : 'question',
+      };
+      setSelected(created);
+      setQuestion('');
+      setMessage(`${type === 'poll' ? 'Poll' : 'Question'} is LIVE on audience phones. It is independent of Start Show.`);
+    } catch (error) {
+      console.error(error);
+      setMessage('Could not create the interaction.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function pushSelected() {
+    if (!eventId || !selected || selected.status === 'open') return;
+    setBusy(true);
+    setMessage('');
+    try {
+      await openSportsInteraction(eventId, selected.id);
+      await publishSportsScreen(eventId, selected.id, selected.type === 'poll' ? 'results' : 'question');
+      setSelected({ ...selected, status: 'open', displayOnScreen: true });
+      setMessage(`${selected.type === 'poll' ? 'Poll' : 'Question'} pushed to the audience.`);
+    } catch (error) {
+      console.error(error);
+      setMessage('Could not push the interaction.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function closeSelected() {
+    if (!eventId || !selected) return;
+    setBusy(true);
+    try {
+      await closeSportsInteraction(eventId, selected.id);
+      await publishSportsScreen(eventId, null, 'idle');
+      setSelected({ ...selected, status: 'closed', displayOnScreen: false, closedAt: Date.now() });
+      setMessage('Interaction closed.');
+    } catch (error) {
+      console.error(error);
+      setMessage('Could not close the interaction.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!eventId) return null;
-  const content = <div style={{ display: 'grid', gap: 16 }}>{!embedded && game && <section className="ls-card"><p className="ls-eyebrow">SPORTS EVENT &middot; {game.sport.toUpperCase()}</p><h2 style={{ margin: '5px 0' }}>{game.homeTeam.name} <span className="ls-muted">vs</span> {game.awayTeam.name}</h2></section>}<section className="ls-card"><div className="ls-section-title"><div><p className="ls-eyebrow">AUDIENCE INTERACTIONS</p><h2>Engage the crowd</h2><p className="ls-muted" style={{ marginTop: 6 }}>Creating a poll or question immediately publishes it to audience phones. It does not start or control the flashlight show.</p></div></div><div className="ls-interact-grid"><div><p className="ls-muted">Quick questions</p><div className="ls-template-list">{TEMPLATES.map(template => <button key={template.label} className="ls-template-chip" onClick={() => useTemplate(template)}><span className="ls-swatch-dot" />{template.label}</button>)}</div><div className="ls-custom-question"><label className="ls-field-label">CUSTOM QUESTION</label><input className="ls-question-input" value={question} onChange={e => setQuestion(e.target.value)} placeholder="Ask the audience..." /><label className="ls-field-label" style={{ marginTop: 12 }}>OPTIONS &mdash; ONE PER LINE</label><textarea className="ls-textarea" value={options} onChange={e => setOptions(e.target.value)} rows={4} /><div className="ls-interact-actions"><button className="ls-button ls-primary" disabled={busy} onClick={() => void create('poll')}>CREATE &amp; SHOW POLL</button><button className="ls-button ls-secondary" disabled={busy} onClick={() => void create('question')}>CREATE &amp; SHOW QUESTION</button></div></div></div><div><p className="ls-muted">Interactions</p><div className="ls-interaction-list">{items.length === 0 && <div className="ls-empty">No interactions yet.</div>}{items.map(item => <button key={item.id} className={`ls-interaction-item ${selected?.id === item.id ? 'is-selected' : ''}`} onClick={() => setSelected(item)}><strong>{item.question}</strong><div className="ls-muted ls-interaction-meta">{item.status.toUpperCase()} &middot; {item.type.toUpperCase()}</div></button>)}</div>{selected && <div className="ls-interaction-detail"><div className="ls-interaction-detail-head"><strong>{total} RESPONSES</strong><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}><button className="ls-button ls-primary" disabled={busy || selected.status === 'open'} onClick={() => void pushSelected()}>PUSH {selected.type === 'poll' ? 'POLL' : 'QUESTION'}</button><button className="ls-button ls-secondary" onClick={() => window.open(`/sports-screen/${eventId}`, '_blank', 'noopener,noreferrer')}>OPEN ARENA STATS</button><button className="ls-button ls-stop" disabled={busy || selected.status === 'closed'} onClick={() => void closeSelected()}>CLOSE</button></div></div>{selected.type === 'poll' && <div style={{ marginTop: 14 }}>{Object.entries(selected.options ?? {}).map(([id, label]) => { const count = counts[id] ?? 0; const pct = total ? Math.round(count / total * 100) : 0; return <div key={id} className="ls-option-row"><div className="ls-option-row-top"><span>{label}</span><strong>{pct}% &middot; {count}</strong></div><div className="ls-option-track"><div className="ls-option-fill" style={{ width: `${pct}%` }} /></div></div>; })}</div>}</div>}{message && <p className="ls-muted" style={{ marginTop: 10 }}>{message}</p>}</div></div></section></div>;
+
+  const content = <div style={{ display: 'grid', gap: 16 }}>
+    {!embedded && game && <section className="ls-card"><p className="ls-eyebrow">SPORTS EVENT &middot; {game.sport.toUpperCase()}</p><h2 style={{ margin: '5px 0' }}>{game.homeTeam.name} <span className="ls-muted">vs</span> {game.awayTeam.name}</h2></section>}
+    <section className="ls-card">
+      <div className="ls-section-title"><div><p className="ls-eyebrow">AUDIENCE INTERACTIONS</p><h2>Engage the crowd</h2><p className="ls-muted" style={{ marginTop: 6 }}>Creating a poll or question immediately publishes it to audience phones. It does not start or control the flashlight show.</p></div></div>
+      <div className="ls-interact-grid">
+        <div>
+          <p className="ls-muted">Quick questions</p>
+          <div className="ls-template-list">{TEMPLATES.map(template => <button key={template.label} className="ls-template-chip" onClick={() => useTemplate(template)}><span className="ls-swatch-dot" />{template.label}</button>)}</div>
+          <div className="ls-custom-question">
+            <label className="ls-field-label">CUSTOM QUESTION</label>
+            <input className="ls-question-input" value={question} onChange={e => setQuestion(e.target.value)} placeholder="Ask the audience..." />
+            <label className="ls-field-label" style={{ marginTop: 12 }}>OPTIONS &mdash; ONE PER LINE</label>
+            <textarea className="ls-textarea" value={options} onChange={e => setOptions(e.target.value)} rows={4} />
+            <div className="ls-interact-actions"><button className="ls-button ls-primary" disabled={busy} onClick={() => void create('poll')}>CREATE &amp; SHOW POLL</button><button className="ls-button ls-secondary" disabled={busy} onClick={() => void create('question')}>CREATE &amp; SHOW QUESTION</button></div>
+          </div>
+        </div>
+        <div>
+          <p className="ls-muted">Interactions</p>
+          <div className="ls-interaction-list">{items.length === 0 && <div className="ls-empty">No interactions yet.</div>}{items.map(item => <button key={item.id} className={`ls-interaction-item ${selected?.id === item.id ? 'is-selected' : ''}`} onClick={() => setSelected(item)}><strong>{item.question}</strong><div className="ls-muted ls-interaction-meta">{item.status.toUpperCase()} &middot; {item.type.toUpperCase()}</div></button>)}</div>
+          {selected && <div className="ls-interaction-detail">
+            <div className="ls-interaction-detail-head"><strong>{total} RESPONSES</strong><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}><button className="ls-button ls-primary" disabled={busy || selected.status === 'open'} onClick={() => void pushSelected()}>PUSH {selected.type === 'poll' ? 'POLL' : 'QUESTION'}</button><button className="ls-button ls-secondary" onClick={() => window.open(`/sports-screen/${eventId}`, '_blank', 'noopener,noreferrer')}>OPEN ARENA STATS</button><button className="ls-button ls-stop" disabled={busy || selected.status === 'closed'} onClick={() => void closeSelected()}>CLOSE</button></div></div>
+            {selected.type === 'poll' && <div style={{ marginTop: 14 }}>{Object.entries(selected.options ?? {}).map(([id, label]) => { const count = counts[id] ?? 0; const pct = total ? Math.round(count / total * 100) : 0; return <div key={id} className="ls-option-row"><div className="ls-option-row-top"><span>{label}</span><strong>{pct}% &middot; {count}</strong></div><div className="ls-option-track"><div className="ls-option-fill" style={{ width: `${pct}%` }} /></div></div>; })}</div>}
+          </div>}
+          {message && <p className="ls-muted" style={{ marginTop: 10 }}>{message}</p>}
+        </div>
+      </div>
+    </section>
+  </div>;
+
   if (embedded) return content;
   return <main className="ls-shell" style={{ minHeight: '100vh', padding: 24 }}><header className="ls-header"><div><div className="ls-brand">LIGHTSYNC</div><p className="ls-eyebrow">SPORTS INTERACTIONS</p></div><button className="ls-button ls-secondary" onClick={() => navigate(`/admin/event/${eventId}`)}>BACK TO EVENT</button></header><div style={{ maxWidth: 1200, margin: '0 auto' }}>{content}</div></main>;
 }
