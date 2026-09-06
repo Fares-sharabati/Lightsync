@@ -27,10 +27,56 @@ export default function EventControl() {
   useEffect(() => { if (!eventId) return; void syncShowStats(eventId, participantCount); }, [eventId, participantCount]);
   useEffect(() => () => { if (startTimerRef.current !== null) window.clearTimeout(startTimerRef.current); if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current); audioRef.current?.pause(); if (songUrl) URL.revokeObjectURL(songUrl); }, [songUrl]);
 
-  function chooseSong(e: ChangeEvent<HTMLInputElement>) { const file = e.target.files?.[0]; if (!file) return; audioRef.current?.pause(); if (songUrl) URL.revokeObjectURL(songUrl); const url = URL.createObjectURL(new Blob([file], { type: getAudioMimeType(file) })); const audio = new Audio(url); audio.preload = 'auto'; audio.addEventListener('loadedmetadata', () => setSongDuration(audio.duration)); audio.addEventListener('timeupdate', () => setSongCurrentTime(audio.currentTime)); audio.addEventListener('ended', () => { setSongCurrentTime(audio.duration); if (eventId) void updateShow(eventId, { status: 'finished', showStartTime: null }).then(() => setAnalysisMessage('Show finished automatically.')).catch(error => { console.error('Could not finish show automatically:', error); setAnalysisMessage('Song ended, but the show status could not be updated.'); }); }); audioRef.current = audio; setSongFile(file); setSongName(file.name); setSongUrl(url); setGeneratedTimeline(null); setAnalysisMessage(''); setCountdown(null); setSongCurrentTime(0); setSongDuration(0); setStartOffset(0); }
-  async function analyzeSong() { if (!songFile) return setAnalysisMessage('Please select an audio file first.'); setAnalyzing(true); setAnalysisMessage('Analyzing music...'); try { const analysis = await analyzeAudioFile(songFile); setGeneratedTimeline(generateLightTimeline(analysis.beats)); setAnalysisMessage(`Analysis complete \u2014 ${analysis.beats.length} beats detected.`); } catch (error) { console.error(error); setGeneratedTimeline(null); setAnalysisMessage('Could not analyze this audio file.'); } finally { setAnalyzing(false); } }
-  async function startShow() { const audio = audioRef.current; if (!eventId || !generatedTimeline || !audio) { setAnalysisMessage(!generatedTimeline ? 'Analyze the song before starting the show.' : 'Please select the song again.'); return; } const offset = Math.max(0, Math.min(startOffset, Math.max(0, songDuration - 0.05))); const delay = Math.max(0, Math.min(30, Math.round(startDelay))); setStarting(true); setAnalysisMessage(''); if (startTimerRef.current !== null) window.clearTimeout(startTimerRef.current); if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current); try { audio.pause(); audio.currentTime = offset; audio.volume = 0; await audio.play(); const startTime = Date.now() + delay * 1000; await updateShow(eventId, { status: 'running', showStartTime: startTime, lightTimeline: generatedTimeline }); setSongCurrentTime(offset); if (delay > 0) { setCountdown(delay); countdownTimerRef.current = window.setInterval(() => setCountdown(current => { if (current === null || current <= 1) { if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current); countdownTimerRef.current = null; return null; } return current - 1; }), 1000); } else { setCountdown(null); } const startPlayback = () => { startTimerRef.current = null; audio.currentTime = offset; audio.volume = 1; setSongCurrentTime(offset); }; if (delay > 0) { startTimerRef.current = window.setTimeout(startPlayback, delay * 1000); } else { startPlayback(); } } catch (error) { console.error('Could not start show:', error); audio.pause(); audio.volume = 1; setCountdown(null); setAnalysisMessage(error instanceof Error && error.name === 'NotAllowedError' ? 'Audio was blocked. Press Play once in the browser audio player, then try Start Show again.' : 'Could not start the show. Check the selected audio file and try again.'); } finally { setStarting(false); } }
-  async function stopShow() { if (!eventId) return; if (startTimerRef.current !== null) window.clearTimeout(startTimerRef.current); if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current); startTimerRef.current = null; countdownTimerRef.current = null; setCountdown(null); if (audioRef.current) { audioRef.current.pause(); audioRef.current.volume = 1; audioRef.current.currentTime = 0; } setSongCurrentTime(0); setStartOffset(0); setAnalysisMessage('Stopping show...'); try { await updateShow(eventId, { status: 'finished', showStartTime: null }); setAnalysisMessage('Show finished.'); } catch (error) { console.error(error); setAnalysisMessage('Could not finish the show. Check the Firebase rules and organizer account.'); } }
+  function chooseSong(e: ChangeEvent<HTMLInputElement>) { const file = e.target.files?.[0]; if (!file) return; audioRef.current?.pause(); if (songUrl) URL.revokeObjectURL(songUrl); const url = URL.createObjectURL(new Blob([file], { type: getAudioMimeType(file) })); const audio = new Audio(url); audio.preload = 'auto'; audio.addEventListener('loadedmetadata', () => setSongDuration(audio.duration)); audio.addEventListener('timeupdate', () => setSongCurrentTime(audio.currentTime)); audio.addEventListener('ended', () => { setSongCurrentTime(audio.duration); if (eventId) void updateShow(eventId, { status: 'finished', showStartTime: null, showStartOffset: 0 }).then(() => setAnalysisMessage('Show finished automatically.')).catch(error => { console.error('Could not finish show automatically:', error); setAnalysisMessage('Song ended, but the show status could not be updated.'); }); }); audioRef.current = audio; setSongFile(file); setSongName(file.name); setSongUrl(url); setGeneratedTimeline(null); setAnalysisMessage(''); setCountdown(null); setSongCurrentTime(0); setSongDuration(0); setStartOffset(0); }
+  async function analyzeSong() { if (!songFile) return setAnalysisMessage('Please select an audio file first.'); setAnalyzing(true); setAnalysisMessage('Analyzing music...'); try { const analysis = await analyzeAudioFile(songFile); setGeneratedTimeline(generateLightTimeline(analysis.beats)); setAnalysisMessage(`Analysis complete — ${analysis.beats.length} beats detected.`); } catch (error) { console.error(error); setGeneratedTimeline(null); setAnalysisMessage('Could not analyze this audio file.'); } finally { setAnalyzing(false); } }
+  async function startShow() {
+    const audio = audioRef.current;
+    if (!eventId || !generatedTimeline || !audio) { setAnalysisMessage(!generatedTimeline ? 'Analyze the song before starting the show.' : 'Please select the song again.'); return; }
+    const offset = Math.max(0, Math.min(startOffset, Math.max(0, songDuration - 0.05)));
+    const delay = Math.max(0, Math.min(30, Math.round(startDelay)));
+    setStarting(true); setAnalysisMessage('');
+    if (startTimerRef.current !== null) window.clearTimeout(startTimerRef.current);
+    if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current);
+    startTimerRef.current = null; countdownTimerRef.current = null;
+    try {
+      audio.pause();
+      audio.currentTime = offset;
+      audio.volume = 1;
+      const startTime = Date.now() + delay * 1000;
+      await updateShow(eventId, { status: 'running', showStartTime: startTime, showStartOffset: offset, lightTimeline: generatedTimeline });
+      setSongCurrentTime(offset);
+      if (delay > 0) {
+        setCountdown(delay);
+        countdownTimerRef.current = window.setInterval(() => setCountdown(current => {
+          if (current === null || current <= 1) { if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current); countdownTimerRef.current = null; return null; }
+          return current - 1;
+        }), 1000);
+      } else setCountdown(null);
+      const startPlayback = () => {
+        startTimerRef.current = null;
+        audio.currentTime = offset;
+        audio.volume = 1;
+        setSongCurrentTime(offset);
+        void audio.play().catch(error => { console.error('Could not play show audio:', error); setAnalysisMessage('The show is synchronized, but browser audio playback was blocked. Press Play on the audio player to start the soundtrack.'); });
+      };
+      if (delay > 0) startTimerRef.current = window.setTimeout(startPlayback, delay * 1000);
+      else startPlayback();
+    } catch (error) {
+      console.error('Could not start show:', error);
+      audio.pause(); audio.volume = 1; setCountdown(null);
+      setAnalysisMessage('Could not start the show. Check the selected audio file and try again.');
+    } finally { setStarting(false); }
+  }
+  async function stopShow() {
+    if (!eventId) return;
+    if (startTimerRef.current !== null) window.clearTimeout(startTimerRef.current);
+    if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current);
+    startTimerRef.current = null; countdownTimerRef.current = null; setCountdown(null);
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.volume = 1; audioRef.current.currentTime = 0; }
+    setSongCurrentTime(0); setStartOffset(0); setAnalysisMessage('Stopping show...');
+    try { await updateShow(eventId, { status: 'finished', showStartTime: null, showStartOffset: 0 }); setAnalysisMessage('Show finished.'); }
+    catch (error) { console.error(error); setAnalysisMessage('Could not finish the show. Check the Firebase rules and organizer account.'); }
+  }
   async function changeScreenColor(color: string) { if (!/^#[0-9a-fA-F]{6}$/.test(color) || !eventId) return; try { const normalized = color.toUpperCase(); await updateShow(eventId, { screenLightColor: normalized }); setCustomColor(normalized); } catch (error) { console.error(error); setAnalysisMessage('Could not change the audience screen color.'); } }
   function applyCustomColor() { const value = customColor.trim().startsWith('#') ? customColor.trim() : `#${customColor.trim()}`; if (!/^#[0-9a-fA-F]{6}$/.test(value)) { setAnalysisMessage('Enter a valid 6-digit HEX color, for example #FFFFFF.'); return; } setAnalysisMessage(''); void changeScreenColor(value); }
 
