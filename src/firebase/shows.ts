@@ -17,10 +17,7 @@ export async function createShow(organizerId: string, input: CreateShowInput) {
   try {
     await set(ref(db, `publicShows/${showId}`), { name: show.name, date: show.date, venue: show.venue, kind: 'sports', status: show.status, showStartTime: null, showStartOffset: 0, lightTimeline: null, screenLightColor: show.screenLightColor, phoneUiColor: show.phoneUiColor });
     await set(ref(db, `showStats/${showId}`), { totalJoined: 0, peakConnected: 0 });
-  } catch (error) {
-    try { await set(showRef, null); } catch { /* preserve the original error */ }
-    throw error;
-  }
+  } catch (error) { try { await set(showRef, null); } catch { /* preserve original error */ } throw error; }
   return showId;
 }
 
@@ -28,9 +25,4 @@ export function watchShow(showId: string, callback: (show: Show | null) => void)
 export function watchPublicShow(showId: string, callback: (show: PublicShow | null) => void): Unsubscribe { return onValue(ref(db, `publicShows/${showId}`), snapshot => { const value = snapshot.val(); callback(value ? normalizePublicShow(showId, value) : null); }); }
 export function watchOrganizerShows(organizerId: string, callback: (shows: Show[]) => void): Unsubscribe { const showsQuery = query(ref(db, 'shows'), orderByChild('organizerId'), equalTo(organizerId)); return onValue(showsQuery, snapshot => { const value = snapshot.val() ?? {}; callback(Object.entries(value).map(([id, show]) => normalizeShow(id, show as Record<string, unknown>)).sort((a, b) => b.createdAt - a.createdAt)); }); }
 export async function updateShow(showId: string, changes: Partial<Omit<Show, 'id' | 'organizerId'>>) { const updates: Record<string, unknown> = {}; for (const [key, value] of Object.entries(changes)) updates[`shows/${showId}/${key}`] = value; for (const key of ['name', 'date', 'venue', 'kind', 'status', 'showStartTime', 'showStartOffset', 'lightTimeline', 'screenLightColor', 'phoneUiColor']) if (key in changes) updates[`publicShows/${showId}/${key}`] = (changes as Record<string, unknown>)[key]; await update(ref(db), updates); }
-
-export async function deleteShow(showId: string) {
-  const paths = ['publicShows', 'showParticipants', 'showStats', 'sportsGames', 'sportsInteractions', 'sportsResponses', 'sportsResults', 'sportsScreen'];
-  for (const path of paths) await set(ref(db, `${path}/${showId}`), null);
-  await set(ref(db, `shows/${showId}`), null);
-}
+export async function deleteShow(showId: string) { const paths = ['publicShows', 'showParticipants', 'showStats', 'sportsGames', 'sportsInteractions', 'sportsResponses', 'sportsResults', 'sportsScreen']; for (const path of paths) await set(ref(db, `${path}/${showId}`), null); await set(ref(db, `shows/${showId}`), null); }
