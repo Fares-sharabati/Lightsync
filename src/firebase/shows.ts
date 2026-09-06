@@ -13,9 +13,6 @@ export async function createShow(organizerId: string, input: CreateShowInput) {
   const showRef = push(ref(db, 'shows')); const showId = showRef.key; if (!showId) throw new Error('Could not create event ID.');
   const now = Date.now();
   const show = { organizerId, name: input.name.trim(), date: input.date, venue: input.venue.trim(), kind: 'sports' as const, status: 'waiting' as ShowStatus, createdAt: now, showStartTime: null, showStartOffset: 0, screenLightColor: '#FFFFFF', phoneUiColor: '#FFFFFF' };
-
-  // Create the owner record first. Firebase rules for public/child paths use this record
-  // to verify ownership, so creating everything in one multi-location update is rejected.
   await set(showRef, show);
   try {
     await set(ref(db, `publicShows/${showId}`), { name: show.name, date: show.date, venue: show.venue, kind: 'sports', status: show.status, showStartTime: null, showStartOffset: 0, lightTimeline: null, screenLightColor: show.screenLightColor, phoneUiColor: show.phoneUiColor });
