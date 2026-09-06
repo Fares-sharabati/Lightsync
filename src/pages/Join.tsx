@@ -95,7 +95,7 @@ export default function Join() {
     const now = Date.now();
     const position = now >= start ? now - start + offsetMs : -1;
     void setFlash(position >= 0 ? getLightStateAtTime(timeline, position) : false);
-    scheduleNextEvent(timeline, start, offsetMs);
+    scheduleNextEvent(timeline, start, offsetSeconds);
   }
 
   async function joinShow() {
@@ -137,6 +137,31 @@ export default function Join() {
     if (!joined || !event) return;
     if (event.status === 'running' && event.showStartTime && event.lightTimeline) synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline, event.showStartOffset ?? 0);
     else { clearNextTimer(); void setFlash(false); }
+  }, [joined, event?.status, event?.showStartTime, event?.showStartOffset, event?.lightTimeline]);
+
+  // Mobile browsers can suspend timers while the tab is backgrounded or the screen wakes.
+  // Recalculate from the Firebase anchor when the page becomes visible again instead of
+  // trusting stale timers. This is intentionally additive and does not change the normal
+  // synchronized path while the page remains active.
+  useEffect(() => {
+    if (!joined) return;
+    const resync = () => {
+      if (document.visibilityState !== 'visible' || !event) return;
+      if (event.status === 'running' && event.showStartTime && event.lightTimeline) {
+        synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline, event.showStartOffset ?? 0);
+      } else {
+        clearNextTimer();
+        void setFlash(false);
+      }
+    };
+    document.addEventListener('visibilitychange', resync);
+    window.addEventListener('pageshow', resync);
+    window.addEventListener('focus', resync);
+    return () => {
+      document.removeEventListener('visibilitychange', resync);
+      window.removeEventListener('pageshow', resync);
+      window.removeEventListener('focus', resync);
+    };
   }, [joined, event?.status, event?.showStartTime, event?.showStartOffset, event?.lightTimeline]);
 
   useEffect(() => () => {
