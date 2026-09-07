@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment variables (contains live Firebase project config)
+.env
+.env.local
+.env.*.local
