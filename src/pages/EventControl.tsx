@@ -28,7 +28,7 @@ export default function EventControl() {
   useEffect(() => () => { if (startTimerRef.current !== null) window.clearTimeout(startTimerRef.current); if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current); audioRef.current?.pause(); if (songUrl) URL.revokeObjectURL(songUrl); }, [songUrl]);
 
   function chooseSong(e: ChangeEvent<HTMLInputElement>) { const file = e.target.files?.[0]; if (!file) return; audioRef.current?.pause(); if (songUrl) URL.revokeObjectURL(songUrl); const url = URL.createObjectURL(new Blob([file], { type: getAudioMimeType(file) })); const audio = new Audio(url); audio.preload = 'auto'; audio.addEventListener('loadedmetadata', () => setSongDuration(audio.duration)); audio.addEventListener('timeupdate', () => setSongCurrentTime(audio.currentTime)); audio.addEventListener('ended', () => { setSongCurrentTime(audio.duration); if (eventId) void updateShow(eventId, { status: 'finished', showStartTime: null, showStartOffset: 0 }).then(() => setAnalysisMessage('Show finished automatically.')).catch(error => { console.error('Could not finish show automatically:', error); setAnalysisMessage('Song ended, but the show status could not be updated.'); }); }); audioRef.current = audio; setSongFile(file); setSongName(file.name); setSongUrl(url); setGeneratedTimeline(null); setAnalysisMessage(''); setCountdown(null); setSongCurrentTime(0); setSongDuration(0); setStartOffset(0); }
-  async function analyzeSong() { if (!songFile) return setAnalysisMessage('Please select an audio file first.'); setAnalyzing(true); setAnalysisMessage('Analyzing music...'); try { const analysis = await analyzeAudioFile(songFile); setGeneratedTimeline(generateLightTimeline(analysis.beats)); setAnalysisMessage(`Analysis complete — ${analysis.beats.length} beats detected.`); } catch (error) { console.error(error); setGeneratedTimeline(null); setAnalysisMessage('Could not analyze this audio file.'); } finally { setAnalyzing(false); } }
+  async function analyzeSong() { if (!songFile) return setAnalysisMessage('Please select an audio file first.'); setAnalyzing(true); setAnalysisMessage('Analyzing music...'); try { const analysis = await analyzeAudioFile(songFile); setGeneratedTimeline(generateLightTimeline(analysis.beats)); setAnalysisMessage(`Analysis complete â€” ${analysis.beats.length} beats detected.`); } catch (error) { console.error(error); setGeneratedTimeline(null); setAnalysisMessage('Could not analyze this audio file.'); } finally { setAnalyzing(false); } }
   async function startShow() {
     const audio = audioRef.current;
     if (!eventId || !generatedTimeline || !audio) { setAnalysisMessage(!generatedTimeline ? 'Analyze the song before starting the show.' : 'Please select the song again.'); return; }
@@ -64,7 +64,8 @@ export default function EventControl() {
     } catch (error) {
       console.error('Could not start show:', error);
       audio.pause(); audio.volume = 1; setCountdown(null);
-      setAnalysisMessage('Could not start the show. Check the selected audio file and try again.');
+      const reason = error instanceof Error ? error.message : '';
+      setAnalysisMessage(reason ? `Could not start the show: ${reason}` : 'Could not start the show. Check the selected audio file and try again.');
     } finally { setStarting(false); }
   }
   async function stopShow() {

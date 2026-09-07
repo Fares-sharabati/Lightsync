@@ -31,10 +31,13 @@ export async function updateShow(showId: string, changes: Partial<Omit<Show, 'id
     if (!currentSnapshot.exists()) throw new Error('Event not found.');
     const currentStatus = currentSnapshot.child('status').val() as ShowStatus;
     const nextStatus = changes.status;
+    // 'finished -> running' is allowed so an organizer can restart/re-test
+    // a show (e.g. after the previous song ended or STOP SHOW was pressed)
+    // without first having to flip it back to 'waiting'.
     const validTransition = currentStatus === nextStatus
       || (currentStatus === 'waiting' && (nextStatus === 'running' || nextStatus === 'finished'))
       || (currentStatus === 'running' && nextStatus === 'finished')
-      || (currentStatus === 'finished' && nextStatus === 'waiting');
+      || (currentStatus === 'finished' && (nextStatus === 'waiting' || nextStatus === 'running'));
     if (!validTransition) throw new Error(`Invalid show status transition: ${currentStatus} → ${nextStatus}.`);
   }
 
