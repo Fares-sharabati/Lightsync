@@ -15,20 +15,31 @@ function formatTime(seconds: number) { if (!Number.isFinite(seconds) || seconds 
 
 export default function EventControl() {
   const navigate = useNavigate(); const { eventId } = useParams();
-  const [event, setEvent] = useState<Show | null>(null); const [game, setGame] = useState<SportsGame | null>(null); const [loaded, setLoaded] = useState(false); const [participantCount, setParticipantCount] = useState(0); const [starting, setStarting] = useState(false);
+  const [event, setEvent] = useState<Show | null>(null); const [game, setGame] = useState<SportsGame | null>(null); const [loaded, setLoaded] = useState(false); const [participantCount, setParticipantCount] = useState(0); const [totalJoinedCount, setTotalJoinedCount] = useState(0); const [starting, setStarting] = useState(false);
   const [songName, setSongName] = useState(''); const [songFile, setSongFile] = useState<File | null>(null); const [songUrl, setSongUrl] = useState<string | null>(null); const [analyzing, setAnalyzing] = useState(false); const [analysisMessage, setAnalysisMessage] = useState(''); const [generatedTimeline, setGeneratedTimeline] = useState<LightTimeline | null>(null); const [countdown, setCountdown] = useState<number | null>(null); const [songCurrentTime, setSongCurrentTime] = useState(0); const [songDuration, setSongDuration] = useState(0); const [startDelay, setStartDelay] = useState(0); const [startOffset, setStartOffset] = useState(0);
   const [customColor, setCustomColor] = useState('#FFFFFF');
   const [stats, setStats] = useState<ShowStats>({ totalJoined: 0, peakConnected: 0 });
-  const audioRef = useRef<HTMLAudioElement | null>(null); const startTimerRef = useRef<number | null>(null); const countdownTimerRef = useRef<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null); const startTimerRef = useRef<number | null>(null); const countdownTimerRef = useRef<number | null>(null); const statsSyncTimerRef = useRef<number | null>(null);
 
-  useEffect(() => { if (!eventId) return; const stopShowWatch = watchShow(eventId, show => { setEvent(show); setLoaded(true); }); const stopParticipantsWatch = watchParticipants(eventId, participants => { setParticipantCount(Object.values(participants).filter((p: ParticipantInfo) => p.connected === true).length); }); const stopStatsWatch = watchShowStats(eventId, setStats); const stopGameWatch = watchSportsGame(eventId, setGame); return () => { stopShowWatch(); stopParticipantsWatch(); stopStatsWatch(); stopGameWatch(); }; }, [eventId]);
+  useEffect(() => { if (!eventId) return; const stopShowWatch = watchShow(eventId, show => { setEvent(show); setLoaded(true); }); const stopParticipantsWatch = watchParticipants(eventId, participants => { const list = Object.values(participants) as ParticipantInfo[]; setParticipantCount(list.filter(p => p.connected === true).length); setTotalJoinedCount(Object.keys(participants).length); }); const stopStatsWatch = watchShowStats(eventId, setStats); const stopGameWatch = watchSportsGame(eventId, setGame); return () => { stopShowWatch(); stopParticipantsWatch(); stopStatsWatch(); stopGameWatch(); }; }, [eventId]);
   useEffect(() => { if (event?.screenLightColor) setCustomColor(event.screenLightColor); }, [event?.screenLightColor]);
   useEffect(() => { if (!eventId || !game?.homeTeam.primaryColor) return; document.documentElement.style.setProperty('--ls-accent', game.homeTeam.primaryColor); document.documentElement.style.setProperty('--ls-accent-2', game.awayTeam?.primaryColor || game.homeTeam.primaryColor); return () => { document.documentElement.style.removeProperty('--ls-accent'); document.documentElement.style.removeProperty('--ls-accent-2'); }; }, [eventId, game?.homeTeam.primaryColor, game?.awayTeam?.primaryColor]);
-  useEffect(() => { if (!eventId) return; void syncShowStats(eventId, participantCount); }, [eventId, participantCount]);
+  useEffect(() => {
+    // Debounce: a burst of thousands of joins in the seconds before a show
+    // would otherwise fire one write per single connect/disconnect event.
+    // This batches any burst into at most one write every 2 seconds.
+    if (!eventId) return;
+    if (statsSyncTimerRef.current !== null) window.clearTimeout(statsSyncTimerRef.current);
+    statsSyncTimerRef.current = window.setTimeout(() => {
+      statsSyncTimerRef.current = null;
+      void syncShowStats(eventId, totalJoinedCount, participantCount);
+    }, 2000);
+    return () => { if (statsSyncTimerRef.current !== null) window.clearTimeout(statsSyncTimerRef.current); };
+  }, [eventId, totalJoinedCount, participantCount]);
   useEffect(() => () => { if (startTimerRef.current !== null) window.clearTimeout(startTimerRef.current); if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current); audioRef.current?.pause(); if (songUrl) URL.revokeObjectURL(songUrl); }, [songUrl]);
 
   function chooseSong(e: ChangeEvent<HTMLInputElement>) { const file = e.target.files?.[0]; if (!file) return; audioRef.current?.pause(); if (songUrl) URL.revokeObjectURL(songUrl); const url = URL.createObjectURL(new Blob([file], { type: getAudioMimeType(file) })); const audio = new Audio(url); audio.preload = 'auto'; audio.addEventListener('loadedmetadata', () => setSongDuration(audio.duration)); audio.addEventListener('timeupdate', () => setSongCurrentTime(audio.currentTime)); audio.addEventListener('ended', () => { setSongCurrentTime(audio.duration); if (eventId) void updateShow(eventId, { status: 'finished', showStartTime: null, showStartOffset: 0 }).then(() => setAnalysisMessage('Show finished automatically.')).catch(error => { console.error('Could not finish show automatically:', error); setAnalysisMessage('Song ended, but the show status could not be updated.'); }); }); audioRef.current = audio; setSongFile(file); setSongName(file.name); setSongUrl(url); setGeneratedTimeline(null); setAnalysisMessage(''); setCountdown(null); setSongCurrentTime(0); setSongDuration(0); setStartOffset(0); }
-  async function analyzeSong() { if (!songFile) return setAnalysisMessage('Please select an audio file first.'); setAnalyzing(true); setAnalysisMessage('Analyzing music...'); try { const analysis = await analyzeAudioFile(songFile); setGeneratedTimeline(generateLightTimeline(analysis.beats)); setAnalysisMessage(`Analysis complete â€” ${analysis.beats.length} beats detected.`); } catch (error) { console.error(error); setGeneratedTimeline(null); setAnalysisMessage('Could not analyze this audio file.'); } finally { setAnalyzing(false); } }
+  async function analyzeSong() { if (!songFile) return setAnalysisMessage('Please select an audio file first.'); setAnalyzing(true); setAnalysisMessage('Analyzing music...'); try { const analysis = await analyzeAudioFile(songFile); setGeneratedTimeline(generateLightTimeline(analysis.beats)); setAnalysisMessage(`Analysis complete Ã¢â‚¬â€ ${analysis.beats.length} beats detected.`); } catch (error) { console.error(error); setGeneratedTimeline(null); setAnalysisMessage('Could not analyze this audio file.'); } finally { setAnalyzing(false); } }
   async function startShow() {
     const audio = audioRef.current;
     if (!eventId || !generatedTimeline || !audio) { setAnalysisMessage(!generatedTimeline ? 'Analyze the song before starting the show.' : 'Please select the song again.'); return; }

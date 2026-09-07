@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createSportsInteraction, openSportsInteraction, closeSportsInteraction, publishSportsResult, publishSportsScreen, watchSportsInteractions, watchSportsResponses, watchSportsScreen, type SportsInteraction, type SportsScreenState } from '../firebase/sports';
 import { watchSportsGame, type SportsGame } from '../firebase/sportsGame';
@@ -27,6 +27,7 @@ export default function SportsInteractions({ embedded = false }: Props) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [responses, setResponses] = useState<Record<string, { optionId?: string; answer?: string; submittedAt: number }>>({});
+  const publishTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!eventId) return;
@@ -53,18 +54,27 @@ export default function SportsInteractions({ embedded = false }: Props) {
 
   useEffect(() => {
     if (!eventId || !selected) return;
-    const counts: Record<string, number> = {};
-    Object.values(responses).forEach(response => {
-      if (response.optionId) counts[response.optionId] = (counts[response.optionId] ?? 0) + 1;
-    });
+    // Debounce: with a large audience, votes can arrive many times per
+    // second. Recomputing and writing the tally on every single vote
+    // would mean thousands of writes in a short poll window. Batch any
+    // burst into at most one publish every 800ms instead.
+    if (publishTimerRef.current !== null) window.clearTimeout(publishTimerRef.current);
+    publishTimerRef.current = window.setTimeout(() => {
+      publishTimerRef.current = null;
+      const counts: Record<string, number> = {};
+      Object.values(responses).forEach(response => {
+        if (response.optionId) counts[response.optionId] = (counts[response.optionId] ?? 0) + 1;
+      });
 
-    // Only publish aggregate poll statistics to the public arena node.
-    // Free-text question answers stay under the organizer-protected responses node.
-    void publishSportsResult(eventId, selected.id, {
-      total: Object.keys(responses).length,
-      counts,
-      updatedAt: Date.now(),
-    }).catch(error => console.error(error));
+      // Only publish aggregate poll statistics to the public arena node.
+      // Free-text question answers stay under the organizer-protected responses node.
+      void publishSportsResult(eventId, selected.id, {
+        total: Object.keys(responses).length,
+        counts,
+        updatedAt: Date.now(),
+      }).catch(error => console.error(error));
+    }, 800);
+    return () => { if (publishTimerRef.current !== null) window.clearTimeout(publishTimerRef.current); };
   }, [eventId, selected, responses]);
 
   const counts = useMemo(() => {
