@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { createSportsInteraction, openSportsInteraction, closeSportsInteraction, publishSportsResult, publishSportsScreen, watchSportsInteractions, watchSportsResponses, type SportsInteraction } from '../firebase/sports';
+import { createSportsInteraction, openSportsInteraction, closeSportsInteraction, publishSportsResult, publishSportsScreen, watchSportsInteractions, watchSportsResponses, watchSportsScreen, type SportsInteraction, type SportsScreenState } from '../firebase/sports';
 import { watchSportsGame, type SportsGame } from '../firebase/sportsGame';
 
 const TEMPLATES = [
@@ -21,6 +21,7 @@ export default function SportsInteractions({ embedded = false }: Props) {
   const [game, setGame] = useState<SportsGame | null>(null);
   const [items, setItems] = useState<SportsInteraction[]>([]);
   const [selected, setSelected] = useState<SportsInteraction | null>(null);
+  const [screen, setScreen] = useState<SportsScreenState | null>(null);
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState('Home Team\nAway Team');
   const [busy, setBusy] = useState(false);
@@ -35,6 +36,11 @@ export default function SportsInteractions({ embedded = false }: Props) {
   useEffect(() => {
     if (!eventId) return;
     return watchSportsInteractions(eventId, setItems);
+  }, [eventId]);
+
+  useEffect(() => {
+    if (!eventId) return;
+    return watchSportsScreen(eventId, setScreen);
   }, [eventId]);
 
   useEffect(() => {
@@ -144,7 +150,11 @@ export default function SportsInteractions({ embedded = false }: Props) {
     setBusy(true);
     try {
       await closeSportsInteraction(eventId, selected.id);
-      await publishSportsScreen(eventId, null, 'idle');
+      // Only clear the arena screen if this interaction is the one currently displayed.
+      // Closing an older interaction must not blank a newer live interaction.
+      if (screen?.activeInteractionId === selected.id) {
+        await publishSportsScreen(eventId, null, 'idle');
+      }
       setSelected({ ...selected, status: 'closed', displayOnScreen: false, closedAt: Date.now() });
       setMessage('Interaction closed.');
     } catch (error) {
