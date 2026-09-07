@@ -1,4 +1,4 @@
-import { onDisconnect, onValue, ref, runTransaction, set, type Unsubscribe } from 'firebase/database';
+import { onDisconnect, onValue, ref, set, type Unsubscribe } from 'firebase/database';
 import { db } from './config';
 
 export type ParticipantInfo = {
@@ -38,20 +38,9 @@ export async function registerParticipant(showId: string, participantId: string)
     joinedAt: Date.now(),
   };
 
+  // Arm the disconnect handler before marking the participant online.
   await onDisconnect(participantRef).update({ connected: false });
-  const result = await runTransaction(participantRef, current => current ?? info);
-
-  if (!result.committed) throw new Error('Could not register participant.');
-  if (result.snapshot.val()?.connected !== true) {
-    await set(participantRef, info);
-  }
-
-  if (result.snapshot.val() === info || result.snapshot.val()?.joinedAt === info.joinedAt) {
-    await runTransaction(ref(db, `showStats/${showId}/totalJoined`), current =>
-      typeof current === 'number' ? current + 1 : 1
-    );
-  }
-
+  await set(participantRef, info);
   return participantRef;
 }
 
