@@ -25,28 +25,37 @@ export function watchShow(showId: string, callback: (show: Show | null) => void)
 export function watchPublicShow(showId: string, callback: (show: PublicShow | null) => void): Unsubscribe { return onValue(ref(db, `publicShows/${showId}`), snapshot => { const value = snapshot.val(); callback(value ? normalizePublicShow(showId, value) : null); }); }
 export function watchOrganizerShows(organizerId: string, callback: (shows: Show[]) => void): Unsubscribe { const showsQuery = query(ref(db, 'shows'), orderByChild('organizerId'), equalTo(organizerId)); return onValue(showsQuery, snapshot => { const value = snapshot.val() ?? {}; callback(Object.entries(value).map(([id, show]) => normalizeShow(id, show as Record<string, unknown>)).sort((a, b) => b.createdAt - a.createdAt)); }); }
 
-export async function updateShow(showId: string, changes: Partial<Omit<Show, 'id' | 'organizerId'>>) {
-  if (changes.status !== undefined) {
-    const currentSnapshot = await get(ref(db, `shows/${showId}`));
-    if (!currentSnapshot.exists()) throw new Error('Event not found.');
-    const currentStatus = currentSnapshot.child('status').val() as ShowStatus;
-    const nextStatus = changes.status;
-    // 'finished -> running' is allowed so an organizer can restart/re-test
-    // a show (e.g. after the previous song ended or STOP SHOW was pressed)
-    // without first having to flip it back to 'waiting'.
-    const validTransition = currentStatus === nextStatus
-      || (currentStatus === 'waiting' && (nextStatus === 'running' || nextStatus === 'finished'))
-      || (currentStatus === 'running' && nextStatus === 'finished')
-      || (currentStatus === 'finished' && (nextStatus === 'waiting' || nextStatus === 'running'));
-    if (!validTransition) throw new Error(`Invalid show status transition: ${currentStatus} -> ${nextStatus}.`);
-  }
-
+async function writeShowChanges(showId: string, changes: Partial<Omit<Show, 'id' | 'organizerId'>>) {
   const updates: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(changes)) updates[`shows/${showId}/${key}`] = value;
   for (const key of ['name', 'date', 'venue', 'kind', 'status', 'showStartTime', 'showStartOffset', 'lightTimeline', 'screenLightColor', 'phoneUiColor']) {
     if (key in changes) updates[`publicShows/${showId}/${key}`] = (changes as Record<string, unknown>)[key];
   }
   await update(ref(db), updates);
+}
+
+export async function updateShow(showId: string, changes: Partial<Omit<Show, 'id' | 'organizerId'>>) {
+  if (changes.status !== undefined) {
+    const currentSnapshot = await get(ref(db, `shows/${showId}`));
+    if (!currentSnapshot.exists()) throw new Error('Event not found.');
+    const currentStatus = currentSnapshot.child('status').val() as ShowStatus;
+    const nextStatus = changes.status;
+    const validTransition = currentStatus === nextStatus
+      || (currentStatus === 'waiting' && (nextStatus === 'running' || nextStatus === 'finished'))
+      || (currentStatus === 'running' && nextStatus === 'finished')
+      || (currentStatus === 'finished' && (nextStatus === 'waiting' || nextStatus === 'running'));
+    if (!validTransition) throw new Error(`Invalid show status transition: ${currentStatus} -> ${nextStatus}.`);
+
+    // Older Firebase rules may still require FINISHED -> WAITING -> RUNNING.
+    // Normalize that transition first so restarting remains compatible while
+    // the updated rules are being published. The two writes are both
+    // organizer-authorized and keep shows/publicShows synchronized.
+    if (currentStatus === 'finished' && nextStatus === 'running') {
+      await writeShowChanges(showId, { status: 'waiting', showStartTime: null, showStartOffset: 0 });
+    }
+  }
+
+  await writeShowChanges(showId, changes);
 }
 
 export async function deleteShow(showId: string) { const paths = ['publicShows', 'showParticipants', 'showStats', 'sportsGames', 'sportsInteractions', 'sportsResponses', 'sportsResults', 'sportsScreen']; for (const path of paths) await set(ref(db, `${path}/${showId}`), null); await set(ref(db, `shows/${showId}`), null); }
