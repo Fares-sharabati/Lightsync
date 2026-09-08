@@ -1,5 +1,7 @@
 import {
+  browserLocalPersistence,
   onAuthStateChanged,
+  setPersistence,
   signInAnonymously,
   signInWithEmailAndPassword,
   signOut,
@@ -15,10 +17,21 @@ export async function signInOrganizer(email: string, password: string) {
   return signInWithEmailAndPassword(auth, email, password);
 }
 
+let anonymousAuthPromise: Promise<User> | null = null;
+
 export async function ensureAnonymousAuth() {
   if (auth.currentUser) return auth.currentUser;
-  const result = await signInAnonymously(auth);
-  return result.user;
+  if (!anonymousAuthPromise) {
+    anonymousAuthPromise = (async () => {
+      await setPersistence(auth, browserLocalPersistence);
+      if (auth.currentUser) return auth.currentUser;
+      const result = await signInAnonymously(auth);
+      return result.user;
+    })().finally(() => {
+      anonymousAuthPromise = null;
+    });
+  }
+  return anonymousAuthPromise;
 }
 
 export async function logout() {
