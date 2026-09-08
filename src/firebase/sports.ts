@@ -1,6 +1,22 @@
 import { get, onValue, ref, set, update, type Unsubscribe } from 'firebase/database';
 import { db } from './config';
 
+const AUDIENCE_ID_KEY = 'lightsync_audience_id';
+
+function getAudienceId() {
+  try {
+    const existing = window.localStorage.getItem(AUDIENCE_ID_KEY);
+    if (existing) return existing;
+    const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}_${Math.random().toString(36).slice(2)}`;
+    window.localStorage.setItem(AUDIENCE_ID_KEY, id);
+    return id;
+  } catch {
+    return 'audience_' + Math.random().toString(36).slice(2);
+  }
+}
+
 export type InteractionType = 'poll' | 'question';
 export type InteractionStatus = 'open' | 'closed';
 export type SportsInteraction = { id: string; type: InteractionType; question: string; status: InteractionStatus; options?: Record<string, string>; createdAt: number; closedAt?: number; displayOnScreen?: boolean; screenMode?: 'percentages' | 'question' };
@@ -15,5 +31,12 @@ export async function openSportsInteraction(showId: string, interactionId: strin
 export async function closeSportsInteraction(showId: string, interactionId: string) { await update(ref(db, `sportsInteractions/${showId}/${interactionId}`), { status: 'closed', closedAt: Date.now(), displayOnScreen: false }); }
 export async function publishSportsScreen(showId: string, activeInteractionId: string | null, displayMode: SportsScreenState['displayMode']) { await set(ref(db, `sportsScreen/${showId}`), { activeInteractionId, displayMode, updatedAt: Date.now() }); }
 export async function publishSportsResult(showId: string, interactionId: string, result: SportsResult) { await set(ref(db, `sportsResults/${showId}/${interactionId}`), result); }
-export async function submitSportsResponse(showId: string, interactionId: string, uid: string, response: { optionId?: string; answer?: string }) { await set(ref(db, `sportsResponses/${showId}/${interactionId}/${uid}`), { ...response, submittedAt: Date.now() }); }
-export async function hasRespondedToInteraction(showId: string, interactionId: string, uid: string) { const snapshot = await get(ref(db, `sportsResponses/${showId}/${interactionId}/${uid}`)); return snapshot.exists(); }
+export async function submitSportsResponse(showId: string, interactionId: string, uid: string, response: { optionId?: string; answer?: string }) {
+  const audienceId = getAudienceId();
+  await set(ref(db, `sportsResponses/${showId}/${interactionId}/${audienceId}`), { ...response, uid, audienceId, submittedAt: Date.now() });
+}
+export async function hasRespondedToInteraction(showId: string, interactionId: string, _uid: string) {
+  const audienceId = getAudienceId();
+  const snapshot = await get(ref(db, `sportsResponses/${showId}/${interactionId}/${audienceId}`));
+  return snapshot.exists();
+}
