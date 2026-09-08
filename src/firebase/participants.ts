@@ -1,11 +1,29 @@
 import { onDisconnect, onValue, ref, set, type Unsubscribe } from 'firebase/database';
 import { db } from './config';
 
+const AUDIENCE_ID_KEY = 'lightsync_audience_id';
+
+function getAudienceId() {
+  try {
+    const existing = window.localStorage.getItem(AUDIENCE_ID_KEY);
+    if (existing) return existing;
+    const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}_${Math.random().toString(36).slice(2)}`;
+    window.localStorage.setItem(AUDIENCE_ID_KEY, id);
+    return id;
+  } catch {
+    return 'audience_' + Math.random().toString(36).slice(2);
+  }
+}
+
 export type ParticipantInfo = {
   connected: boolean;
   device: string;
   browser: string;
   joinedAt: number;
+  uid?: string;
+  audienceId?: string;
 };
 
 export function detectDevice() {
@@ -36,20 +54,14 @@ export async function registerParticipant(showId: string, participantId: string)
     device: detectDevice(),
     browser: detectBrowser(),
     joinedAt: Date.now(),
+    uid: participantId,
+    audienceId: getAudienceId(),
   };
 
-  // Write the full record FIRST. The database's validation rules require
-  // every write to this path to include all four fields (connected, device,
-  // browser, joinedAt). Registering the onDisconnect handler before this node
-  // exists would try to partially update a node that isn't there yet - the
-  // rules reject that outright, which was blocking every single join attempt.
   await set(participantRef, info);
   try {
     await onDisconnect(participantRef).update({ connected: false });
   } catch (err) {
-    // Non-fatal: the participant has already successfully joined even if the
-    // disconnect handler couldn't be armed. Their connected status just won't
-    // auto-flip to false if their phone drops off suddenly.
     console.error('Could not arm disconnect handler:', err);
   }
   return participantRef;
@@ -57,6 +69,15 @@ export async function registerParticipant(showId: string, participantId: string)
 
 export function watchParticipants(showId: string, callback: (participants: Record<string, ParticipantInfo>) => void): Unsubscribe {
   return onValue(ref(db, `showParticipants/${showId}`), snapshot => {
-    callback((snapshot.val() ?? {}) as Record<string, ParticipantInfo>);
+    const raw = (snapshot.val() ?? {}) as Record<string, ParticipantInfo>;
+    const unique: Record<string, ParticipantInfo> = {};
+
+    for (const [uid, participant] of Object.entries(raw)) {
+      const identity = participant.audienceId || uid;
+      const previous = unique[identity];
+      if (!previous || participant.joinedAt >= previous.joinedAt) unique[identity] = participant;
+    }
+
+    callback(unique);
   });
 }
