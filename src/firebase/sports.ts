@@ -1,4 +1,4 @@
-import { onValue, ref, set, update, type Unsubscribe } from 'firebase/database';
+import { get, onValue, ref, set, update, type Unsubscribe } from 'firebase/database';
 import { db } from './config';
 
 export type InteractionType = 'poll' | 'question';
@@ -16,3 +16,4 @@ export async function closeSportsInteraction(showId: string, interactionId: stri
 export async function publishSportsScreen(showId: string, activeInteractionId: string | null, displayMode: SportsScreenState['displayMode']) { await set(ref(db, `sportsScreen/${showId}`), { activeInteractionId, displayMode, updatedAt: Date.now() }); }
 export async function publishSportsResult(showId: string, interactionId: string, result: SportsResult) { await set(ref(db, `sportsResults/${showId}/${interactionId}`), result); }
 export async function submitSportsResponse(showId: string, interactionId: string, uid: string, response: { optionId?: string; answer?: string }) { await set(ref(db, `sportsResponses/${showId}/${interactionId}/${uid}`), { ...response, submittedAt: Date.now() }); }
+export async function hasRespondedToInteraction(showId: string, interactionId: string, uid: string) { const snapshot = await get(ref(db, `sportsResponses/${showId}/${interactionId}/${uid}`)); return snapshot.exists(); }

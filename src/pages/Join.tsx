@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ensureAnonymousAuth } from '../firebase/auth';
 import { watchPublicShow, type PublicShow } from '../firebase/shows';
 import { watchSportsGame, getSportsLightColor, type SportsGame } from '../firebase/sportsGame';
-import { watchSportsInteractions, submitSportsResponse, type SportsInteraction } from '../firebase/sports';
+import { watchSportsInteractions, submitSportsResponse, hasRespondedToInteraction, type SportsInteraction } from '../firebase/sports';
 import { registerParticipant } from '../firebase/participants';
 import { getLightStateAtTime, getNextLightEvent, type LightTimeline } from '../lightSync/timeline';
 
@@ -59,7 +59,22 @@ export default function Join() {
 
   useEffect(() => {
     setSelectedOption(''); setAnswer(''); setMessage(''); setSending(false); setSubmittedInteractionId(null);
-  }, [activeInteraction?.id]);
+    if (!eventId || !activeInteraction) return;
+    // On (re)join, a currently-open interaction might be one this device
+    // already answered before the tab was closed - check once so the
+    // "already answered" state shows immediately instead of only surfacing
+    // after a rejected resubmission attempt.
+    let cancelled = false;
+    const interactionId = activeInteraction.id;
+    void (async () => {
+      try {
+        const uid = (await ensureAnonymousAuth()).uid;
+        const already = await hasRespondedToInteraction(eventId, interactionId, uid);
+        if (!cancelled && already) setSubmittedInteractionId(interactionId);
+      } catch (err) { console.error(err); }
+    })();
+    return () => { cancelled = true; };
+  }, [eventId, activeInteraction?.id]);
 
   function clearNextTimer() {
     if (nextTimerRef.current !== null) window.clearTimeout(nextTimerRef.current);
@@ -207,17 +222,19 @@ export default function Join() {
   const uiColor = event.phoneUiColor && /^#[0-9a-fA-F]{6}$/.test(event.phoneUiColor) ? event.phoneUiColor : getSportsLightColor(game);
   const flashColor = event.screenLightColor && /^#[0-9a-fA-F]{6}$/.test(event.screenLightColor) ? event.screenLightColor : uiColor;
   const running = event.status === 'running';
-  const interactionVisible = !!activeInteraction && submittedInteractionId !== activeInteraction.id;
+  const alreadyResponded = !!activeInteraction && submittedInteractionId === activeInteraction.id;
   const pageBackground = lightState ? flashColor : `radial-gradient(circle at 50% 0%, ${uiColor}55 0%, transparent 42%), linear-gradient(160deg, #101218 0%, #08090d 58%, #050507 100%)`;
 
-  const interactionCard = interactionVisible ? <section className="light-interaction" aria-live="polite">
+  const interactionCard = activeInteraction ? <section className="light-interaction" aria-live="polite">
     <div className="interaction-header"><span className="interaction-live-dot" /><span>{activeInteraction.type === 'poll' ? 'LIVE POLL' : 'LIVE QUESTION'}</span></div>
     <div className="interaction-question">{activeInteraction.question}</div>
-    {activeInteraction.type === 'poll' ? <div className="interaction-options">
-      {Object.entries(activeInteraction.options ?? {}).map(([id, label]) => <button key={id} type="button" className={`interaction-option ${selectedOption === id ? 'is-selected' : ''}`} disabled={sending} onClick={() => { setSelectedOption(id); setMessage(''); }} style={selectedOption === id ? ({ '--choice-color': uiColor } as CSSProperties) : undefined}><span>{label}</span><span className="choice-mark">{selectedOption === id ? 'v' : ''}</span></button>)}
-    </div> : <textarea className="interaction-answer" value={answer} onChange={e => { setAnswer(e.target.value); setMessage(''); }} maxLength={200} placeholder="Type your answer..." rows={3} />}
-    <button type="button" className="interaction-submit" disabled={sending} onClick={() => void submitInteraction()} style={{ background: uiColor }}>{sending ? 'SUBMITTING...' : activeInteraction.type === 'poll' ? 'SUBMIT VOTE' : 'SUBMIT ANSWER'}</button>
-    {message && <div className={`interaction-message ${message.startsWith('Could not') ? 'is-error' : ''}`}>{message}</div>}
+    {alreadyResponded ? <div className="interaction-message">{message || 'You already responded to this one.'}</div> : <>
+      {activeInteraction.type === 'poll' ? <div className="interaction-options">
+        {Object.entries(activeInteraction.options ?? {}).map(([id, label]) => <button key={id} type="button" className={`interaction-option ${selectedOption === id ? 'is-selected' : ''}`} disabled={sending} onClick={() => { setSelectedOption(id); setMessage(''); }} style={selectedOption === id ? ({ '--choice-color': uiColor } as CSSProperties) : undefined}><span>{label}</span><span className="choice-mark">{selectedOption === id ? 'v' : ''}</span></button>)}
+      </div> : <textarea className="interaction-answer" value={answer} onChange={e => { setAnswer(e.target.value); setMessage(''); }} maxLength={200} placeholder="Type your answer..." rows={3} />}
+      <button type="button" className="interaction-submit" disabled={sending} onClick={() => void submitInteraction()} style={{ background: uiColor }}>{sending ? 'SUBMITTING...' : activeInteraction.type === 'poll' ? 'SUBMIT VOTE' : 'SUBMIT ANSWER'}</button>
+      {message && <div className={`interaction-message ${message.startsWith('Could not') ? 'is-error' : ''}`}>{message}</div>}
+    </>}
   </section> : null;
 
   if (!joined) return <main className="light-page" style={{ background: pageBackground }}><div className="light-shell light-shell-join">
