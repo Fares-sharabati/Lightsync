@@ -148,7 +148,17 @@ export default function Join() {
       const uid = (await ensureAnonymousAuth()).uid;
       await submitSportsResponse(eventId, interactionId, uid, activeInteraction.type === 'poll' ? { optionId: selectedOption } : { answer: answer.trim().slice(0, 200) });
       setSubmittedInteractionId(interactionId); setMessage('Response submitted!'); setSelectedOption(''); setAnswer('');
-    } catch (err) { console.error(err); setMessage('Could not submit your answer. Please try again.'); }
+    } catch (err) {
+      console.error(err);
+      // A permission-denied here almost always means they already voted
+      // (the database only accepts one response per person per interaction,
+      // e.g. after they refresh the page and the poll reappears). Treat that
+      // as "already submitted" rather than telling them to retry, since
+      // retrying can never succeed once a response is on file.
+      const alreadyResponded = err instanceof Error && /permission/i.test(err.message);
+      if (alreadyResponded) { setSubmittedInteractionId(interactionId); setMessage('You already responded to this one.'); }
+      else setMessage('Could not submit your answer. Please try again.');
+    }
     finally { setSending(false); }
   }
 
