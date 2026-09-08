@@ -44,7 +44,7 @@
         "$participantId": {
           ".read": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
           ".write": "auth != null && auth.uid === $participantId && root.child('publicShows').child($showId).exists()",
-          ".validate": "!newData.exists() || (newData.hasChildren(['connected', 'device', 'browser', 'joinedAt']) && newData.child('connected').isBoolean() && newData.child('device').isString() && newData.child('browser').isString() && newData.child('joinedAt').isNumber())"
+          ".validate": "!newData.exists() || (newData.hasChildren(['connected', 'device', 'browser', 'joinedAt', 'uid', 'audienceId']) && newData.child('connected').isBoolean() && newData.child('device').isString() && newData.child('browser').isString() && newData.child('joinedAt').isNumber() && newData.child('uid').val() === auth.uid && newData.child('audienceId').isString())"
         }
       }
     },
@@ -71,9 +71,10 @@
         ".read": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
         ".write": "auth != null && !newData.exists() && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
         "$interactionId": {
-          "$uid": {
-            ".write": "auth != null && auth.uid === $uid && !data.exists() && root.child('publicShows').child($showId).exists() && root.child('sportsInteractions').child($showId).child($interactionId).child('status').val() === 'open'",
-            ".validate": "!newData.exists() || (newData.hasChildren(['submittedAt']) && newData.child('submittedAt').isNumber())"
+          "$responseId": {
+            ".read": "auth != null && data.child('uid').val() === auth.uid",
+            ".write": "auth != null && !data.exists() && newData.child('uid').val() === auth.uid && newData.child('audienceId').val() === $responseId && root.child('publicShows').child($showId).exists() && root.child('sportsInteractions').child($showId).child($interactionId).child('status').val() === 'open'",
+            ".validate": "!newData.exists() || (newData.hasChildren(['submittedAt', 'uid', 'audienceId']) && newData.child('submittedAt').isNumber() && newData.child('uid').val() === auth.uid && newData.child('audienceId').val() === $responseId && ((!newData.hasChild('optionId')) || newData.child('optionId').isString()) && ((!newData.hasChild('answer')) || (newData.child('answer').isString() && newData.child('answer').val().length <= 200)))"
           }
         }
       }
