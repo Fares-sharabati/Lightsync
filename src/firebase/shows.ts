@@ -38,7 +38,7 @@ export async function updateShow(showId: string, changes: Partial<Omit<Show, 'id
       || (currentStatus === 'waiting' && (nextStatus === 'running' || nextStatus === 'finished'))
       || (currentStatus === 'running' && nextStatus === 'finished')
       || (currentStatus === 'finished' && (nextStatus === 'waiting' || nextStatus === 'running'));
-    if (!validTransition) throw new Error(`Invalid show status transition: ${currentStatus} → ${nextStatus}.`);
+    if (!validTransition) throw new Error(`Invalid show status transition: ${currentStatus} -> ${nextStatus}.`);
   }
 
   const updates: Record<string, unknown> = {};

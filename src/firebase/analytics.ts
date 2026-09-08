@@ -13,7 +13,7 @@ export function watchShowStats(showId: string, callback: (stats: ShowStats) => v
  * IMPORTANT: `totalJoined` and `connected` must be values the caller
  * already has in memory (e.g. from an existing `watchParticipants`
  * listener). This function intentionally does NOT re-read the full
- * participant list from the database on every call — doing that once
+ * participant list from the database on every call - doing that once
  * per connect/disconnect event turns every single join into a
  * full-collection download. At a handful of attendees that's
  * invisible; at thousands of attendees it means thousands of

@@ -116,11 +116,11 @@ export default function Join() {
           trackRef.current = track;
         } else {
           stream.getTracks().forEach(t => t.stop());
-          torchNote = 'Your phone will use its screen as the light â€” camera flash control isnâ€™t supported on this device/browser.';
+          torchNote = 'Your phone will use its screen as the light - camera flash control is not supported on this device/browser.';
         }
       } catch (mediaErr) {
         console.error(mediaErr);
-        torchNote = 'Your phone will use its screen as the light â€” camera access was unavailable.';
+        torchNote = 'Your phone will use its screen as the light - camera access was unavailable.';
       }
     } else {
       torchNote = 'Your phone will use its screen as the light on this browser.';
@@ -146,7 +146,7 @@ export default function Join() {
     try {
       const uid = (await ensureAnonymousAuth()).uid;
       await submitSportsResponse(eventId, interactionId, uid, activeInteraction.type === 'poll' ? { optionId: selectedOption } : { answer: answer.trim().slice(0, 200) });
-      setSubmittedInteractionId(interactionId); setMessage('Response submitted âœ“'); setSelectedOption(''); setAnswer('');
+      setSubmittedInteractionId(interactionId); setMessage('Response submitted!'); setSelectedOption(''); setAnswer('');
     } catch (err) { console.error(err); setMessage('Could not submit your answer. Please try again.'); }
     finally { setSending(false); }
   }
@@ -190,7 +190,7 @@ export default function Join() {
     }
   }, []);
 
-  if (!loaded) return <main className="light-page light-page-loading"><div className="light-shell"><div className="light-brand">LIGHTSYNC</div><div className="light-loading">Connecting to showâ€¦</div></div></main>;
+  if (!loaded) return <main className="light-page light-page-loading"><div className="light-shell"><div className="light-brand">LIGHTSYNC</div><div className="light-loading">Connecting to show...</div></div></main>;
   if (!event || !eventId) return <main className="light-page light-page-loading"><div className="light-shell"><div className="light-brand">LIGHTSYNC</div><div className="light-loading">{error || 'Show not found.'}</div><button className="light-primary-button" onClick={() => navigate('/')}>BACK</button></div></main>;
 
   const uiColor = event.phoneUiColor && /^#[0-9a-fA-F]{6}$/.test(event.phoneUiColor) ? event.phoneUiColor : getSportsLightColor(game);
@@ -203,15 +203,15 @@ export default function Join() {
     <div className="interaction-header"><span className="interaction-live-dot" /><span>{activeInteraction.type === 'poll' ? 'LIVE POLL' : 'LIVE QUESTION'}</span></div>
     <div className="interaction-question">{activeInteraction.question}</div>
     {activeInteraction.type === 'poll' ? <div className="interaction-options">
-      {Object.entries(activeInteraction.options ?? {}).map(([id, label]) => <button key={id} type="button" className={`interaction-option ${selectedOption === id ? 'is-selected' : ''}`} disabled={sending} onClick={() => { setSelectedOption(id); setMessage(''); }} style={selectedOption === id ? ({ '--choice-color': uiColor } as CSSProperties) : undefined}><span>{label}</span><span className="choice-mark">{selectedOption === id ? 'âœ“' : ''}</span></button>)}
-    </div> : <textarea className="interaction-answer" value={answer} onChange={e => { setAnswer(e.target.value); setMessage(''); }} maxLength={200} placeholder="Type your answerâ€¦" rows={3} />}
-    <button type="button" className="interaction-submit" disabled={sending} onClick={() => void submitInteraction()} style={{ background: uiColor }}>{sending ? 'SUBMITTINGâ€¦' : activeInteraction.type === 'poll' ? 'SUBMIT VOTE' : 'SUBMIT ANSWER'}</button>
+      {Object.entries(activeInteraction.options ?? {}).map(([id, label]) => <button key={id} type="button" className={`interaction-option ${selectedOption === id ? 'is-selected' : ''}`} disabled={sending} onClick={() => { setSelectedOption(id); setMessage(''); }} style={selectedOption === id ? ({ '--choice-color': uiColor } as CSSProperties) : undefined}><span>{label}</span><span className="choice-mark">{selectedOption === id ? 'v' : ''}</span></button>)}
+    </div> : <textarea className="interaction-answer" value={answer} onChange={e => { setAnswer(e.target.value); setMessage(''); }} maxLength={200} placeholder="Type your answer..." rows={3} />}
+    <button type="button" className="interaction-submit" disabled={sending} onClick={() => void submitInteraction()} style={{ background: uiColor }}>{sending ? 'SUBMITTING...' : activeInteraction.type === 'poll' ? 'SUBMIT VOTE' : 'SUBMIT ANSWER'}</button>
     {message && <div className={`interaction-message ${message.startsWith('Could not') ? 'is-error' : ''}`}>{message}</div>}
   </section> : null;
 
   if (!joined) return <main className="light-page" style={{ background: pageBackground }}><div className="light-shell light-shell-join">
     <header className="light-header"><div className="light-brand">LIGHTSYNC</div><div className="light-status"><span /> SYSTEM READY</div></header>
-    <section className="light-main join-main"><div className="light-kicker">YOUâ€™RE CONNECTED</div><h1 className="light-title">{event.name}</h1>{game && <div className="light-matchup"><strong>{game.homeTeam.name}</strong><span>VS</span><strong>{game.awayTeam.name}</strong></div>}<p className="light-copy">Join the show to enable your phoneâ€™s flashlight and take part in live audience interactions.</p><button className="light-primary-button" onClick={() => void joinShow()}>JOIN SHOW</button><div className="light-note">Camera permission is used only to control your phone flashlight.</div></section>
+    <section className="light-main join-main"><div className="light-kicker">YOU'RE CONNECTED</div><h1 className="light-title">{event.name}</h1>{game && <div className="light-matchup"><strong>{game.homeTeam.name}</strong><span>VS</span><strong>{game.awayTeam.name}</strong></div>}<p className="light-copy">Join the show to enable your phone's flashlight and take part in live audience interactions.</p><button className="light-primary-button" onClick={() => void joinShow()}>JOIN SHOW</button><div className="light-note">Camera permission is used only to control your phone flashlight.</div></section>
     {interactionCard}{error && <p className="light-error">{error}</p>}
   </div></main>;
 
