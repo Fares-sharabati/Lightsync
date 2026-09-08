@@ -38,9 +38,20 @@ export async function registerParticipant(showId: string, participantId: string)
     joinedAt: Date.now(),
   };
 
-  // Arm the disconnect handler before marking the participant online.
-  await onDisconnect(participantRef).update({ connected: false });
+  // Write the full record FIRST. The database's validation rules require
+  // every write to this path to include all four fields (connected, device,
+  // browser, joinedAt). Registering the onDisconnect handler before this node
+  // exists would try to partially update a node that isn't there yet - the
+  // rules reject that outright, which was blocking every single join attempt.
   await set(participantRef, info);
+  try {
+    await onDisconnect(participantRef).update({ connected: false });
+  } catch (err) {
+    // Non-fatal: the participant has already successfully joined even if the
+    // disconnect handler couldn't be armed. Their connected status just won't
+    // auto-flip to false if their phone drops off suddenly.
+    console.error('Could not arm disconnect handler:', err);
+  }
   return participantRef;
 }
 

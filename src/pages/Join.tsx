@@ -133,7 +133,8 @@ export default function Join() {
       if (event.status === 'running' && event.showStartTime && event.lightTimeline) synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline, event.showStartOffset ?? 0);
     } catch (err) {
       console.error(err);
-      setError('Could not join the show. Please check your connection and try again.');
+      const reason = err instanceof Error ? err.message : '';
+      setError(reason ? `Could not join the show: ${reason}` : 'Could not join the show. Please check your connection and try again.');
     }
   }
 
