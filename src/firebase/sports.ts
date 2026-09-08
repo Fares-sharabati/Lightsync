@@ -35,8 +35,14 @@ export async function submitSportsResponse(showId: string, interactionId: string
   const audienceId = getAudienceId();
   await set(ref(db, `sportsResponses/${showId}/${interactionId}/${audienceId}`), { ...response, uid, audienceId, submittedAt: Date.now() });
 }
-export async function hasRespondedToInteraction(showId: string, interactionId: string, _uid: string) {
+export async function hasRespondedToInteraction(showId: string, interactionId: string, uid: string) {
   const audienceId = getAudienceId();
-  const snapshot = await get(ref(db, `sportsResponses/${showId}/${interactionId}/${audienceId}`));
-  return snapshot.exists();
+  const current = await get(ref(db, `sportsResponses/${showId}/${interactionId}/${audienceId}`));
+  if (current.exists()) return true;
+
+  // Compatibility with responses created before the stable audience identity
+  // was introduced. This prevents an existing vote from being submitted a
+  // second time during the migration.
+  const legacy = await get(ref(db, `sportsResponses/${showId}/${interactionId}/${uid}`));
+  return legacy.exists();
 }
