@@ -17,7 +17,7 @@
       "$showId": {
         ".read": "auth != null && data.child('organizerId').val() === auth.uid",
         ".write": "auth != null && (data.child('organizerId').val() === auth.uid || (!data.exists() && newData.child('organizerId').val() === auth.uid))",
-        ".validate": "!newData.exists() || (newData.hasChildren(['organizerId', 'name', 'date', 'venue', 'status', 'createdAt', 'kind']) && newData.child('organizerId').val() === auth.uid && newData.child('kind').val() === 'sports' && (!data.exists() || data.child('status').val() === newData.child('status').val() || (data.child('status').val() === 'waiting' && (newData.child('status').val() === 'running' || newData.child('status').val() === 'finished')) || (data.child('status').val() === 'running' && newData.child('status').val() === 'finished') || (data.child('status').val() === 'finished' && newData.child('status').val() === 'waiting')))"
+        ".validate": "!newData.exists() || (newData.hasChildren(['organizerId', 'name', 'date', 'venue', 'status', 'createdAt', 'kind']) && newData.child('organizerId').val() === auth.uid && newData.child('kind').val() === 'sports' && (!data.exists() || data.child('status').val() === newData.child('status').val() || (data.child('status').val() === 'waiting' && (newData.child('status').val() === 'running' || newData.child('status').val() === 'finished')) || (data.child('status').val() === 'running' && newData.child('status').val() === 'finished') || (data.child('status').val() === 'finished' && (newData.child('status').val() === 'waiting' || newData.child('status').val() === 'running'))))"
       }
     },
 
@@ -25,7 +25,7 @@
       "$showId": {
         ".read": true,
         ".write": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
-        ".validate": "!newData.exists() || (newData.hasChildren(['name', 'date', 'venue', 'status', 'kind']) && newData.child('kind').val() === 'sports' && (!data.exists() || data.child('status').val() === newData.child('status').val() || (data.child('status').val() === 'waiting' && (newData.child('status').val() === 'running' || newData.child('status').val() === 'finished')) || (data.child('status').val() === 'running' && newData.child('status').val() === 'finished') || (data.child('status').val() === 'finished' && newData.child('status').val() === 'waiting')))"
+        ".validate": "!newData.exists() || (newData.hasChildren(['name', 'date', 'venue', 'status', 'kind']) && newData.child('kind').val() === 'sports' && (!data.exists() || data.child('status').val() === newData.child('status').val() || (data.child('status').val() === 'waiting' && (newData.child('status').val() === 'running' || newData.child('status').val() === 'finished')) || (data.child('status').val() === 'running' && newData.child('status').val() === 'finished') || (data.child('status').val() === 'finished' && (newData.child('status').val() === 'waiting' || newData.child('status').val() === 'running'))))"
       }
     },
 
