@@ -73,8 +73,8 @@
         "$interactionId": {
           "$responseId": {
             ".read": "auth != null && data.child('uid').val() === auth.uid",
-            ".write": "auth != null && !data.exists() && newData.child('uid').val() === auth.uid && newData.child('audienceId').val() === $responseId && root.child('publicShows').child($showId).exists() && root.child('sportsInteractions').child($showId).child($interactionId).child('status').val() === 'open'",
-            ".validate": "!newData.exists() || (newData.hasChildren(['submittedAt', 'uid', 'audienceId']) && newData.child('submittedAt').isNumber() && newData.child('uid').val() === auth.uid && newData.child('audienceId').val() === $responseId && ((!newData.hasChild('optionId')) || newData.child('optionId').isString()) && ((!newData.hasChild('answer')) || (newData.child('answer').isString() && newData.child('answer').val().length <= 200)))"
+            ".write": "auth != null && !data.exists() && newData.child('uid').val() === auth.uid && $responseId === auth.uid && root.child('publicShows').child($showId).exists() && root.child('sportsInteractions').child($showId).child($interactionId).child('status').val() === 'open'",
+            ".validate": "!newData.exists() || (newData.hasChildren(['submittedAt', 'uid', 'audienceId']) && newData.child('submittedAt').isNumber() && newData.child('uid').val() === auth.uid && $responseId === auth.uid && newData.child('audienceId').isString() && ((!newData.hasChild('optionId')) || newData.child('optionId').isString()) && ((!newData.hasChild('answer')) || (newData.child('answer').isString() && newData.child('answer').val().length <= 200)))"
           }
         }
       }
