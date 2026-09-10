@@ -23,7 +23,7 @@ export type SportsInteraction = { id: string; type: InteractionType; question: s
 export type SportsResult = { total: number; counts?: Record<string, number>; answers?: Record<string, string>; updatedAt: number };
 export type SportsScreenState = { activeInteractionId?: string | null; displayMode: 'results' | 'question' | 'idle'; updatedAt: number };
 export function watchSportsInteractions(showId: string, callback: (items: SportsInteraction[]) => void): Unsubscribe { return onValue(ref(db, `sportsInteractions/${showId}`), snapshot => { const value = snapshot.val() ?? {}; callback(Object.entries(value).map(([id, item]) => ({ id, ...(item as Omit<SportsInteraction, 'id'>) })).sort((a, b) => b.createdAt - a.createdAt)); }); }
-type SportsResponse = { optionId?: string; answer?: string; submittedAt: number };
+type SportsResponse = { optionId?: string; answer?: string; submittedAt: number; uid?: string; audienceId?: string };
 
 export function watchSportsResponses(showId: string, interactionId: string, callback: (responses: Record<string, SportsResponse>) => void): Unsubscribe {
   // Keep the response watcher independent of requestAnimationFrame. rAF is
@@ -74,16 +74,19 @@ export async function publishSportsScreen(showId: string, activeInteractionId: s
 export async function publishSportsResult(showId: string, interactionId: string, result: SportsResult) { await set(ref(db, `sportsResults/${showId}/${interactionId}`), result); }
 export async function submitSportsResponse(showId: string, interactionId: string, uid: string, response: { optionId?: string; answer?: string }) {
   const audienceId = getAudienceId();
-  await set(ref(db, `sportsResponses/${showId}/${interactionId}/${audienceId}`), { ...response, uid, audienceId, submittedAt: Date.now() });
+  // Firebase anonymous auth has browser-local persistence in this app. Use the
+  // Firebase UID as the canonical response key so closing/reopening the same
+  // browser cannot create a second response record for the same interaction.
+  // audienceId is retained as metadata for compatibility with older records.
+  await set(ref(db, `sportsResponses/${showId}/${interactionId}/${uid}`), { ...response, uid, audienceId, submittedAt: Date.now() });
 }
 export async function hasRespondedToInteraction(showId: string, interactionId: string, uid: string) {
-  const audienceId = getAudienceId();
-  const current = await get(ref(db, `sportsResponses/${showId}/${interactionId}/${audienceId}`));
-  if (current.exists()) return true;
+  // New responses are keyed by Firebase UID.
+  const byUid = await get(ref(db, `sportsResponses/${showId}/${interactionId}/${uid}`));
+  if (byUid.exists()) return true;
 
-  // Compatibility with responses created before the stable audience identity
-  // was introduced. This prevents an existing vote from being submitted a
-  // second time during the migration.
-  const legacy = await get(ref(db, `sportsResponses/${showId}/${interactionId}/${uid}`));
+  // Compatibility with responses created before the UID-key migration.
+  const audienceId = getAudienceId();
+  const legacy = await get(ref(db, `sportsResponses/${showId}/${interactionId}/${audienceId}`));
   return legacy.exists();
 }
