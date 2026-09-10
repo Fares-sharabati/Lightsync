@@ -7,6 +7,7 @@ import { watchSportsGame, getSportsLightColor, type SportsGame } from '../fireba
 import { watchSportsInteractions, submitSportsResponse, hasRespondedToInteraction, type SportsInteraction } from '../firebase/sports';
 import { registerParticipant } from '../firebase/participants';
 import { getLightStateAtTime, getNextLightEvent, type LightTimeline } from '../lightSync/timeline';
+import { getReadableTextColor } from '../utils/color';
 
 type TorchConstraints = MediaTrackConstraintSet & { torch?: boolean };
 type TorchCapabilities = MediaTrackCapabilities & { torch?: boolean };
@@ -224,15 +225,16 @@ export default function Join() {
   const running = event.status === 'running';
   const alreadyResponded = !!activeInteraction && submittedInteractionId === activeInteraction.id;
   const pageBackground = lightState ? flashColor : `radial-gradient(circle at 50% 0%, ${uiColor}55 0%, transparent 42%), linear-gradient(160deg, #101218 0%, #08090d 58%, #050507 100%)`;
+  const choiceInk = getReadableTextColor(uiColor);
 
   const interactionCard = activeInteraction ? <section className="light-interaction" aria-live="polite">
     <div className="interaction-header"><span className="interaction-live-dot" /><span>{activeInteraction.type === 'poll' ? 'LIVE POLL' : 'LIVE QUESTION'}</span></div>
     <div className="interaction-question">{activeInteraction.question}</div>
     {alreadyResponded ? <div className="interaction-message">{message || 'You already responded to this one.'}</div> : <>
       {activeInteraction.type === 'poll' ? <div className="interaction-options">
-        {Object.entries(activeInteraction.options ?? {}).map(([id, label]) => <button key={id} type="button" className={`interaction-option ${selectedOption === id ? 'is-selected' : ''}`} disabled={sending} onClick={() => { setSelectedOption(id); setMessage(''); }} style={selectedOption === id ? ({ '--choice-color': uiColor } as CSSProperties) : undefined}><span>{label}</span><span className="choice-mark">{selectedOption === id ? 'v' : ''}</span></button>)}
+        {Object.entries(activeInteraction.options ?? {}).map(([id, label]) => <button key={id} type="button" className={`interaction-option ${selectedOption === id ? 'is-selected' : ''}`} disabled={sending} onClick={() => { setSelectedOption(id); setMessage(''); }} style={selectedOption === id ? ({ '--choice-color': uiColor, '--choice-ink': choiceInk } as CSSProperties) : undefined}><span>{label}</span><span className="choice-mark">{selectedOption === id ? 'v' : ''}</span></button>)}
       </div> : <textarea className="interaction-answer" value={answer} onChange={e => { setAnswer(e.target.value); setMessage(''); }} maxLength={200} placeholder="Type your answer..." rows={3} />}
-      <button type="button" className="interaction-submit" disabled={sending} onClick={() => void submitInteraction()} style={{ background: uiColor }}>{sending ? 'SUBMITTING...' : activeInteraction.type === 'poll' ? 'SUBMIT VOTE' : 'SUBMIT ANSWER'}</button>
+      <button type="button" className="interaction-submit" disabled={sending} onClick={() => void submitInteraction()} style={{ background: uiColor, color: getReadableTextColor(uiColor) }}>{sending ? 'SUBMITTING...' : activeInteraction.type === 'poll' ? 'SUBMIT VOTE' : 'SUBMIT ANSWER'}</button>
       {message && <div className={`interaction-message ${message.startsWith('Could not') ? 'is-error' : ''}`}>{message}</div>}
     </>}
   </section> : null;
@@ -243,7 +245,7 @@ export default function Join() {
     {interactionCard}{error && <p className="light-error">{error}</p>}
   </div></main>;
 
-  return <main className={`light-page ${lightState ? 'is-flashing' : ''}`} style={{ background: pageBackground, color: lightState ? '#050505' : '#fff' }}>
+  return <main className={`light-page ${lightState ? 'is-flashing' : ''}`} style={{ background: pageBackground, color: lightState ? getReadableTextColor(flashColor, '#050505') : '#fff' }}>
     <div className="light-shell">
       <header className="light-header"><div className="light-brand">LIGHTSYNC</div><div className="light-status" style={lightState ? { background: 'rgba(0,0,0,.16)' } : undefined}><span /> {running ? 'SHOW LIVE' : 'SYSTEM READY'}</div></header>
       <section className="light-main"><div className="light-kicker">{running ? 'SYNCED WITH THE ARENA' : 'STAY CONNECTED'}</div><h1 className="light-title">{event.name}</h1>{game && <div className="light-matchup"><strong>{game.homeTeam.name}</strong><span>VS</span><strong>{game.awayTeam.name}</strong></div>}

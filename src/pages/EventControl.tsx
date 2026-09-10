@@ -9,6 +9,7 @@ import { syncShowStats, watchShowStats, type ShowStats } from '../firebase/analy
 import { watchSportsGame, type SportsGame, getSportsLightColor } from '../firebase/sportsGame';
 import SportsInteractions from './SportsInteractions';
 import { PUBLIC_APP_URL } from '../constants';
+import { getReadableTextColor } from '../utils/color';
 
 function getAudioMimeType(file: File) { const n = file.name.toLowerCase(); if (n.endsWith('.mp3') || n.endsWith('.mpeg')) return 'audio/mpeg'; if (n.endsWith('.m4a') || n.endsWith('.mp4')) return 'audio/mp4'; if (n.endsWith('.wav')) return 'audio/wav'; if (n.endsWith('.ogg') || n.endsWith('.oga')) return 'audio/ogg'; if (n.endsWith('.webm')) return 'audio/webm'; if (n.endsWith('.aac')) return 'audio/aac'; if (n.endsWith('.flac')) return 'audio/flac'; return file.type || 'audio/mpeg'; }
 function formatTime(seconds: number) { if (!Number.isFinite(seconds) || seconds < 0) return '0:00'; const total = Math.floor(seconds); return `${Math.floor(total / 60)}:${(total % 60).toString().padStart(2, '0')}`; }
@@ -97,7 +98,7 @@ export default function EventControl() {
   const running = event.status === 'running'; const joinUrl = `${PUBLIC_APP_URL}/join/${eventId}`; const startDisabled = starting || running || !songFile || !generatedTimeline; const stopDisabled = starting || (!running && countdown === null); const screenColor = /^#[0-9a-fA-F]{6}$/.test(event.screenLightColor || '') ? event.screenLightColor! : (game ? getSportsLightColor(game) : '#FFFFFF');
   const homeColor = game?.homeTeam.primaryColor || '#FFFFFF'; const awayColor = game?.awayTeam.primaryColor || homeColor;
 
-  return <main className="ls-shell ls-event-shell" style={{ '--ls-accent': homeColor, '--ls-accent-2': awayColor } as React.CSSProperties}>
+  return <main className="ls-shell ls-event-shell" style={{ '--ls-accent': homeColor, '--ls-accent-2': awayColor, '--ls-accent-ink': getReadableTextColor(homeColor) } as React.CSSProperties}>
     <header className="ls-header ls-event-header"><div><div className="ls-brand">LIGHTSYNC</div><p className="ls-eyebrow">SPORTS EVENT CONTROL</p></div><button type="button" className="ls-button ls-secondary" onClick={() => navigate('/admin')}>BACK TO EVENTS</button></header>
     <section className="ls-event-titlebar"><div><p className="ls-eyebrow">{game?.sport?.toUpperCase() || 'SPORTS EVENT'}</p><h1>{event.name}</h1><p className="ls-muted">{event.venue} &middot; {event.date}</p></div><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div className={`ls-live-pill ${running ? 'is-running' : ''}`}><span />{running ? 'SHOW RUNNING' : event.status === 'finished' ? 'FINISHED' : 'WAITING'}</div></div></section>
     {game && <div className="ls-matchup" style={{ maxWidth: 1200, margin: '0 auto 18px' }}><div className="ls-matchup-side" style={{ '--side-color': homeColor } as React.CSSProperties}><strong>{game.homeTeam.name}</strong><small>HOME</small></div><div className="ls-matchup-vs">VS</div><div className="ls-matchup-side" style={{ '--side-color': awayColor } as React.CSSProperties}><strong>{game.awayTeam.name}</strong><small>AWAY</small></div></div>}

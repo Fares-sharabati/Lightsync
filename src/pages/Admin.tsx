@@ -4,6 +4,7 @@ import { getAuth } from 'firebase/auth';
 import { createShow, deleteShow, updateShow, watchOrganizerShows, type Show } from '../firebase/shows';
 import { signInOrganizer } from '../firebase/auth';
 import { saveSportsGame, type SportsTeam } from '../firebase/sportsGame';
+import { getReadableTextColor } from '../utils/color';
 import '../styles/lightsync.css';
 
 const blankTeam = (name: string): SportsTeam => ({ name, primaryColor: '#FFFFFF', secondaryColor: '#111111' });
@@ -21,7 +22,7 @@ export default function Admin() {
   useEffect(() => auth.onAuthStateChanged(user => setAuthenticated(!!user && !user.isAnonymous)), [auth]);
   useEffect(() => { if (!authenticated || !auth.currentUser) return; return watchOrganizerShows(auth.currentUser.uid, setShows); }, [authenticated, auth]);
 
-  const theme = useMemo(() => ({ ...baseTheme, '--ls-accent': home.primaryColor || '#FFFFFF', '--ls-accent-2': away.primaryColor || home.primaryColor || '#FFFFFF' }) as CSSProperties, [home.primaryColor, away.primaryColor]);
+  const theme = useMemo(() => ({ ...baseTheme, '--ls-accent': home.primaryColor || '#FFFFFF', '--ls-accent-2': away.primaryColor || home.primaryColor || '#FFFFFF', '--ls-accent-ink': getReadableTextColor(home.primaryColor) }) as CSSProperties, [home.primaryColor, away.primaryColor]);
   const lightColor = lightTeam === 'away' ? away.primaryColor : lightTeam === 'custom' ? customLightColor : home.primaryColor;
   const filteredShows = useMemo(() => { const term = search.trim().toLowerCase(); return term ? shows.filter(show => show.name.toLowerCase().includes(term) || show.venue.toLowerCase().includes(term)) : shows; }, [shows, search]);
   const upcomingShows = useMemo(() => filteredShows.filter(show => show.status !== 'finished').sort((a, b) => a.date.localeCompare(b.date)), [filteredShows]);
@@ -76,7 +77,7 @@ export default function Admin() {
       <button type="button" onClick={() => void handleStatusChange(show, 'waiting')} disabled={statusUpdatingId === show.id || show.status === 'waiting'} style={{ border: '1px solid #45494e', background: show.status === 'waiting' ? '#24282c' : '#111315', color: '#c9cdd2', borderRadius: 8, padding: '7px 9px', fontSize: 9, fontWeight: 800, letterSpacing: '.06em', cursor: show.status === 'waiting' ? 'default' : 'pointer' }}>WAITING</button>
       <button type="button" onClick={() => void handleStatusChange(show, 'finished')} disabled={statusUpdatingId === show.id || show.status === 'finished'} style={{ border: '1px solid #45494e', background: show.status === 'finished' ? '#24282c' : '#111315', color: '#c9cdd2', borderRadius: 8, padding: '7px 9px', fontSize: 9, fontWeight: 800, letterSpacing: '.06em', cursor: show.status === 'finished' ? 'default' : 'pointer' }}>{statusUpdatingId === show.id ? '...' : 'FINISHED'}</button>
     </div>}
-    <button className="ls-delete-show" style={{ marginRight: 10, border: '1px solid #45494e', background: '#111315', color: '#c9cdd2', borderRadius: 8, padding: '8px 10px', fontSize: 10, fontWeight: 800, letterSpacing: '.08em', cursor: 'pointer' }} onClick={() => void handleDelete(show)} disabled={deletingId === show.id}>{deletingId === show.id ? 'DELETING...' : 'DELETE'}</button>
+    <button className="ls-delete-show" style={{ marginRight: 10, border: '1px solid #5a2a2f', background: '#1c1113', color: '#ff9c9c', borderRadius: 8, padding: '8px 10px', fontSize: 10, fontWeight: 800, letterSpacing: '.08em', cursor: 'pointer' }} onClick={() => void handleDelete(show)} disabled={deletingId === show.id}>{deletingId === show.id ? 'DELETING...' : 'DELETE'}</button>
   </div>;
 
   return <main className="ls-shell" style={theme}>

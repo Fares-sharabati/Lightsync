@@ -200,7 +200,7 @@ export default function SportsInteractions({ embedded = false }: Props) {
             <div className="ls-interaction-detail-head"><strong>{total} RESPONSES</strong><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}><button className="ls-button ls-primary" disabled={busy || selected.status === 'open'} onClick={() => void pushSelected()}>PUSH {selected.type === 'poll' ? 'POLL' : 'QUESTION'}</button><button className="ls-button ls-secondary" onClick={() => window.open(`/sports-screen/${eventId}`, '_blank', 'noopener,noreferrer')}>OPEN ARENA STATS</button><button className="ls-button ls-stop" disabled={busy || selected.status === 'closed'} onClick={() => void closeSelected()}>CLOSE</button></div></div>
             {selected.type === 'poll' && <div style={{ marginTop: 14 }}>{Object.entries(selected.options ?? {}).map(([id, label]) => { const count = counts[id] ?? 0; const pct = total ? Math.round(count / total * 100) : 0; return <div key={id} className="ls-option-row"><div className="ls-option-row-top"><span>{label}</span><strong>{pct}% &middot; {count}</strong></div><div className="ls-option-track"><div className="ls-option-fill" style={{ width: `${pct}%` }} /></div></div>; })}</div>}
           </div>}
-          {message && <p className="ls-muted" style={{ marginTop: 10 }}>{message}</p>}
+          {message && <p className={/^(Could not|Enter |Add )/.test(message) ? 'ls-error' : 'ls-muted'} style={{ marginTop: 10 }}>{message}</p>}
         </div>
       </div>
     </section>

@@ -64,7 +64,7 @@
        radial-gradient(1100px 620px at 12% -8%, color-mix(in srgb, var(--ls-accent) 6%, transparent), transparent 60%),
        radial-gradient(1100px 620px at 92% 108%, color-mix(in srgb, var(--ls-accent-2) 5%, transparent), transparent 60%),
        var(--ls-bg); background-attachment:fixed; }
-   .ls-shell .ls-button.ls-primary,.ls-shell .ls-button.ls-control-main{background:color-mix(in srgb,var(--ls-accent) 78%,#fff 22%);color:#0a0a0a;border-color:color-mix(in srgb,var(--ls-accent) 45%,#3a3d41 55%);box-shadow:0 4px 14px color-mix(in srgb,var(--ls-accent) 14%,transparent)}
+   .ls-shell .ls-button.ls-primary,.ls-shell .ls-button.ls-control-main{background:color-mix(in srgb,var(--ls-accent) 78%,#fff 22%);color:var(--ls-accent-ink,#0a0a0a);border-color:color-mix(in srgb,var(--ls-accent) 45%,#3a3d41 55%);box-shadow:0 4px 14px color-mix(in srgb,var(--ls-accent) 14%,transparent)}
    .ls-shell .ls-button.ls-primary:hover:not(:disabled),.ls-shell .ls-button.ls-control-main:hover:not(:disabled){filter:brightness(1.05);box-shadow:0 6px 18px color-mix(in srgb,var(--ls-accent) 18%,transparent)}
    .ls-shell .ls-button.ls-secondary,.ls-shell .ls-copy-id{border-color:#383c41;background:linear-gradient(180deg,#17191c,#0c0d0f);color:#dfe2e5}
    .ls-shell .ls-button.ls-secondary:hover:not(:disabled),.ls-shell .ls-copy-id:hover{border-color:var(--ls-accent);color:#fff}
