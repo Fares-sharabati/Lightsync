@@ -69,7 +69,7 @@
     "sportsResponses": {
       "$showId": {
         ".read": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
-        ".write": "auth != null && !newData.exists() && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
+        ".write": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
         "$interactionId": {
           "$responseId": {
             ".read": "auth != null && ($responseId === auth.uid || root.child('shows').child($showId).child('organizerId').val() === auth.uid)",
@@ -83,7 +83,7 @@
     "sportsResults": {
       "$showId": {
         ".read": true,
-        ".write": "auth != null && !newData.exists() && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
+        ".write": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
         "$interactionId": {
           ".write": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
           ".validate": "!newData.exists() || (newData.hasChildren(['total', 'updatedAt']) && newData.child('total').isNumber() && newData.child('updatedAt').isNumber())"
