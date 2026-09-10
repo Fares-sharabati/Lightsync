@@ -58,4 +58,38 @@ export async function updateShow(showId: string, changes: Partial<Omit<Show, 'id
   await writeShowChanges(showId, changes);
 }
 
-export async function deleteShow(showId: string) { const paths = ['publicShows', 'showParticipants', 'showStats', 'sportsGames', 'sportsInteractions', 'sportsResponses', 'sportsResults', 'sportsScreen']; for (const path of paths) await set(ref(db, `${path}/${showId}`), null); await set(ref(db, `shows/${showId}`), null); }
+/**
+ * Delete all event-owned data while the organizer record still exists.
+ *
+ * The Firebase rules authorize deletion of each top-level event collection
+ * using the organizerId stored under `shows/$showId`. Therefore we must delete
+ * the dependent collections first and delete `shows/$showId` last. Doing this
+ * in a single multi-location update would make the authorization checks see
+ * the show as deleted and can cause PERMISSION_DENIED.
+ */
+export async function deleteShow(showId: string) {
+  const paths = [
+    'publicShows',
+    'showParticipants',
+    'showStats',
+    'sportsGames',
+    'sportsInteractions',
+    'sportsResponses',
+    'sportsResults',
+    'sportsScreen',
+  ];
+
+  for (const path of paths) {
+    try {
+      await set(ref(db, `${path}/${showId}`), null);
+    } catch (error) {
+      throw new Error(`Could not delete ${path}/${showId}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  try {
+    await set(ref(db, `shows/${showId}`), null);
+  } catch (error) {
+    throw new Error(`Could not delete shows/${showId}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
