@@ -26,41 +26,40 @@ export function watchSportsInteractions(showId: string, callback: (items: Sports
 type SportsResponse = { optionId?: string; answer?: string; submittedAt: number };
 
 export function watchSportsResponses(showId: string, interactionId: string, callback: (responses: Record<string, SportsResponse>) => void): Unsubscribe {
-  // Same fix as watchParticipants: onValue on the whole responses node would
-  // re-download every vote cast so far on every single new vote. During a
-  // live poll with a full arena that turns thousands of votes into an
-  // ever-growing payload hitting the organizer's tab on every tap. Instead,
-  // listen for individual added/changed/removed children and keep the
-  // merged tally in memory locally.
+  // Keep the response watcher independent of requestAnimationFrame. rAF is
+  // deliberately throttled/suspended by browsers when this organizer tab is
+  // in the background. That caused the arena/sports screen to receive a vote
+  // only after the organizer switched back to that tab. Firebase events are
+  // already realtime, so publish the updated in-memory response set directly.
+  // This also keeps the public result publisher working while its tab is not
+  // the foreground tab.
   const baseRef = ref(db, `sportsResponses/${showId}/${interactionId}`);
   const raw: Record<string, SportsResponse> = {};
-  let frame: number | null = null;
 
-  function scheduleEmit() {
-    if (frame !== null) return;
-    frame = requestAnimationFrame(() => { frame = null; callback({ ...raw }); });
+  function emit() {
+    callback({ ...raw });
   }
 
   const stopAdded = onChildAdded(baseRef, snapshot => {
     if (!snapshot.key) return;
     raw[snapshot.key] = snapshot.val() as SportsResponse;
-    scheduleEmit();
+    emit();
   });
   const stopChanged = onChildChanged(baseRef, snapshot => {
     if (!snapshot.key) return;
     raw[snapshot.key] = snapshot.val() as SportsResponse;
-    scheduleEmit();
+    emit();
   });
   const stopRemoved = onChildRemoved(baseRef, snapshot => {
     if (!snapshot.key) return;
     delete raw[snapshot.key];
-    scheduleEmit();
+    emit();
   });
 
-  callback({ ...raw });
+  // Emit the current state immediately for an already-populated interaction.
+  emit();
 
   return () => {
-    if (frame !== null) cancelAnimationFrame(frame);
     stopAdded();
     stopChanged();
     stopRemoved();
