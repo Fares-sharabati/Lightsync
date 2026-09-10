@@ -14,6 +14,19 @@ const TEMPLATES = [
 ];
 
 type Props = { embedded?: boolean };
+type Response = { optionId?: string; answer?: string; submittedAt: number; uid?: string };
+
+function getUniqueResponses(responses: Record<string, Response>) {
+  const unique: Record<string, Response> = {};
+  Object.entries(responses).forEach(([responseId, response]) => {
+    // UID is the canonical voter identity for new responses. Keep the response
+    // key as a fallback for older records that predate the UID-key migration.
+    const voterId = response.uid || responseId;
+    const existing = unique[voterId];
+    if (!existing || response.submittedAt >= existing.submittedAt) unique[voterId] = response;
+  });
+  return unique;
+}
 
 export default function SportsInteractions({ embedded = false }: Props) {
   const navigate = useNavigate();
@@ -26,7 +39,7 @@ export default function SportsInteractions({ embedded = false }: Props) {
   const [options, setOptions] = useState('Home Team\nAway Team');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-  const [responses, setResponses] = useState<Record<string, { optionId?: string; answer?: string; submittedAt: number }>>({});
+  const [responses, setResponses] = useState<Record<string, Response>>({});
   const publishTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -61,15 +74,16 @@ export default function SportsInteractions({ embedded = false }: Props) {
     if (publishTimerRef.current !== null) window.clearTimeout(publishTimerRef.current);
     publishTimerRef.current = window.setTimeout(() => {
       publishTimerRef.current = null;
+      const uniqueResponses = getUniqueResponses(responses);
       const counts: Record<string, number> = {};
-      Object.values(responses).forEach(response => {
+      Object.values(uniqueResponses).forEach(response => {
         if (response.optionId) counts[response.optionId] = (counts[response.optionId] ?? 0) + 1;
       });
 
       // Only publish aggregate poll statistics to the public arena node.
       // Free-text question answers stay under the organizer-protected responses node.
       void publishSportsResult(eventId, selected.id, {
-        total: Object.keys(responses).length,
+        total: Object.keys(uniqueResponses).length,
         counts,
         updatedAt: Date.now(),
       }).catch(error => console.error(error));
@@ -77,15 +91,17 @@ export default function SportsInteractions({ embedded = false }: Props) {
     return () => { if (publishTimerRef.current !== null) window.clearTimeout(publishTimerRef.current); };
   }, [eventId, selected, responses]);
 
+  const uniqueResponses = useMemo(() => getUniqueResponses(responses), [responses]);
+
   const counts = useMemo(() => {
     const value: Record<string, number> = {};
-    Object.values(responses).forEach(response => {
+    Object.values(uniqueResponses).forEach(response => {
       if (response.optionId) value[response.optionId] = (value[response.optionId] ?? 0) + 1;
     });
     return value;
-  }, [responses]);
+  }, [uniqueResponses]);
 
-  const total = Object.keys(responses).length;
+  const total = Object.keys(uniqueResponses).length;
 
   function useTemplate(template: typeof TEMPLATES[number]) {
     const home = game?.homeTeam.name || 'Home Team';
