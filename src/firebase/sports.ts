@@ -1,4 +1,4 @@
-import { get, onValue, ref, set, update, type Unsubscribe } from 'firebase/database';
+import { get, onChildAdded, onChildChanged, onChildRemoved, onValue, ref, set, update, type Unsubscribe } from 'firebase/database';
 import { db } from './config';
 
 const AUDIENCE_ID_KEY = 'lightsync_audience_id';
@@ -23,7 +23,49 @@ export type SportsInteraction = { id: string; type: InteractionType; question: s
 export type SportsResult = { total: number; counts?: Record<string, number>; answers?: Record<string, string>; updatedAt: number };
 export type SportsScreenState = { activeInteractionId?: string | null; displayMode: 'results' | 'question' | 'idle'; updatedAt: number };
 export function watchSportsInteractions(showId: string, callback: (items: SportsInteraction[]) => void): Unsubscribe { return onValue(ref(db, `sportsInteractions/${showId}`), snapshot => { const value = snapshot.val() ?? {}; callback(Object.entries(value).map(([id, item]) => ({ id, ...(item as Omit<SportsInteraction, 'id'>) })).sort((a, b) => b.createdAt - a.createdAt)); }); }
-export function watchSportsResponses(showId: string, interactionId: string, callback: (responses: Record<string, { optionId?: string; answer?: string; submittedAt: number }>) => void): Unsubscribe { return onValue(ref(db, `sportsResponses/${showId}/${interactionId}`), snapshot => callback((snapshot.val() ?? {}) as Record<string, { optionId?: string; answer?: string; submittedAt: number }>)); }
+type SportsResponse = { optionId?: string; answer?: string; submittedAt: number };
+
+export function watchSportsResponses(showId: string, interactionId: string, callback: (responses: Record<string, SportsResponse>) => void): Unsubscribe {
+  // Same fix as watchParticipants: onValue on the whole responses node would
+  // re-download every vote cast so far on every single new vote. During a
+  // live poll with a full arena that turns thousands of votes into an
+  // ever-growing payload hitting the organizer's tab on every tap. Instead,
+  // listen for individual added/changed/removed children and keep the
+  // merged tally in memory locally.
+  const baseRef = ref(db, `sportsResponses/${showId}/${interactionId}`);
+  const raw: Record<string, SportsResponse> = {};
+  let frame: number | null = null;
+
+  function scheduleEmit() {
+    if (frame !== null) return;
+    frame = requestAnimationFrame(() => { frame = null; callback({ ...raw }); });
+  }
+
+  const stopAdded = onChildAdded(baseRef, snapshot => {
+    if (!snapshot.key) return;
+    raw[snapshot.key] = snapshot.val() as SportsResponse;
+    scheduleEmit();
+  });
+  const stopChanged = onChildChanged(baseRef, snapshot => {
+    if (!snapshot.key) return;
+    raw[snapshot.key] = snapshot.val() as SportsResponse;
+    scheduleEmit();
+  });
+  const stopRemoved = onChildRemoved(baseRef, snapshot => {
+    if (!snapshot.key) return;
+    delete raw[snapshot.key];
+    scheduleEmit();
+  });
+
+  callback({ ...raw });
+
+  return () => {
+    if (frame !== null) cancelAnimationFrame(frame);
+    stopAdded();
+    stopChanged();
+    stopRemoved();
+  };
+}
 export function watchSportsResult(showId: string, interactionId: string, callback: (result: SportsResult | null) => void): Unsubscribe { return onValue(ref(db, `sportsResults/${showId}/${interactionId}`), snapshot => callback(snapshot.val() as SportsResult | null)); }
 export function watchSportsScreen(showId: string, callback: (state: SportsScreenState | null) => void): Unsubscribe { return onValue(ref(db, `sportsScreen/${showId}`), snapshot => callback(snapshot.val() as SportsScreenState | null)); }
 export async function createSportsInteraction(showId: string, interaction: Omit<SportsInteraction, 'id'>) { const id = `interaction_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`; await set(ref(db, `sportsInteractions/${showId}/${id}`), { ...interaction, status: 'open', displayOnScreen: true }); await publishSportsScreen(showId, id, interaction.type === 'poll' ? 'results' : 'question'); return id; }
