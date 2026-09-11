@@ -11,6 +11,14 @@
       }
     },
 
+    "showOwners": {
+      "$showId": {
+        ".read": "auth != null && data.child('organizerId').val() === auth.uid",
+        ".write": "auth != null && (!data.exists() ? newData.child('organizerId').val() === auth.uid : data.child('organizerId').val() === auth.uid)",
+        ".validate": "!newData.exists() || (newData.hasChildren(['organizerId']) && newData.child('organizerId').val() === auth.uid)"
+      }
+    },
+
     "shows": {
       ".read": "auth != null && query.orderByChild === 'organizerId' && query.equalTo === auth.uid",
       ".indexOn": ["organizerId"],
@@ -24,7 +32,7 @@
     "publicShows": {
       "$showId": {
         ".read": true,
-        ".write": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
+        ".write": "auth != null && root.child('showOwners').child($showId).child('organizerId').val() === auth.uid",
         ".validate": "!newData.exists() || (newData.hasChildren(['name', 'date', 'venue', 'status', 'kind']) && newData.child('kind').val() === 'sports' && (!data.exists() || data.child('status').val() === newData.child('status').val() || (data.child('status').val() === 'waiting' && (newData.child('status').val() === 'running' || newData.child('status').val() === 'finished')) || (data.child('status').val() === 'running' && newData.child('status').val() === 'finished') || (data.child('status').val() === 'finished' && (newData.child('status').val() === 'waiting' || newData.child('status').val() === 'running'))))"
       }
     },
@@ -52,7 +60,7 @@
     "showStats": {
       "$showId": {
         ".read": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
-        ".write": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid"
+        ".write": "auth != null && root.child('showOwners').child($showId).child('organizerId').val() === auth.uid"
       }
     },
 
