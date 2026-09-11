@@ -67,7 +67,7 @@ export async function updateShow(showId: string, changes: Partial<Omit<Show, 'id
 }
 
 export async function deleteShow(showId: string) {
-  const paths = ['publicShows', 'showOwners', 'showParticipants', 'showStats', 'sportsGames', 'sportsInteractions', 'sportsResponses', 'sportsResults', 'sportsScreen'];
+  const paths = ['publicShows', 'showParticipants', 'showStats', 'sportsGames', 'sportsInteractions', 'sportsResponses', 'sportsResults', 'sportsScreen'];
   for (const path of paths) {
     try {
       await set(ref(db, `${path}/${showId}`), null);
@@ -75,6 +75,19 @@ export async function deleteShow(showId: string) {
       throw new Error(`Could not delete ${path}/${showId}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
+
+  // Legacy events were created before showOwners existed, so only delete the
+  // ownership record when one actually exists. This keeps old events deletable
+  // through the shows/{showId}.organizerId fallback rule.
+  try {
+    const ownerSnapshot = await get(ref(db, `showOwners/${showId}`));
+    if (ownerSnapshot.exists()) {
+      await set(ref(db, `showOwners/${showId}`), null);
+    }
+  } catch (error) {
+    throw new Error(`Could not delete showOwners/${showId}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
   try {
     await set(ref(db, `shows/${showId}`), null);
   } catch (error) {
