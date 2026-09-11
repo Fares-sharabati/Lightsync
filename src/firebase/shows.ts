@@ -13,11 +13,28 @@ export async function createShow(organizerId: string, input: CreateShowInput) {
   const showRef = push(ref(db, 'shows')); const showId = showRef.key; if (!showId) throw new Error('Could not create event ID.');
   const now = Date.now();
   const show = { organizerId, name: input.name.trim(), date: input.date, venue: input.venue.trim(), kind: 'sports' as const, status: 'waiting' as ShowStatus, createdAt: now, showStartTime: null, showStartOffset: 0, screenLightColor: '#FFFFFF', phoneUiColor: '#FFFFFF' };
-  await set(showRef, show);
+
+  try {
+    await set(showRef, show);
+  } catch (error) {
+    throw new Error(`Could not create shows/${showId}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
   try {
     await set(ref(db, `publicShows/${showId}`), { name: show.name, date: show.date, venue: show.venue, kind: 'sports', status: show.status, showStartTime: null, showStartOffset: 0, lightTimeline: null, screenLightColor: show.screenLightColor, phoneUiColor: show.phoneUiColor });
+  } catch (error) {
+    try { await set(showRef, null); } catch { /* preserve original error */ }
+    throw new Error(`Could not create publicShows/${showId}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  try {
     await set(ref(db, `showStats/${showId}`), { totalJoined: 0, peakConnected: 0 });
-  } catch (error) { try { await set(showRef, null); } catch { /* preserve original error */ } throw error; }
+  } catch (error) {
+    try { await set(ref(db, `publicShows/${showId}`), null); } catch { /* preserve original error */ }
+    try { await set(showRef, null); } catch { /* preserve original error */ }
+    throw new Error(`Could not create showStats/${showId}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
   return showId;
 }
 
@@ -45,40 +62,15 @@ export async function updateShow(showId: string, changes: Partial<Omit<Show, 'id
       || (currentStatus === 'running' && nextStatus === 'finished')
       || (currentStatus === 'finished' && (nextStatus === 'waiting' || nextStatus === 'running'));
     if (!validTransition) throw new Error(`Invalid show status transition: ${currentStatus} -> ${nextStatus}.`);
-
-    // Older Firebase rules may still require FINISHED -> WAITING -> RUNNING.
-    // Normalize that transition first so restarting remains compatible while
-    // the updated rules are being published. The two writes are both
-    // organizer-authorized and keep shows/publicShows synchronized.
     if (currentStatus === 'finished' && nextStatus === 'running') {
       await writeShowChanges(showId, { status: 'waiting', showStartTime: null, showStartOffset: 0 });
     }
   }
-
   await writeShowChanges(showId, changes);
 }
 
-/**
- * Delete all event-owned data while the organizer record still exists.
- *
- * The Firebase rules authorize deletion of each top-level event collection
- * using the organizerId stored under `shows/$showId`. Therefore we must delete
- * the dependent collections first and delete `shows/$showId` last. Doing this
- * in a single multi-location update would make the authorization checks see
- * the show as deleted and can cause PERMISSION_DENIED.
- */
 export async function deleteShow(showId: string) {
-  const paths = [
-    'publicShows',
-    'showParticipants',
-    'showStats',
-    'sportsGames',
-    'sportsInteractions',
-    'sportsResponses',
-    'sportsResults',
-    'sportsScreen',
-  ];
-
+  const paths = ['publicShows', 'showParticipants', 'showStats', 'sportsGames', 'sportsInteractions', 'sportsResponses', 'sportsResults', 'sportsScreen'];
   for (const path of paths) {
     try {
       await set(ref(db, `${path}/${showId}`), null);
@@ -86,7 +78,6 @@ export async function deleteShow(showId: string) {
       throw new Error(`Could not delete ${path}/${showId}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-
   try {
     await set(ref(db, `shows/${showId}`), null);
   } catch (error) {
