@@ -13,26 +13,23 @@ export async function createShow(organizerId: string, input: CreateShowInput) {
   const showRef = push(ref(db, 'shows')); const showId = showRef.key; if (!showId) throw new Error('Could not create event ID.');
   const now = Date.now();
   const show = { organizerId, name: input.name.trim(), date: input.date, venue: input.venue.trim(), kind: 'sports' as const, status: 'waiting' as ShowStatus, createdAt: now, showStartTime: null, showStartOffset: 0, screenLightColor: '#FFFFFF', phoneUiColor: '#FFFFFF' };
+  const publicShow = { name: show.name, date: show.date, venue: show.venue, kind: 'sports' as const, status: show.status, showStartTime: null, showStartOffset: 0, lightTimeline: null, screenLightColor: show.screenLightColor, phoneUiColor: show.phoneUiColor };
 
   try {
-    await set(showRef, show);
+    await set(ref(db, `showOwners/${showId}`), { organizerId });
   } catch (error) {
-    throw new Error(`Could not create shows/${showId}: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`Could not reserve event ${showId}: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   try {
-    await set(ref(db, `publicShows/${showId}`), { name: show.name, date: show.date, venue: show.venue, kind: 'sports', status: show.status, showStartTime: null, showStartOffset: 0, lightTimeline: null, screenLightColor: show.screenLightColor, phoneUiColor: show.phoneUiColor });
+    await update(ref(db), {
+      [`shows/${showId}`]: show,
+      [`publicShows/${showId}`]: publicShow,
+      [`showStats/${showId}`]: { totalJoined: 0, peakConnected: 0 },
+    });
   } catch (error) {
-    try { await set(showRef, null); } catch { /* preserve original error */ }
-    throw new Error(`Could not create publicShows/${showId}: ${error instanceof Error ? error.message : String(error)}`);
-  }
-
-  try {
-    await set(ref(db, `showStats/${showId}`), { totalJoined: 0, peakConnected: 0 });
-  } catch (error) {
-    try { await set(ref(db, `publicShows/${showId}`), null); } catch { /* preserve original error */ }
-    try { await set(showRef, null); } catch { /* preserve original error */ }
-    throw new Error(`Could not create showStats/${showId}: ${error instanceof Error ? error.message : String(error)}`);
+    try { await set(ref(db, `showOwners/${showId}`), null); } catch { /* preserve original error */ }
+    throw new Error(`Could not create event ${showId}: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   return showId;
@@ -70,7 +67,7 @@ export async function updateShow(showId: string, changes: Partial<Omit<Show, 'id
 }
 
 export async function deleteShow(showId: string) {
-  const paths = ['publicShows', 'showParticipants', 'showStats', 'sportsGames', 'sportsInteractions', 'sportsResponses', 'sportsResults', 'sportsScreen'];
+  const paths = ['publicShows', 'showOwners', 'showParticipants', 'showStats', 'sportsGames', 'sportsInteractions', 'sportsResponses', 'sportsResults', 'sportsScreen'];
   for (const path of paths) {
     try {
       await set(ref(db, `${path}/${showId}`), null);
