@@ -37,7 +37,7 @@ export async function createShow(organizerId: string, input: CreateShowInput) {
 
 export function watchShow(showId: string, callback: (show: Show | null) => void): Unsubscribe { return onValue(ref(db, `shows/${showId}`), snapshot => { const value = snapshot.val(); callback(value ? normalizeShow(showId, value) : null); }); }
 export function watchPublicShow(showId: string, callback: (show: PublicShow | null) => void): Unsubscribe { return onValue(ref(db, `publicShows/${showId}`), snapshot => { const value = snapshot.val(); callback(value ? normalizePublicShow(showId, value) : null); }); }
-export function watchOrganizerShows(organizerId: string, callback: (shows: Show[]) => void): Unsubscribe { const showsQuery = query(ref(db, 'shows'), orderByChild('organizerId'), equalTo(organizerId)); return onValue(showsQuery, snapshot => { const value = snapshot.val() ?? {}; callback(Object.entries(value).map(([id, show]) => normalizeShow(id, show as Record<string, unknown>)).sort((a, b) => b.createdAt - a.createdAt)); }); }
+export function watchOrganizerShows(organizerId: string, callback: (shows: Show[]) => void) { const showsQuery = query(ref(db, 'shows'), orderByChild('organizerId'), equalTo(organizerId)); return onValue(showsQuery, snapshot => { const value = snapshot.val() ?? {}; callback(Object.entries(value).map(([id, show]) => normalizeShow(id, show as Record<string, unknown>)).sort((a, b) => b.createdAt - a.createdAt)); }); }
 
 async function writeShowChanges(showId: string, changes: Partial<Omit<Show, 'id' | 'organizerId'>>) {
   const updates: Record<string, unknown> = {};
@@ -59,38 +59,31 @@ export async function updateShow(showId: string, changes: Partial<Omit<Show, 'id
       || (currentStatus === 'running' && nextStatus === 'finished')
       || (currentStatus === 'finished' && (nextStatus === 'waiting' || nextStatus === 'running'));
     if (!validTransition) throw new Error(`Invalid show status transition: ${currentStatus} -> ${nextStatus}.`);
-    if (currentStatus === 'finished' && nextStatus === 'running') {
-      await writeShowChanges(showId, { status: 'waiting', showStartTime: null, showStartOffset: 0 });
-    }
+    if (currentStatus === 'finished' && nextStatus === 'running') await writeShowChanges(showId, { status: 'waiting', showStartTime: null, showStartOffset: 0 });
   }
   await writeShowChanges(showId, changes);
 }
 
 export async function deleteShow(showId: string) {
-  const paths = ['publicShows', 'showParticipants', 'showStats', 'sportsGames', 'sportsInteractions', 'sportsResponses', 'sportsResults', 'sportsScreen'];
-  for (const path of paths) {
-    try {
-      await set(ref(db, `${path}/${showId}`), null);
-    } catch (error) {
-      throw new Error(`Could not delete ${path}/${showId}: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-
-  // Legacy events were created before showOwners existed, so only delete the
-  // ownership record when one actually exists. This keeps old events deletable
-  // through the shows/{showId}.organizerId fallback rule.
-  try {
-    const ownerSnapshot = await get(ref(db, `showOwners/${showId}`));
-    if (ownerSnapshot.exists()) {
-      await set(ref(db, `showOwners/${showId}`), null);
-    }
-  } catch (error) {
-    throw new Error(`Could not delete showOwners/${showId}: ${error instanceof Error ? error.message : String(error)}`);
-  }
+  // The shows record is the canonical ownership record for both legacy and new events.
+  // All event branches are deleted together. A missing showOwners branch is harmless,
+  // so legacy events do not need a showOwners record.
+  const updates: Record<string, null> = {
+    [`publicShows/${showId}`]: null,
+    [`showParticipants/${showId}`]: null,
+    [`showStats/${showId}`]: null,
+    [`sportsGames/${showId}`]: null,
+    [`sportsInteractions/${showId}`]: null,
+    [`sportsResponses/${showId}`]: null,
+    [`sportsResults/${showId}`]: null,
+    [`sportsScreen/${showId}`]: null,
+    [`showOwners/${showId}`]: null,
+    [`shows/${showId}`]: null,
+  };
 
   try {
-    await set(ref(db, `shows/${showId}`), null);
+    await update(ref(db), updates);
   } catch (error) {
-    throw new Error(`Could not delete shows/${showId}: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`Could not delete event ${showId}: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
