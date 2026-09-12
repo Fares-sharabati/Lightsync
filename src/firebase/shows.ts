@@ -65,10 +65,17 @@ export async function updateShow(showId: string, changes: Partial<Omit<Show, 'id
 }
 
 export async function deleteShow(showId: string) {
-  // The shows record is the canonical ownership record for both legacy and new events.
-  // All event branches are deleted together. A missing showOwners branch is harmless,
-  // so legacy events do not need a showOwners record.
-  const updates: Record<string, null> = {
+  // Mirrors the fix already used in createShow(): ownership-record writes are
+  // sequenced separately from the writes that depend on that ownership record
+  // existing. Every dependent path's rule (sportsGames, sportsInteractions,
+  // sportsResponses, sportsResults, sportsScreen, showParticipants) checks
+  // root.child('shows')...organizerId. Firebase evaluates multi-location
+  // update() rules against the fully-applied result of that same update, so
+  // deleting `shows/$showId` in the SAME call as those dependents would mean
+  // the very record authorizing their deletion is already gone by the time
+  // it's checked. Deleting dependents first - while shows/showOwners still
+  // exist - avoids relying on that at all, and is correct either way.
+  const dependentUpdates: Record<string, null> = {
     [`publicShows/${showId}`]: null,
     [`showParticipants/${showId}`]: null,
     [`showStats/${showId}`]: null,
@@ -77,13 +84,19 @@ export async function deleteShow(showId: string) {
     [`sportsResponses/${showId}`]: null,
     [`sportsResults/${showId}`]: null,
     [`sportsScreen/${showId}`]: null,
-    [`showOwners/${showId}`]: null,
-    [`shows/${showId}`]: null,
   };
 
   try {
-    await update(ref(db), updates);
+    await update(ref(db), dependentUpdates);
   } catch (error) {
-    throw new Error(`Could not delete event ${showId}: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`Could not delete event data for ${showId}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  // The shows/showOwners records authorize themselves via their own existing
+  // data, not via each other, so they're safe to remove together last.
+  try {
+    await update(ref(db), { [`showOwners/${showId}`]: null, [`shows/${showId}`]: null });
+  } catch (error) {
+    throw new Error(`Event data was cleared, but the event record for ${showId} could not be removed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
