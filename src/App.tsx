@@ -2,6 +2,9 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
 const Home = lazy(() => import('./pages/Home'));
+const Mission = lazy(() => import('./pages/Mission'));
+const Projects = lazy(() => import('./pages/Projects'));
+const Contact = lazy(() => import('./pages/Contact'));
 const Admin = lazy(() => import('./pages/Admin'));
 const Join = lazy(() => import('./pages/Join'));
 const EventControl = lazy(() => import('./pages/EventControl'));
@@ -15,6 +18,9 @@ function RouteFallback() {
 export default function App() {
   return <BrowserRouter><Suspense fallback={<RouteFallback />}><Routes>
     <Route path="/" element={<Home />} />
+    <Route path="/mission" element={<Mission />} />
+    <Route path="/projects" element={<Projects />} />
+    <Route path="/contact" element={<Contact />} />
     <Route path="/admin" element={<Admin />} />
     <Route path="/admin/show/:eventId" element={<EventControl />} />
     <Route path="/admin/event/:eventId" element={<EventControl />} />
