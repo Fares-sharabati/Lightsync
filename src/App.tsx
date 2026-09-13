@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, useEffect } from 'react';
+import { Component, lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 
 const Home = lazy(() => import('./pages/Home'));
@@ -52,10 +52,7 @@ function ScrollToHash() {
   return null;
 }
 
-class RouteErrorBoundary extends Component<
-  { children: React.ReactNode },
-  { hasError: boolean }
-> {
+class RouteErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
 
   static getDerivedStateFromError() {
