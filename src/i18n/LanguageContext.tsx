@@ -21,6 +21,23 @@ function readStoredLanguage(): Language {
   }
 }
 
+// Claude's audience localization commit introduced a UTF-8 -> Latin-1/Windows-1252
+// mojibake into a number of Turkish translation strings (for example
+// "BAÄLANDINIZ" instead of "BAĞLANDINIZ"). Keep the fix in the translation
+// boundary so existing screens are repaired without touching their behavior,
+// Firebase data, or the bilingual architecture.
+function repairMojibake(value: string): string {
+  if (!/[ÃÂÄÅ]/.test(value)) return value;
+
+  try {
+    const bytes = Uint8Array.from(value, char => char.charCodeAt(0) & 0xff);
+    const decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    return decoded.includes('\uFFFD') ? value : decoded;
+  } catch {
+    return value;
+  }
+}
+
 // Turkish is the default for every visitor unless they've explicitly
 // switched before (remembered via localStorage on this device).
 export function LanguageProvider({ children }: { children: ReactNode }) {
@@ -51,7 +68,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
 export function useLanguage() {
   const ctx = useContext(LanguageContext);
-  if (!ctx) throw new Error('useLanguage must be used within a LanguageProvider');
+  if (!ctx) throw new Error('useLanguage must be used within LanguageProvider');
   return ctx;
 }
 
@@ -59,5 +76,8 @@ export function useLanguage() {
 // instead of repeating `language === 'tr' ? x : y` everywhere.
 export function useTranslate() {
   const { language } = useLanguage();
-  return <T,>(pair: Record<Language, T>): T => pair[language];
+  return <T,>(pair: Record<Language, T>): T => {
+    const value = pair[language];
+    return typeof value === 'string' ? (repairMojibake(value) as T) : value;
+  };
 }
