@@ -8,23 +8,75 @@ import { watchSportsInteractions, submitSportsResponse, hasRespondedToInteractio
 import { registerParticipant } from '../firebase/participants';
 import { getLightStateAtTime, getNextLightEvent, type LightTimeline } from '../lightSync/timeline';
 import { getReadableTextColor } from '../utils/color';
+import { useLanguage, useTranslate, type Language } from '../i18n/LanguageContext';
 
 type TorchConstraints = MediaTrackConstraintSet & { torch?: boolean };
 type TorchCapabilities = MediaTrackCapabilities & { torch?: boolean };
 
+// Notices are stored as a stable key (+ optional dynamic detail) rather than
+// an already-translated string. If they were stored pre-translated, toggling
+// the language after a notice is already on screen would leave that one
+// piece of text stuck in whatever language was active when it was set,
+// while everything else on the page switches - a visibly broken, half
+// -translated screen. Resolving the text at render time (see noticeText
+// below) means every notice always reflects the current language.
+type NoticeKey =
+  | 'invalid-link'
+  | 'not-found'
+  | 'connect-failed'
+  | 'flash-control-failed'
+  | 'torch-unsupported'
+  | 'torch-unavailable'
+  | 'torch-no-camera-api'
+  | 'join-failed'
+  | 'choose-answer-first'
+  | 'enter-answer-first'
+  | 'response-submitted'
+  | 'already-responded'
+  | 'submit-failed';
+
+type Notice = { key: NoticeKey; detail?: string; isError: boolean } | null;
+
+const NOTICE_TEXT: Record<NoticeKey, Record<Language, string>> = {
+  'invalid-link': { tr: 'GeÃ§ersiz etkinlik baÄŸlantÄ±sÄ±.', en: 'Invalid show link.' },
+  'not-found': { tr: 'Etkinlik bulunamadÄ±.', en: 'Show not found.' },
+  'connect-failed': { tr: "LightSync'e baÄŸlanÄ±lamadÄ±. LÃ¼tfen sayfayÄ± yenileyin.", en: 'Could not connect to LightSync. Please refresh.' },
+  'flash-control-failed': { tr: 'TarayÄ±cÄ±nÄ±z fener Ä±ÅŸÄ±ÄŸÄ±nÄ± kontrol edemedi.', en: 'Your browser could not control the flashlight.' },
+  'torch-unsupported': { tr: 'Telefonunuz Ä±ÅŸÄ±k iÃ§in ekranÄ±nÄ± kullanacak - bu cihaz/tarayÄ±cÄ±da kamera feneri kontrolÃ¼ desteklenmiyor.', en: 'Your phone will use its screen as the light - camera flash control is not supported on this device/browser.' },
+  'torch-unavailable': { tr: 'Telefonunuz Ä±ÅŸÄ±k iÃ§in ekranÄ±nÄ± kullanacak - kameraya eriÅŸilemedi.', en: 'Your phone will use its screen as the light - camera access was unavailable.' },
+  'torch-no-camera-api': { tr: 'Telefonunuz bu tarayÄ±cÄ±da Ä±ÅŸÄ±k iÃ§in ekranÄ±nÄ± kullanacak.', en: 'Your phone will use its screen as the light on this browser.' },
+  'join-failed': { tr: 'EtkinliÄŸe katÄ±lÄ±namadÄ±. LÃ¼tfen baÄŸlantÄ±nÄ±zÄ± kontrol edip tekrar deneyin.', en: 'Could not join the show. Please check your connection and try again.' },
+  'choose-answer-first': { tr: 'Ã–nce bir cevap seÃ§in.', en: 'Choose an answer first.' },
+  'enter-answer-first': { tr: 'Ã–nce bir cevap yazÄ±n.', en: 'Enter an answer first.' },
+  'response-submitted': { tr: 'CevabÄ±nÄ±z gÃ¶nderildi!', en: 'Response submitted!' },
+  'already-responded': { tr: 'Bu soruyu zaten cevapladÄ±nÄ±z.', en: 'You already responded to this one.' },
+  'submit-failed': { tr: 'CevabÄ±nÄ±z gÃ¶nderilemedi. LÃ¼tfen tekrar deneyin.', en: 'Could not submit your answer. Please try again.' },
+};
+
 export default function Join() {
   const navigate = useNavigate();
   const { eventId } = useParams();
+  const { language, toggleLanguage } = useLanguage();
+  const t = useTranslate();
+
+  function noticeText(notice: Notice): string {
+    if (!notice) return '';
+    if (notice.key === 'join-failed' && notice.detail) {
+      return t({ tr: `EtkinliÄŸe katÄ±lÄ±namadÄ±: ${notice.detail}`, en: `Could not join the show: ${notice.detail}` });
+    }
+    return NOTICE_TEXT[notice.key][language];
+  }
+
   const [event, setEvent] = useState<PublicShow | null>(null);
   const [game, setGame] = useState<SportsGame | null>(null);
   const [activeInteraction, setActiveInteraction] = useState<SportsInteraction | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [joined, setJoined] = useState(false);
-  const [error, setError] = useState('');
+  const [notice, setNotice] = useState<Notice>(null);
   const [lightState, setLightState] = useState(false);
   const [selectedOption, setSelectedOption] = useState('');
   const [answer, setAnswer] = useState('');
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState<Notice>(null);
   const [sending, setSending] = useState(false);
   const [submittedInteractionId, setSubmittedInteractionId] = useState<string | null>(null);
   const trackRef = useRef<MediaStreamTrack | null>(null);
@@ -32,7 +84,7 @@ export default function Join() {
   const currentLightRef = useRef(false);
 
   useEffect(() => {
-    if (!eventId) { setLoaded(true); setError('Invalid show link.'); return; }
+    if (!eventId) { setLoaded(true); setNotice({ key: 'invalid-link', isError: true }); return; }
     const showId = eventId;
     let cancelled = false;
     let stopShow: (() => void) | undefined;
@@ -45,13 +97,13 @@ export default function Join() {
         stopShow = watchPublicShow(showId, show => {
           if (cancelled) return;
           setEvent(show); setLoaded(true);
-          if (!show) setError('Show not found.');
+          if (!show) setNotice({ key: 'not-found', isError: true });
         });
         stopGame = watchSportsGame(showId, setGame);
         stopInteractions = watchSportsInteractions(showId, items => setActiveInteraction(items.find(item => item.status === 'open') ?? null));
       } catch (err) {
         console.error(err);
-        if (!cancelled) { setLoaded(true); setError('Could not connect to LightSync. Please refresh.'); }
+        if (!cancelled) { setLoaded(true); setNotice({ key: 'connect-failed', isError: true }); }
       }
     }
     void connect();
@@ -59,7 +111,7 @@ export default function Join() {
   }, [eventId]);
 
   useEffect(() => {
-    setSelectedOption(''); setAnswer(''); setMessage(''); setSending(false); setSubmittedInteractionId(null);
+    setSelectedOption(''); setAnswer(''); setMessage(null); setSending(false); setSubmittedInteractionId(null);
     if (!eventId || !activeInteraction) return;
     // On (re)join, a currently-open interaction might be one this device
     // already answered before the tab was closed - check once so the
@@ -87,7 +139,7 @@ export default function Join() {
     try {
       await track.applyConstraints({ advanced: [{ torch: enabled } as TorchConstraints] });
       currentLightRef.current = enabled; setLightState(enabled);
-    } catch (err) { console.error(err); setError('Your browser could not control the flashlight.'); }
+    } catch (err) { console.error(err); setNotice({ key: 'flash-control-failed', isError: true }); }
   }
   function scheduleNextEvent(timeline: LightTimeline, start: number, offsetMs: number) {
     clearNextTimer();
@@ -116,13 +168,13 @@ export default function Join() {
 
   async function joinShow() {
     if (!eventId || !event) return;
-    setError('');
+    setNotice(null);
     // Real camera-torch control is a bonus, not a requirement: the full-screen
     // background color (see `pageBackground` below) is the actual flashlight
     // effect and works on every device with zero permissions. iOS Safari in
     // particular has never supported the web torch API at all, so treating
     // torch as mandatory here would lock out every iPhone in the audience.
-    let torchNote = '';
+    let torchNotice: Notice = null;
     if (navigator.mediaDevices?.getUserMedia) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
@@ -131,39 +183,39 @@ export default function Join() {
         if (track && capabilities?.torch) {
           trackRef.current = track;
         } else {
-          stream.getTracks().forEach(t => t.stop());
-          torchNote = 'Your phone will use its screen as the light - camera flash control is not supported on this device/browser.';
+          stream.getTracks().forEach(track => track.stop());
+          torchNotice = { key: 'torch-unsupported', isError: false };
         }
       } catch (mediaErr) {
         console.error(mediaErr);
-        torchNote = 'Your phone will use its screen as the light - camera access was unavailable.';
+        torchNotice = { key: 'torch-unavailable', isError: false };
       }
     } else {
-      torchNote = 'Your phone will use its screen as the light on this browser.';
+      torchNotice = { key: 'torch-no-camera-api', isError: false };
     }
     try {
       const user = await ensureAnonymousAuth();
       await registerParticipant(eventId, user.uid);
       setJoined(true);
-      if (torchNote) setError(torchNote);
+      if (torchNotice) setNotice(torchNotice);
       if (event.status === 'running' && event.showStartTime && event.lightTimeline) synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline, event.showStartOffset ?? 0);
     } catch (err) {
       console.error(err);
       const reason = err instanceof Error ? err.message : '';
-      setError(reason ? `Could not join the show: ${reason}` : 'Could not join the show. Please check your connection and try again.');
+      setNotice({ key: 'join-failed', detail: reason || undefined, isError: true });
     }
   }
 
   async function submitInteraction() {
     if (!eventId || !activeInteraction || sending) return;
-    if (activeInteraction.type === 'poll' && !selectedOption) { setMessage('Choose an answer first.'); return; }
-    if (activeInteraction.type === 'question' && !answer.trim()) { setMessage('Enter an answer first.'); return; }
+    if (activeInteraction.type === 'poll' && !selectedOption) { setMessage({ key: 'choose-answer-first', isError: true }); return; }
+    if (activeInteraction.type === 'question' && !answer.trim()) { setMessage({ key: 'enter-answer-first', isError: true }); return; }
     const interactionId = activeInteraction.id;
-    setSending(true); setMessage('');
+    setSending(true); setMessage(null);
     try {
       const uid = (await ensureAnonymousAuth()).uid;
       await submitSportsResponse(eventId, interactionId, uid, activeInteraction.type === 'poll' ? { optionId: selectedOption } : { answer: answer.trim().slice(0, 200) });
-      setSubmittedInteractionId(interactionId); setMessage('Response submitted!'); setSelectedOption(''); setAnswer('');
+      setSubmittedInteractionId(interactionId); setMessage({ key: 'response-submitted', isError: false }); setSelectedOption(''); setAnswer('');
     } catch (err) {
       console.error(err);
       // A permission-denied here almost always means they already voted
@@ -172,8 +224,8 @@ export default function Join() {
       // as "already submitted" rather than telling them to retry, since
       // retrying can never succeed once a response is on file.
       const alreadyResponded = err instanceof Error && /permission/i.test(err.message);
-      if (alreadyResponded) { setSubmittedInteractionId(interactionId); setMessage('You already responded to this one.'); }
-      else setMessage('Could not submit your answer. Please try again.');
+      if (alreadyResponded) { setSubmittedInteractionId(interactionId); setMessage({ key: 'already-responded', isError: false }); }
+      else setMessage({ key: 'submit-failed', isError: true });
     }
     finally { setSending(false); }
   }
@@ -182,6 +234,7 @@ export default function Join() {
     if (!joined || !event) return;
     if (event.status === 'running' && event.showStartTime && event.lightTimeline) synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline, event.showStartOffset ?? 0);
     else { clearNextTimer(); void setFlash(false); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [joined, event?.status, event?.showStartTime, event?.showStartOffset, event?.lightTimeline]);
 
   // Mobile browsers can suspend timers while the tab is backgrounded or the screen wakes.
@@ -207,6 +260,7 @@ export default function Join() {
       window.removeEventListener('pageshow', resync);
       window.removeEventListener('focus', resync);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [joined, event?.status, event?.showStartTime, event?.showStartOffset, event?.lightTimeline]);
 
   useEffect(() => () => {
@@ -217,8 +271,10 @@ export default function Join() {
     }
   }, []);
 
-  if (!loaded) return <main className="light-page light-page-loading"><div className="light-shell"><div className="light-brand">LIGHTSYNC</div><div className="light-loading">Connecting to show...</div></div></main>;
-  if (!event || !eventId) return <main className="light-page light-page-loading"><div className="light-shell"><div className="light-brand">LIGHTSYNC</div><div className="light-loading">{error || 'Show not found.'}</div><button className="light-primary-button" onClick={() => navigate('/')}>BACK</button></div></main>;
+  const langToggle = <button type="button" className="light-lang-toggle" onClick={toggleLanguage} aria-label="Switch language">{language === 'tr' ? 'EN' : 'TR'}</button>;
+
+  if (!loaded) return <main className="light-page light-page-loading"><div className="light-shell"><div className="light-header"><div className="light-brand">LIGHTSYNC</div>{langToggle}</div><div className="light-loading">{t({ tr: 'EtkinliÄŸe baÄŸlanÄ±lÄ±yor...', en: 'Connecting to show...' })}</div></div></main>;
+  if (!event || !eventId) return <main className="light-page light-page-loading"><div className="light-shell"><div className="light-header"><div className="light-brand">LIGHTSYNC</div>{langToggle}</div><div className="light-loading">{notice ? noticeText(notice) : t({ tr: 'Etkinlik bulunamadÄ±.', en: 'Show not found.' })}</div><button className="light-primary-button" onClick={() => navigate('/')}>{t({ tr: 'GERÄ°', en: 'BACK' })}</button></div></main>;
 
   const uiColor = event.phoneUiColor && /^#[0-9a-fA-F]{6}$/.test(event.phoneUiColor) ? event.phoneUiColor : getSportsLightColor(game);
   const flashColor = event.screenLightColor && /^#[0-9a-fA-F]{6}$/.test(event.screenLightColor) ? event.screenLightColor : uiColor;
@@ -228,30 +284,30 @@ export default function Join() {
   const choiceInk = getReadableTextColor(uiColor);
 
   const interactionCard = activeInteraction ? <section className="light-interaction" aria-live="polite">
-    <div className="interaction-header"><span className="interaction-live-dot" /><span>{activeInteraction.type === 'poll' ? 'LIVE POLL' : 'LIVE QUESTION'}</span></div>
+    <div className="interaction-header"><span className="interaction-live-dot" /><span>{activeInteraction.type === 'poll' ? t({ tr: 'CANLI ANKET', en: 'LIVE POLL' }) : t({ tr: 'CANLI SORU', en: 'LIVE QUESTION' })}</span></div>
     <div className="interaction-question">{activeInteraction.question}</div>
-    {alreadyResponded ? <div className="interaction-message">{message || 'You already responded to this one.'}</div> : <>
+    {alreadyResponded ? <div className="interaction-message">{message ? noticeText(message) : t({ tr: 'Bu soruyu zaten cevapladÄ±nÄ±z.', en: 'You already responded to this one.' })}</div> : <>
       {activeInteraction.type === 'poll' ? <div className="interaction-options">
-        {Object.entries(activeInteraction.options ?? {}).map(([id, label]) => <button key={id} type="button" className={`interaction-option ${selectedOption === id ? 'is-selected' : ''}`} disabled={sending} onClick={() => { setSelectedOption(id); setMessage(''); }} style={selectedOption === id ? ({ '--choice-color': uiColor, '--choice-ink': choiceInk } as CSSProperties) : undefined}><span>{label}</span><span className="choice-mark">{selectedOption === id ? 'v' : ''}</span></button>)}
-      </div> : <textarea className="interaction-answer" value={answer} onChange={e => { setAnswer(e.target.value); setMessage(''); }} maxLength={200} placeholder="Type your answer..." rows={3} />}
-      <button type="button" className="interaction-submit" disabled={sending} onClick={() => void submitInteraction()} style={{ background: uiColor, color: getReadableTextColor(uiColor) }}>{sending ? 'SUBMITTING...' : activeInteraction.type === 'poll' ? 'SUBMIT VOTE' : 'SUBMIT ANSWER'}</button>
-      {message && <div className={`interaction-message ${message.startsWith('Could not') ? 'is-error' : ''}`}>{message}</div>}
+        {Object.entries(activeInteraction.options ?? {}).map(([id, label]) => <button key={id} type="button" className={`interaction-option ${selectedOption === id ? 'is-selected' : ''}`} disabled={sending} onClick={() => { setSelectedOption(id); setMessage(null); }} style={selectedOption === id ? ({ '--choice-color': uiColor, '--choice-ink': choiceInk } as CSSProperties) : undefined}><span>{label}</span><span className="choice-mark">{selectedOption === id ? 'v' : ''}</span></button>)}
+      </div> : <textarea className="interaction-answer" value={answer} onChange={e => { setAnswer(e.target.value); setMessage(null); }} maxLength={200} placeholder={t({ tr: 'CevabÄ±nÄ±zÄ± yazÄ±n...', en: 'Type your answer...' })} rows={3} />}
+      <button type="button" className="interaction-submit" disabled={sending} onClick={() => void submitInteraction()} style={{ background: uiColor, color: getReadableTextColor(uiColor) }}>{sending ? t({ tr: 'GÃ–NDERÄ°LÄ°YOR...', en: 'SUBMITTING...' }) : activeInteraction.type === 'poll' ? t({ tr: 'OYU GÃ–NDER', en: 'SUBMIT VOTE' }) : t({ tr: 'CEVABI GÃ–NDER', en: 'SUBMIT ANSWER' })}</button>
+      {message && <div className={`interaction-message ${message.isError ? 'is-error' : ''}`}>{noticeText(message)}</div>}
     </>}
   </section> : null;
 
   if (!joined) return <main className="light-page" style={{ background: pageBackground }}><div className="light-shell light-shell-join">
-    <header className="light-header"><div className="light-brand">LIGHTSYNC</div><div className="light-status"><span /> SYSTEM READY</div></header>
-    <section className="light-main join-main"><div className="light-kicker">YOU'RE CONNECTED</div><h1 className="light-title">{event.name}</h1>{game && <div className="light-matchup"><strong>{game.homeTeam.name}</strong><span>VS</span><strong>{game.awayTeam.name}</strong></div>}<p className="light-copy">Join the show to enable your phone's flashlight and take part in live audience interactions.</p><button className="light-primary-button" onClick={() => void joinShow()}>JOIN SHOW</button><div className="light-note">Camera permission is used only to control your phone flashlight.</div></section>
-    {interactionCard}{error && <p className="light-error">{error}</p>}
+    <header className="light-header"><div className="light-brand">LIGHTSYNC</div><div className="light-header-right">{langToggle}<div className="light-status"><span /> {t({ tr: 'SÄ°STEM HAZIR', en: 'SYSTEM READY' })}</div></div></header>
+    <section className="light-main join-main"><div className="light-kicker">{t({ tr: 'BAÄLANDINIZ', en: "YOU'RE CONNECTED" })}</div><h1 className="light-title">{event.name}</h1>{game && <div className="light-matchup"><strong>{game.homeTeam.name}</strong><span>VS</span><strong>{game.awayTeam.name}</strong></div>}<p className="light-copy">{t({ tr: "Telefonunuzun fener Ä±ÅŸÄ±ÄŸÄ±nÄ± etkinleÅŸtirmek ve canlÄ± anket/sorulara katÄ±lmak iÃ§in etkinliÄŸe katÄ±lÄ±n.", en: "Join the show to enable your phone's flashlight and take part in live audience interactions." })}</p><button className="light-primary-button" onClick={() => void joinShow()}>{t({ tr: 'ETKÄ°NLÄ°ÄE KATIL', en: 'JOIN SHOW' })}</button><div className="light-note">{t({ tr: 'Kamera izni yalnÄ±zca telefonunuzun fener Ä±ÅŸÄ±ÄŸÄ±nÄ± kontrol etmek iÃ§in kullanÄ±lÄ±r.', en: 'Camera permission is used only to control your phone flashlight.' })}</div></section>
+    {interactionCard}{notice && <p className="light-error">{noticeText(notice)}</p>}
   </div></main>;
 
   return <main className={`light-page ${lightState ? 'is-flashing' : ''}`} style={{ background: pageBackground, color: lightState ? getReadableTextColor(flashColor, '#050505') : '#fff' }}>
     <div className="light-shell">
-      <header className="light-header"><div className="light-brand">LIGHTSYNC</div><div className="light-status" style={lightState ? { background: 'rgba(0,0,0,.16)' } : undefined}><span /> {running ? 'SHOW LIVE' : 'SYSTEM READY'}</div></header>
-      <section className="light-main"><div className="light-kicker">{running ? 'SYNCED WITH THE ARENA' : 'STAY CONNECTED'}</div><h1 className="light-title">{event.name}</h1>{game && <div className="light-matchup"><strong>{game.homeTeam.name}</strong><span>VS</span><strong>{game.awayTeam.name}</strong></div>}
-        {running ? <><div className="light-state" aria-label={lightState ? 'Flashlight on' : 'Flashlight off'}>{lightState ? 'ON' : 'OFF'}</div><p className="light-copy">Your flashlight is synchronized with the show.</p></> : <><div className="light-waiting">FLASHLIGHT SHOW WILL START SOON</div><p className="light-copy">Stay connected. The organizer can start the light show at any time.</p></>}
+      <header className="light-header"><div className="light-brand">LIGHTSYNC</div><div className="light-header-right">{langToggle}<div className="light-status" style={lightState ? { background: 'rgba(0,0,0,.16)' } : undefined}><span /> {running ? t({ tr: 'CANLI YAYINDA', en: 'SHOW LIVE' }) : t({ tr: 'SÄ°STEM HAZIR', en: 'SYSTEM READY' })}</div></div></header>
+      <section className="light-main"><div className="light-kicker">{running ? t({ tr: 'SALONLA SENKRONÄ°ZE', en: 'SYNCED WITH THE ARENA' }) : t({ tr: 'BAÄLANTIDA KALIN', en: 'STAY CONNECTED' })}</div><h1 className="light-title">{event.name}</h1>{game && <div className="light-matchup"><strong>{game.homeTeam.name}</strong><span>VS</span><strong>{game.awayTeam.name}</strong></div>}
+        {running ? <><div className="light-state" aria-label={lightState ? t({ tr: 'Fener Ä±ÅŸÄ±ÄŸÄ± aÃ§Ä±k', en: 'Flashlight on' }) : t({ tr: 'Fener Ä±ÅŸÄ±ÄŸÄ± kapalÄ±', en: 'Flashlight off' })}>{lightState ? t({ tr: 'AÃ‡IK', en: 'ON' }) : t({ tr: 'KAPALI', en: 'OFF' })}</div><p className="light-copy">{t({ tr: 'Fener Ä±ÅŸÄ±ÄŸÄ±nÄ±z etkinlikle senkronize.', en: 'Your flashlight is synchronized with the show.' })}</p></> : <><div className="light-waiting">{t({ tr: 'IÅIK GÃ–STERÄ°SÄ° YAKINDA BAÅLAYACAK', en: 'FLASHLIGHT SHOW WILL START SOON' })}</div><p className="light-copy">{t({ tr: 'BaÄŸlantÄ±da kalÄ±n. OrganizatÃ¶r Ä±ÅŸÄ±k gÃ¶sterisini istediÄŸi an baÅŸlatabilir.', en: 'Stay connected. The organizer can start the light show at any time.' })}</p></>}
       </section>
-      {interactionCard}{error && <p className="light-error">{error}</p>}
+      {interactionCard}{notice && <p className="light-error">{noticeText(notice)}</p>}
     </div>
   </main>;
 }

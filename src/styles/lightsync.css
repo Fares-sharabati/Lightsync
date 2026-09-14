@@ -187,7 +187,7 @@
   @media (max-width:760px){.ls-shell{padding:18px}.ls-hero-grid,.ls-form-grid,.ls-team-grid,.ls-light-grid{grid-template-columns:1fr}.ls-header{margin-bottom:28px}.ls-hero-grid h1{font-size:48px}.ls-orbit{height:170px}.ls-event-titlebar{align-items:flex-start;flex-direction:column}.ls-show-id-card div{align-items:flex-start;flex-direction:column;gap:5px}.ls-audience-card{min-height:260px}.ls-qr-frame{transform:scale(.9);transform-origin:top center;margin-bottom:-5px}.ls-matchup{flex-direction:column}.ls-matchup-vs{width:100%;padding:6px}}
   @media (prefers-reduced-motion:reduce){.ls-shell *{animation:none!important;transition:none!important}}
 
-  /* LightSync participant experience — responsive, no overlays */
+ /* LightSync participant experience — responsive, no overlays */
 .light-page {
   position: fixed !important;
   inset: 0 !important;
@@ -274,6 +274,27 @@
   border-radius: 50%;
   background: #35e47b;
   box-shadow: 0 0 11px #35e47b;
+}
+
+.light-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.light-lang-toggle {
+  border: 1px solid rgba(255,255,255,.20);
+  background: rgba(0,0,0,.24);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 999px;
+  padding: 7px 10px;
+  color: #fff;
+  font-size: clamp(8px, 2.4vw, 10px);
+  font-weight: 900;
+  letter-spacing: .1em;
+  cursor: pointer;
 }
 
 .light-main {
@@ -479,7 +500,6 @@
 .interaction-option.is-selected {
   border-color: var(--choice-color, #fff);
   background: var(--choice-color, #fff);
-  color: var(--choice-ink, #0a0a0a);
 }
 
 .choice-mark {
