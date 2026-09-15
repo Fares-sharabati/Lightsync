@@ -54,20 +54,40 @@ function createRunId() {
 export async function startLottery(showId: string, winnerIds: string[], eligibleIds: string[], eligibleCount: number, winnerCount: number) {
   const runId = createRunId();
   const startedAt = serverNow();
-  const updates: Record<string, unknown> = {
-    [`lotteryPrivate/${showId}/${runId}`]: { winnerIds: Object.fromEntries(winnerIds.map(uid => [uid, true])) },
-    [`lotteries/${showId}`]: {
-      runId,
-      status: 'running' as LotteryStatus,
-      winnerCount,
-      eligibleCount,
-      startedAt,
-      revealAt: startedAt + 10_000,
-      resultsReady: false,
-    } satisfies LotteryState,
+  const lotteryState: LotteryState = {
+    runId,
+    status: 'running',
+    winnerCount,
+    eligibleCount,
+    startedAt,
+    revealAt: startedAt + 10_000,
+    resultsReady: false,
   };
-  for (const uid of eligibleIds) updates[`lotteryEligibility/${showId}/${runId}/${uid}`] = true;
-  await update(ref(db), updates);
+
+  // Write the run-specific data first. The actual lottery state is then
+  // reserved transactionally so two organizer tabs cannot both start a
+  // different run and race to become the active lottery.
+  const runData: Record<string, unknown> = {
+    [`lotteryPrivate/${showId}/${runId}`]: { winnerIds: Object.fromEntries(winnerIds.map(uid => [uid, true])) },
+  };
+  for (const uid of eligibleIds) runData[`lotteryEligibility/${showId}/${runId}/${uid}`] = true;
+  await update(ref(db), runData);
+
+  const reservation = await runTransaction(ref(db, `lotteries/${showId}`), current => {
+    if (current && current.status === 'running') return;
+    return lotteryState;
+  });
+
+  if (!reservation.committed) {
+    // Another organizer action won the race. Remove the unused run data so
+    // abandoned eligibility/winner records do not accumulate.
+    const cleanup: Record<string, null> = {
+      [`lotteryPrivate/${showId}/${runId}`]: null,
+      [`lotteryEligibility/${showId}/${runId}`]: null,
+    };
+    await update(ref(db), cleanup);
+    throw new Error('A lottery is already running.');
+  }
 }
 
 export async function cancelLottery(showId: string) {
