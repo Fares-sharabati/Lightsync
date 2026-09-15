@@ -1,5 +1,7 @@
 import { Component, lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import LotteryOrganizer from './components/LotteryOrganizer';
+import LotteryAudience from './components/LotteryAudience';
 
 const Home = lazy(() => import('./pages/Home'));
 const Mission = lazy(() => import('./pages/Mission'));
@@ -52,6 +54,17 @@ function ScrollToHash() {
   return null;
 }
 
+function LotteryRouteLayer() {
+  const location = useLocation();
+  const isEventControl = /^\/admin\/(event|show)\/[^/]+$/.test(location.pathname);
+  const isAudienceJoin = /^\/join\/[^/]+$/.test(location.pathname);
+
+  return <>
+    {isEventControl && <LotteryOrganizer />}
+    {isAudienceJoin && <LotteryAudience />}
+  </>;
+}
+
 class RouteErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
 
@@ -73,7 +86,7 @@ class RouteErrorBoundary extends Component<{ children: ReactNode }, { hasError: 
 }
 
 export default function App() {
-  return <BrowserRouter><ScrollToHash /><RouteErrorBoundary><Suspense fallback={<RouteFallback />}><Routes>
+  return <BrowserRouter><ScrollToHash /><LotteryRouteLayer /><RouteErrorBoundary><Suspense fallback={<RouteFallback />}><Routes>
     <Route path="/" element={<Home />} />
     <Route path="/mission" element={<Mission />} />
     <Route path="/projects" element={<Projects />} />
