@@ -64,8 +64,9 @@ export default function LotteryOrganizer({ participants, participantCount }: Lot
     setBusy(true);
     setMessage('');
     try {
+      const eligibleIds = connected.map(participant => participant.uid as string);
       const selected = shuffleAndPick(connected, count).map(participant => participant.uid as string);
-      await startLottery(eventId, selected, connected.length, count);
+      await startLottery(eventId, selected, eligibleIds, eligibleIds.length, count);
       setWinnerCount(count);
     } catch (error) {
       console.error(error);
