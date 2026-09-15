@@ -95,6 +95,7 @@
     "lotteryContacts": {
       "$showId": {
         ".read": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
+        ".write": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
         "$uid": {
           ".read": "auth != null && (auth.uid === $uid || root.child('shows').child($showId).child('organizerId').val() === auth.uid)",
           ".write": "auth != null && (root.child('shows').child($showId).child('organizerId').val() === auth.uid || (auth.uid === $uid && root.child('lotteries').child($showId).child('status').val() === 'revealed' && root.child('lotteries').child($showId).child('winnerIds').child($uid).val() === true))",
