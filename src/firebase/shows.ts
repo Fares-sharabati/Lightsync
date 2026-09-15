@@ -14,20 +14,10 @@ export async function createShow(organizerId: string, input: CreateShowInput) {
   const now = Date.now();
   const show = { organizerId, name: input.name.trim(), date: input.date, venue: input.venue.trim(), kind: 'sports' as const, status: 'waiting' as ShowStatus, createdAt: now, showStartTime: null, showStartOffset: 0, screenLightColor: '#FFFFFF', phoneUiColor: '#FFFFFF' };
   const publicShow = { name: show.name, date: show.date, venue: show.venue, kind: 'sports' as const, status: show.status, showStartTime: null, showStartOffset: 0, lightTimeline: null, screenLightColor: show.screenLightColor, phoneUiColor: show.phoneUiColor };
-
   try { await set(ref(db, `showOwners/${showId}`), { organizerId }); }
   catch (error) { throw new Error(`Could not reserve event ${showId}: ${error instanceof Error ? error.message : String(error)}`); }
-
-  try {
-    await update(ref(db), {
-      [`shows/${showId}`]: show,
-      [`publicShows/${showId}`]: publicShow,
-      [`showStats/${showId}`]: { totalJoined: 0, peakConnected: 0 },
-    });
-  } catch (error) {
-    try { await set(ref(db, `showOwners/${showId}`), null); } catch { /* preserve original error */ }
-    throw new Error(`Could not create event ${showId}: ${error instanceof Error ? error.message : String(error)}`);
-  }
+  try { await update(ref(db), { [`shows/${showId}`]: show, [`publicShows/${showId}`]: publicShow, [`showStats/${showId}`]: { totalJoined: 0, peakConnected: 0 } }); }
+  catch (error) { try { await set(ref(db, `showOwners/${showId}`), null); } catch { /* preserve original error */ } throw new Error(`Could not create event ${showId}: ${error instanceof Error ? error.message : String(error)}`); }
   return showId;
 }
 
@@ -38,9 +28,7 @@ export function watchOrganizerShows(organizerId: string, callback: (shows: Show[
 async function writeShowChanges(showId: string, changes: Partial<Omit<Show, 'id' | 'organizerId'>>) {
   const updates: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(changes)) updates[`shows/${showId}/${key}`] = value;
-  for (const key of ['name', 'date', 'venue', 'kind', 'status', 'showStartTime', 'showStartOffset', 'lightTimeline', 'screenLightColor', 'phoneUiColor']) {
-    if (key in changes) updates[`publicShows/${showId}/${key}`] = (changes as Record<string, unknown>)[key];
-  }
+  for (const key of ['name', 'date', 'venue', 'kind', 'status', 'showStartTime', 'showStartOffset', 'lightTimeline', 'screenLightColor', 'phoneUiColor']) if (key in changes) updates[`publicShows/${showId}/${key}`] = (changes as Record<string, unknown>)[key];
   await update(ref(db), updates);
 }
 
@@ -68,6 +56,7 @@ export async function deleteShow(showId: string) {
     [`sportsResults/${showId}`]: null,
     [`sportsScreen/${showId}`]: null,
     [`lotteries/${showId}`]: null,
+    [`lotteryPrivate/${showId}`]: null,
     [`lotteryContacts/${showId}`]: null,
   };
   try { await update(ref(db), dependentUpdates); }
