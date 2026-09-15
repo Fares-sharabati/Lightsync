@@ -70,8 +70,8 @@ export default function NexttedHome() {
             <h2>{t({ tr: 'Problemin içinden geldik.', en: 'We came from inside the problem.' })}</h2>
             <div>
               <p>{t({
-                tr: <>Profesyonel spordaki çalışmalarımız LightSync'ten yıllar önce başladı. <strong>Gaziantep Basketbol</strong>, <strong>Adam Voleybol</strong>, <strong>Gaziantep FK</strong> ve 2026–2027 sezonunda <strong>KBB Kipaş İstiklal Basketbol</strong> ile müzik, ışık, anons ve maç günü operasyonlarında çalıştık.</>,
-                en: <>Our work in professional sports started years before LightSync. We have worked on music, lighting, announcing and game-day operations with <strong>Gaziantep Basketbol</strong>, <strong>Adam Voleybol</strong>, <strong>Gaziantep FK</strong> and, for the 2026–2027 season, <strong>KBB Kipaş İstiklal Basketbol</strong>.</>,
+                tr: <>Profesyonel spordaki çalışmalarımız LightSync'ten yıllar önce başladı. <strong>Gaziantep Basketbol</strong>, <strong>Adam Voleybol</strong> ve 2026–2027 sezonunda <strong>KBB Kipaş İstiklal Basketbol</strong> ile müzik, ışık, anons ve maç günü operasyonlarında çalıştık.</>,
+                en: <>Our work in professional sports started years before LightSync. We have worked on music, lighting, announcing and game-day operations with <strong>Gaziantep Basketbol</strong>, <strong>Adam Voleybol</strong> and, for the 2026–2027 season, <strong>KBB Kipaş İstiklal Basketbol</strong>.</>,
               })}</p>
               <p>{t({
                 tr: 'Bu ortamların içinde olmak, canlı bir maçın ne kadar daha etkileşimli olabileceğini gösterdi. LightSync, bu deneyimi değiştirmek için geliştirdiğimiz ilk ürün.',
@@ -83,7 +83,7 @@ export default function NexttedHome() {
           <div className="nextted-stat-row">
             <div className="nextted-stat"><b>1</b><span>{t({ tr: 'Geliştirdiğimiz spor teknolojisi ürünü', en: 'Sports technology product being built by us' })}</span></div>
             <div className="nextted-stat"><b>2</b><span>{t({ tr: "Gaziantep'teki büyük ürün tasarımı projesi", en: 'Major product design projects in Gaziantep' })}</span></div>
-            <div className="nextted-stat"><b>4</b><span>{t({ tr: 'Deneyimimizle bağlantılı spor organizasyonu', en: 'Sports organizations connected to our experience' })}</span></div>
+            <div className="nextted-stat"><b>3</b><span>{t({ tr: 'Deneyimimizle bağlantılı spor organizasyonu', en: 'Sports organizations connected to our experience' })}</span></div>
             <div className="nextted-stat"><b>∞</b><span>{t({ tr: 'Deneyimi daha iyi hale getirmek için alan', en: 'Room to make the experience better' })}</span></div>
           </div>
         </div></section>
