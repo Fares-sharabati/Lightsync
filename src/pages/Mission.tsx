@@ -4,7 +4,6 @@ import '../styles/nextted.css';
 
 const TIMELINE = [
   { year: '2021 — 2023', name: 'Adam Voleybol', body: { tr: 'Müzik, ışık, anons ve canlı etkinlik deneyimi.', en: 'Music, lighting, announcing and live event experience.' } },
-  { year: '2024 — 2026', name: 'Gaziantep Futbol Kulübü', body: { tr: 'Profesyonel futbol için müzik ve anons.', en: 'Music and announcing for professional football.' } },
   { year: { tr: '2020 — Günümüz', en: '2020 — Present' }, name: 'Gaziantep Basketbol', body: { tr: 'Müzik, ışık, anons ve maç günü operasyonları. Bugün hâlâ ekibin bir parçasıyız.', en: 'Music, lighting, announcing and game-day operations. We are still part of the team today.' } },
   { year: '2026 — 2027', name: 'KBB Kipaş İstiklal Basketbol', body: { tr: 'Anonsör olarak ilk sezonumuz.', en: 'First season working as the announcer.' } },
 ];
