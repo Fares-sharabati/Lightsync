@@ -23,8 +23,14 @@ export default function LotteryOrganizer({ participants }: LotteryOrganizerProps
   useEffect(() => { if (!eventId) return; return watchLotteryPrivate(eventId, lottery?.runId ?? null, setWinnerIds); }, [eventId, lottery?.runId]);
 
   const connected = useMemo(() => Object.values(participants).filter(p => p.connected === true && Boolean(p.uid)), [participants]);
+  const maxWinners = Math.max(1, connected.length);
   const winnerUidList = useMemo(() => Object.keys(winnerIds).filter(uid => winnerIds[uid]), [winnerIds]);
   const winnerRows = winnerUidList.map(uid => ({ uid, contact: contacts[uid] })).filter(row => row.contact);
+
+  useEffect(() => {
+    if (lottery?.status === 'running') return;
+    setWinnerCount(current => Math.min(Math.max(1, current), maxWinners));
+  }, [maxWinners, lottery?.status]);
 
   useEffect(() => {
     if (!lottery || lottery.status !== 'running') return;
@@ -75,9 +81,15 @@ export default function LotteryOrganizer({ participants }: LotteryOrganizerProps
       </div>
       <p className="ls-muted" style={{ marginTop: 0 }}>All currently connected phones are automatically eligible for the draw. The audience will see a 10-second synchronized flash countdown before the result is revealed.</p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 16, alignItems: 'end', marginTop: 18 }}>
-        <label><span className="ls-field-label">NUMBER OF WINNERS</span><input aria-label="Number of winners" type="number" min={1} max={Math.max(1, connected.length)} value={winnerCount} disabled={lottery?.status === 'running'} onChange={e => setWinnerCount(Math.max(1, Math.min(Number(e.target.value) || 1, Math.max(1, connected.length))))} style={{ display: 'block', width: 120, marginTop: 7, border: '1px solid #343940', background: '#080a0d', color: '#fff', borderRadius: 10, padding: '12px 13px', fontWeight: 800 }} /></label>
-        <div style={{ textAlign: 'right' }}><div className="ls-eyebrow">WINNERS</div><strong style={{ fontSize: 28, color: winnerColor }}>{winnerLabel}</strong></div>
+      <div style={{ marginTop: 18 }}>
+        <span className="ls-field-label">NUMBER OF WINNERS</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 7 }}>
+          <button type="button" aria-label="Decrease number of winners" onClick={() => setWinnerCount(current => Math.max(1, current - 1))} disabled={lottery?.status === 'running' || winnerCount <= 1} style={{ width: 46, height: 46, border: '1px solid #343940', borderRadius: 10, background: '#080a0d', color: '#fff', fontSize: 22, fontWeight: 800, cursor: lottery?.status === 'running' || winnerCount <= 1 ? 'not-allowed' : 'pointer', opacity: lottery?.status === 'running' || winnerCount <= 1 ? .4 : 1 }}>−</button>
+          <input aria-label="Number of winners" type="number" inputMode="numeric" min={1} max={maxWinners} step={1} value={winnerCount} disabled={lottery?.status === 'running'} onChange={e => { const value = Number(e.target.value); if (!Number.isFinite(value)) return; setWinnerCount(Math.max(1, Math.min(Math.floor(value), maxWinners))); }} style={{ width: 80, height: 46, boxSizing: 'border-box', border: '1px solid #343940', background: '#080a0d', color: '#fff', borderRadius: 10, padding: '10px 12px', fontWeight: 800, fontSize: 18, textAlign: 'center' }} />
+          <button type="button" aria-label="Increase number of winners" onClick={() => setWinnerCount(current => Math.min(maxWinners, current + 1))} disabled={lottery?.status === 'running' || winnerCount >= maxWinners} style={{ width: 46, height: 46, border: '1px solid #343940', borderRadius: 10, background: '#080a0d', color: '#fff', fontSize: 22, fontWeight: 800, cursor: lottery?.status === 'running' || winnerCount >= maxWinners ? 'not-allowed' : 'pointer', opacity: lottery?.status === 'running' || winnerCount >= maxWinners ? .4 : 1 }}>+</button>
+          <div style={{ marginLeft: 4 }}><div className="ls-eyebrow">AVAILABLE</div><strong style={{ fontSize: 18 }}>{connected.length}</strong></div>
+        </div>
+        <p className="ls-muted" style={{ margin: '8px 0 0', fontSize: 11 }}>{connected.length === 0 ? 'Connect audience phones before starting the lottery.' : `You can select up to ${connected.length} winner${connected.length === 1 ? '' : 's'}.`}</p>
       </div>
 
       {(!lottery || lottery.status === 'revealed' || lottery.status === 'idle') && <button type="button" onClick={() => void runLottery()} disabled={busy || connected.length === 0} style={{ ...button, width: '100%', marginTop: 14, opacity: busy || connected.length === 0 ? .45 : 1 }}>{busy ? 'STARTING...' : 'START LOTTERY'}</button>}
