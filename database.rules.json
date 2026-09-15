@@ -95,10 +95,10 @@
     "lotteryContacts": {
       "$showId": {
         ".read": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
-        ".write": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
+        ".write": "auth != null && (root.child('showOwners').child($showId).child('organizerId').val() === auth.uid || root.child('shows').child($showId).child('organizerId').val() === auth.uid)",
         "$uid": {
           ".read": "auth != null && (auth.uid === $uid || root.child('shows').child($showId).child('organizerId').val() === auth.uid)",
-          ".write": "auth != null && (root.child('shows').child($showId).child('organizerId').val() === auth.uid || (auth.uid === $uid && root.child('lotteries').child($showId).child('status').val() === 'revealed' && root.child('lotteries').child($showId).child('winnerIds').child($uid).val() === true))",
+          ".write": "auth != null && (root.child('showOwners').child($showId).child('organizerId').val() === auth.uid || root.child('shows').child($showId).child('organizerId').val() === auth.uid || (auth.uid === $uid && root.child('lotteries').child($showId).child('status').val() === 'revealed' && root.child('lotteries').child($showId).child('winnerIds').child($uid).val() === true))",
           ".validate": "!newData.exists() || (newData.hasChildren(['name', 'surname', 'phone', 'submittedAt']) && newData.child('name').isString() && newData.child('name').val().length >= 2 && newData.child('name').val().length <= 80 && newData.child('surname').isString() && newData.child('surname').val().length >= 2 && newData.child('surname').val().length <= 80 && newData.child('phone').isString() && newData.child('phone').val().length >= 7 && newData.child('phone').val().length <= 30 && newData.child('submittedAt').isNumber())"
         }
       }
