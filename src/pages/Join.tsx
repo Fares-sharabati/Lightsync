@@ -7,6 +7,7 @@ import { watchSportsGame, getSportsLightColor, type SportsGame } from '../fireba
 import { watchSportsInteractions, submitSportsResponse, hasRespondedToInteraction, type SportsInteraction } from '../firebase/sports';
 import { registerParticipant } from '../firebase/participants';
 import { getLightStateAtTime, getNextLightEvent, type LightTimeline } from '../lightSync/timeline';
+import { serverNow, watchServerTimeOffset } from '../firebase/serverTime';
 import { getReadableTextColor } from '../utils/color';
 import { useLanguage, useTranslate, type Language } from '../i18n/LanguageContext';
 
@@ -76,6 +77,8 @@ export default function Join() {
   const nextTimerRef = useRef<number | null>(null);
   const currentLightRef = useRef(false);
 
+  useEffect(() => watchServerTimeOffset(() => {}), []);
+
   useEffect(() => {
     if (!eventId) { setLoaded(true); setNotice({ key: 'invalid-link', isError: true }); return; }
     const showId = eventId;
@@ -132,7 +135,7 @@ export default function Join() {
   }
   function scheduleNextEvent(timeline: LightTimeline, start: number, offsetMs: number) {
     clearNextTimer();
-    const now = Date.now();
+    const now = serverNow();
     if (now < start) {
       nextTimerRef.current = window.setTimeout(() => synchronizeShow(start, timeline, offsetMs / 1000), Math.max(0, start - now));
       return;
@@ -142,14 +145,14 @@ export default function Join() {
     if (!next) return;
     const eventAt = start + next.time - offsetMs;
     nextTimerRef.current = window.setTimeout(() => {
-      const currentPosition = Date.now() - start + offsetMs;
+      const currentPosition = serverNow() - start + offsetMs;
       void setFlash(getLightStateAtTime(timeline, currentPosition));
       scheduleNextEvent(timeline, start, offsetMs);
     }, Math.max(0, eventAt - now));
   }
   function synchronizeShow(start: number, timeline: LightTimeline, offsetSeconds = 0) {
     const offsetMs = Math.max(0, offsetSeconds) * 1000;
-    const now = Date.now();
+    const now = serverNow();
     const position = now >= start ? now - start + offsetMs : -1;
     void setFlash(position >= 0 ? getLightStateAtTime(timeline, position) : false);
     scheduleNextEvent(timeline, start, offsetSeconds);

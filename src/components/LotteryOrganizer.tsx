@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useParams } from 'react-router-dom';
 import { type ParticipantInfo } from '../firebase/participants';
-import { revealLottery, shuffleAndPick, startLottery, watchLottery, watchLotteryContacts, type LotteryContact, type LotteryState } from '../firebase/lottery';
+import { cancelLottery, revealLottery, shuffleAndPick, startLottery, watchLottery, watchLotteryContacts, type LotteryContact, type LotteryState } from '../firebase/lottery';
+import { serverNow, watchServerTimeOffset } from '../firebase/serverTime';
 
 interface LotteryOrganizerProps {
   participants: Record<string, ParticipantInfo>;
@@ -14,8 +15,13 @@ export default function LotteryOrganizer({ participants, participantCount }: Lot
   const [contacts, setContacts] = useState<Record<string, LotteryContact>>({});
   const [winnerCount, setWinnerCount] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [message, setMessage] = useState('');
   const [seconds, setSeconds] = useState(10);
+
+  // Subscribing keeps serverNow() primed with a fresh offset for as long as
+  // this panel is mounted; the callback itself isn't needed here.
+  useEffect(() => watchServerTimeOffset(() => {}), []);
 
   useEffect(() => {
     if (!eventId) return;
@@ -36,15 +42,21 @@ export default function LotteryOrganizer({ participants, participantCount }: Lot
 
   useEffect(() => {
     if (!lottery || lottery.status !== 'running') return;
-    const update = () => setSeconds(Math.max(0, Math.ceil((lottery.revealAt - Date.now()) / 1000)));
+    const update = () => setSeconds(Math.max(0, Math.ceil((lottery.revealAt - serverNow()) / 1000)));
     update();
     const timer = window.setInterval(update, 100);
     return () => window.clearInterval(timer);
   }, [lottery?.status, lottery?.revealAt]);
 
+  // Client-side reveal trigger. This is a *fallback*, not the source of
+  // truth: revealLottery() is transaction-guarded, so it's safe for this to
+  // race with the revealLotteryOnSchedule Cloud Function (see /functions) -
+  // whichever fires first wins, the other becomes a no-op. Deploy the
+  // Cloud Function so reveal still happens even if this tab is closed,
+  // backgrounded, or loses connection during the countdown.
   useEffect(() => {
     if (!eventId || lottery?.status !== 'running') return;
-    const delay = Math.max(0, lottery.revealAt - Date.now());
+    const delay = Math.max(0, lottery.revealAt - serverNow());
     const timer = window.setTimeout(() => {
       void revealLottery(eventId).catch(error => {
         console.error(error);
@@ -76,6 +88,20 @@ export default function LotteryOrganizer({ participants, participantCount }: Lot
     }
   }
 
+  async function stopLottery() {
+    if (!eventId || cancelling || lottery?.status !== 'running') return;
+    setCancelling(true);
+    setMessage('');
+    try {
+      await cancelLottery(eventId);
+    } catch (error) {
+      console.error(error);
+      setMessage(error instanceof Error ? error.message : 'Could not cancel the lottery.');
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   const winnerLabel = lottery?.status === 'running' || lottery?.status === 'revealed' ? lottery.winnerCount : winnerCount;
   const winnerColor = lottery?.status === 'running' ? '#f2c66d' : lottery?.status === 'revealed' ? '#9fe0ad' : '#fff';
   const button: CSSProperties = {
@@ -87,6 +113,16 @@ export default function LotteryOrganizer({ participants, participantCount }: Lot
     cursor: busy || lottery?.status === 'running' ? 'not-allowed' : 'pointer',
     background: '#fff',
     color: '#08090b',
+  };
+  const ghostButton: CSSProperties = {
+    border: '1px solid #5b4820',
+    borderRadius: 10,
+    padding: '10px 16px',
+    fontWeight: 800,
+    letterSpacing: '.06em',
+    cursor: cancelling ? 'not-allowed' : 'pointer',
+    background: 'transparent',
+    color: '#f2c66d',
   };
 
   return (
@@ -137,6 +173,9 @@ export default function LotteryOrganizer({ participants, participantCount }: Lot
           <div className="ls-eyebrow">LOTTERY RUNNING</div>
           <strong style={{ display: 'block', fontSize: 64, lineHeight: 1, marginTop: 8, color: '#f2c66d' }}>{seconds}</strong>
           <p style={{ margin: '8px 0 0', color: '#c9c0ae', fontSize: 12 }}>The result will be revealed automatically when the countdown reaches zero.</p>
+          <button type="button" onClick={() => void stopLottery()} disabled={cancelling} style={{ ...ghostButton, marginTop: 14, opacity: cancelling ? .5 : 1 }}>
+            {cancelling ? 'CANCELLING...' : 'CANCEL LOTTERY'}
+          </button>
         </div>
       )}
 

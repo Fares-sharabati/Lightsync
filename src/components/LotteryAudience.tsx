@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useParams } from 'react-router-dom';
 import { ensureAnonymousAuth } from '../firebase/auth';
-import { submitLotteryContact, watchLottery, watchLotteryContact, type LotteryContact, type LotteryState } from '../firebase/lottery';
+import {
+  submitLotteryContact,
+  watchLottery,
+  watchLotteryContact,
+  watchLotteryEligibility,
+  type LotteryContact,
+  type LotteryState,
+} from '../firebase/lottery';
+import { serverNow, watchServerTimeOffset } from '../firebase/serverTime';
 import { watchPublicShow, type PublicShow } from '../firebase/shows';
 import { useTranslate } from '../i18n/LanguageContext';
 
@@ -11,6 +19,8 @@ export default function LotteryAudience() {
   const [lottery, setLottery] = useState<LotteryState | null>(null);
   const [show, setShow] = useState<PublicShow | null>(null);
   const [uid, setUid] = useState<string | null>(null);
+  const [eligible, setEligible] = useState(false);
+  const [eligibilityLoaded, setEligibilityLoaded] = useState(false);
   const [contact, setContact] = useState<LotteryContact | null>(null);
   const [name, setName] = useState('');
   const [surname, setSurname] = useState('');
@@ -18,6 +28,9 @@ export default function LotteryAudience() {
   const [seconds, setSeconds] = useState(10);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  // Subscribing keeps serverNow() primed with a fresh offset for as long as
+  // this overlay is mounted; the callback itself isn't needed here.
+  useEffect(() => watchServerTimeOffset(() => {}), []);
 
   useEffect(() => {
     if (!eventId) return;
@@ -33,6 +46,19 @@ export default function LotteryAudience() {
     return () => { active = false; };
   }, [eventId]);
 
+  // Eligibility now lives at its own per-uid path (see firebase/lottery.ts)
+  // instead of a giant map broadcast to every phone. Track whether we've
+  // actually heard back yet so we never render a "you lost" screen off of
+  // eligible defaulting to false before the real value arrives.
+  useEffect(() => {
+    setEligibilityLoaded(false);
+    if (!eventId || !uid || !lottery || lottery.status === 'idle') return;
+    return watchLotteryEligibility(eventId, uid, value => {
+      setEligible(value);
+      setEligibilityLoaded(true);
+    });
+  }, [eventId, uid, lottery?.status, lottery?.startedAt]);
+
   useEffect(() => {
     if (!eventId || !uid) return;
     return watchLotteryContact(eventId, uid, setContact);
@@ -40,15 +66,22 @@ export default function LotteryAudience() {
 
   useEffect(() => {
     if (!lottery || lottery.status !== 'running') return;
-    const update = () => setSeconds(Math.max(0, Math.ceil((lottery.revealAt - Date.now()) / 1000)));
+    const update = () => setSeconds(Math.max(0, Math.ceil((lottery.revealAt - serverNow()) / 1000)));
     update();
     const timer = window.setInterval(update, 250);
     return () => window.clearInterval(timer);
   }, [lottery?.status, lottery?.revealAt]);
 
-  const isEligible = !!uid && !!lottery?.eligibleIds?.[uid];
-  const isWinner = isEligible && !!lottery?.winnerIds?.[uid];
-  const active = isEligible && (lottery?.status === 'running' || lottery?.status === 'revealed');
+  const isEligible = !!uid && eligible;
+  // status can flip to 'revealed' slightly before winnerIds finishes
+  // writing (reveal is a status-flip transaction followed by a separate
+  // winnerIds write, so the server-authoritative reveal can't be one
+  // single-path atomic call - see revealLottery()). Treat that brief gap as
+  // "still resolving" rather than "you lost" so winners never see a false
+  // negative flash.
+  const resolving = lottery?.status === 'revealed' && lottery.winnerIds === undefined;
+  const isWinner = isEligible && !!lottery?.winnerIds?.[uid as string];
+  const active = isEligible && eligibilityLoaded && (lottery?.status === 'running' || lottery?.status === 'revealed');
   const flashColor = /^#[0-9a-fA-F]{6}$/.test(show?.screenLightColor || '') ? show!.screenLightColor! : '#FFFFFF';
   const background = lottery?.status === 'running'
     ? `radial-gradient(circle, ${flashColor} 0%, ${flashColor} 48%, rgba(255,255,255,.12) 100%)`
@@ -58,19 +91,101 @@ export default function LotteryAudience() {
   async function submitContact() {
     if (!eventId || !uid || !isWinner || !formValid || saving) return;
     setSaving(true); setError('');
-    try { await submitLotteryContact(eventId, uid, { name: name.trim(), surname: surname.trim(), phone: phone.trim() }); }
-    catch (err) { console.error(err); setError(t({ tr: 'Bilgiler gönderilemedi. Lütfen tekrar deneyin.', en: 'Could not submit your details. Please try again.' })); }
-    finally { setSaving(false); }
+    try {
+      await submitLotteryContact(eventId, uid, { name: name.trim(), surname: surname.trim(), phone: phone.trim() });
+    } catch (err) {
+      console.error(err);
+      setError(t({ tr: 'Bilgiler gönderilemedi. Lütfen tekrar deneyin.', en: 'Could not submit your details. Please try again.' }));
+    } finally {
+      setSaving(false);
+    }
   }
 
-  if (!active) return null;
+  if (!active || !lottery) return null;
 
-  if (lottery.status === 'running') return <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'grid', placeItems: 'center', background, color: '#050505', animation: 'lightsync-lottery-flash .55s ease-in-out infinite alternate', textAlign: 'center', padding: 24 }}><style>{'@keyframes lightsync-lottery-flash{from{filter:brightness(.72)}to{filter:brightness(1.18)}}'}</style><div><div style={{ fontSize: 12, letterSpacing: '.35em', fontWeight: 900 }}>{t({ tr: 'ÇEKİLİŞ', en: 'LOTTERY' })}</div><div style={{ fontSize: 'clamp(88px,22vw,220px)', lineHeight: .85, fontWeight: 950 }}>{seconds}</div><div style={{ fontSize: 'clamp(16px,3vw,28px)', fontWeight: 900 }}>{t({ tr: 'SONUCU BEKLEYİN', en: 'WAIT FOR THE RESULT' })}</div></div></div>;
+  const overlayBase: CSSProperties = {
+    position: 'fixed', inset: 0, zIndex: 9999, display: 'grid', placeItems: 'center',
+    background, color: '#fff', textAlign: 'center', padding: 24,
+  };
 
-  if (!isWinner) return <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'grid', placeItems: 'center', background, color: '#fff', textAlign: 'center', padding: 24 }}><div style={{ width: 'min(92vw,520px)' }}><div style={{ fontSize: 11, letterSpacing: '.3em', color: '#8d939d', fontWeight: 800 }}>{t({ tr: 'ÇEKİLİŞ SONUCU', en: 'LOTTERY RESULT' })}</div><h2 style={{ fontSize: 'clamp(38px,9vw,68px)', lineHeight: 1.05, margin: '16px 0 10px' }}>{t({ tr: 'MAALESEF KAZANAMADINIZ', en: 'UNFORTUNATELY, YOU DID NOT WIN' })}</h2><p style={{ color: '#9ba1aa', margin: 0 }}>{t({ tr: 'Katıldığınız için teşekkürler.', en: 'Thank you for taking part.' })}</p></div></div>;
+  if (lottery.status === 'running') {
+    return (
+      <div
+        role="status"
+        aria-live="assertive"
+        style={{ ...overlayBase, color: '#050505', animation: 'lightsync-lottery-flash .55s ease-in-out infinite alternate' }}
+      >
+        <style>{'@keyframes lightsync-lottery-flash{from{filter:brightness(.72)}to{filter:brightness(1.18)}}'}</style>
+        <div>
+          <div style={{ fontSize: 12, letterSpacing: '.35em', fontWeight: 900 }}>{t({ tr: 'ÇEKİLİŞ', en: 'LOTTERY' })}</div>
+          <div style={{ fontSize: 'clamp(88px,22vw,220px)', lineHeight: .85, fontWeight: 950 }}>{seconds}</div>
+          <div style={{ fontSize: 'clamp(16px,3vw,28px)', fontWeight: 900 }}>{t({ tr: 'SONUCU BEKLEYİN', en: 'WAIT FOR THE RESULT' })}</div>
+        </div>
+      </div>
+    );
+  }
 
-  if (contact) return <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'grid', placeItems: 'center', background, color: '#fff', textAlign: 'center', padding: 24 }}><div style={{ width: 'min(92vw,520px)' }}><div style={{ fontSize: 11, letterSpacing: '.3em', color: '#9fe0ad', fontWeight: 800 }}>{t({ tr: 'TEBRİKLER', en: 'CONGRATULATIONS' })}</div><h2 style={{ fontSize: 'clamp(42px,10vw,72px)', margin: '14px 0' }}>{t({ tr: 'KAZANDINIZ!', en: 'YOU WON!' })}</h2><p style={{ color: '#aeb5bd' }}>{t({ tr: 'İletişim bilgileriniz alındı. Ödülünüz için sizinle iletişime geçeceğiz.', en: 'Your contact details were received. We will contact you about your prize.' })}</p></div></div>;
+  if (resolving) {
+    return (
+      <div role="status" aria-live="polite" style={overlayBase}>
+        <div style={{ fontSize: 'clamp(20px,4vw,32px)', fontWeight: 900 }}>
+          {t({ tr: 'SONUÇLAR AÇIKLANIYOR...', en: 'REVEALING RESULTS...' })}
+        </div>
+      </div>
+    );
+  }
+
+  if (!isWinner) {
+    return (
+      <div role="status" aria-live="assertive" style={overlayBase}>
+        <div style={{ width: 'min(92vw,520px)' }}>
+          <div style={{ fontSize: 11, letterSpacing: '.3em', color: '#8d939d', fontWeight: 800 }}>{t({ tr: 'ÇEKİLİŞ SONUCU', en: 'LOTTERY RESULT' })}</div>
+          <h2 style={{ fontSize: 'clamp(38px,9vw,68px)', lineHeight: 1.05, margin: '16px 0 10px' }}>{t({ tr: 'MAALESEF KAZANAMADINIZ', en: 'UNFORTUNATELY, YOU DID NOT WIN' })}</h2>
+          <p style={{ color: '#9ba1aa', margin: 0 }}>{t({ tr: 'Katıldığınız için teşekkürler.', en: 'Thank you for taking part.' })}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (contact) {
+    return (
+      <div role="status" aria-live="assertive" style={overlayBase}>
+        <div style={{ width: 'min(92vw,520px)' }}>
+          <div style={{ fontSize: 11, letterSpacing: '.3em', color: '#9fe0ad', fontWeight: 800 }}>{t({ tr: 'TEBRİKLER', en: 'CONGRATULATIONS' })}</div>
+          <h2 style={{ fontSize: 'clamp(42px,10vw,72px)', margin: '14px 0' }}>{t({ tr: 'KAZANDINIZ!', en: 'YOU WON!' })}</h2>
+          <p style={{ color: '#aeb5bd' }}>{t({ tr: 'İletişim bilgileriniz alındı. Ödülünüz için sizinle iletişime geçeceğiz.', en: 'Your contact details were received. We will contact you about your prize.' })}</p>
+        </div>
+      </div>
+    );
+  }
 
   const input: CSSProperties = { width: '100%', border: '1px solid #343940', background: '#0b0d10', color: '#fff', borderRadius: 10, padding: '13px 14px', fontSize: 16, outline: 'none' };
-  return <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'grid', placeItems: 'center', background, color: '#fff', textAlign: 'left', padding: 20, overflowY: 'auto' }}><div style={{ width: 'min(92vw,520px)', background: '#090b0e', border: '1px solid #30343a', borderRadius: 20, padding: '28px 22px', boxShadow: '0 30px 100px rgba(0,0,0,.5)' }}><div style={{ textAlign: 'center' }}><div style={{ fontSize: 11, letterSpacing: '.3em', color: '#9fe0ad', fontWeight: 800 }}>{t({ tr: 'TEBRİKLER', en: 'CONGRATULATIONS' })}</div><h2 style={{ fontSize: 42, margin: '12px 0 8px' }}>{t({ tr: 'KAZANDINIZ!', en: 'YOU WON!' })}</h2><p style={{ color: '#9ba1aa', margin: 0 }}>{t({ tr: 'Ödülünüz için iletişim bilgilerinizi girin.', en: 'Enter your contact details to claim your prize.' })}</p></div><div style={{ display: 'grid', gap: 10, marginTop: 22 }}><input style={input} placeholder={t({ tr: 'Ad', en: 'First name' })} value={name} onChange={e => setName(e.target.value)} autoComplete="given-name" /><input style={input} placeholder={t({ tr: 'Soyad', en: 'Surname' })} value={surname} onChange={e => setSurname(e.target.value)} autoComplete="family-name" /><input style={input} placeholder={t({ tr: 'Telefon numarası', en: 'Phone number' })} value={phone} onChange={e => setPhone(e.target.value)} inputMode="tel" autoComplete="tel" /><button type="button" onClick={() => void submitContact()} disabled={!formValid || saving} style={{ border: 0, borderRadius: 10, padding: 14, marginTop: 4, background: formValid ? '#fff' : '#363a40', color: '#08090b', fontWeight: 900, cursor: formValid ? 'pointer' : 'not-allowed' }}>{saving ? t({ tr: 'GÖNDERİLİYOR...', en: 'SUBMITTING...' }) : t({ tr: 'BİLGİLERİ GÖNDER', en: 'SUBMIT DETAILS' })}</button></div>{error && <p style={{ color: '#ff9c9c', fontSize: 12, marginBottom: 0 }}>{error}</p>}<p style={{ color: '#666c75', fontSize: 11, lineHeight: 1.5, marginBottom: 0 }}>{t({ tr: 'Bu bilgiler yalnızca çekiliş ödülünüz için sizinle iletişime geçmek amacıyla kullanılır.', en: 'These details are used only to contact you about the lottery prize.' })}</p></div></div>;
+  return (
+    <div role="status" aria-live="assertive" style={{ ...overlayBase, textAlign: 'left', overflowY: 'auto' }}>
+      <div style={{ width: 'min(92vw,520px)', background: '#090b0e', border: '1px solid #30343a', borderRadius: 20, padding: '28px 22px', boxShadow: '0 30px 100px rgba(0,0,0,.5)' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 11, letterSpacing: '.3em', color: '#9fe0ad', fontWeight: 800 }}>{t({ tr: 'TEBRİKLER', en: 'CONGRATULATIONS' })}</div>
+          <h2 style={{ fontSize: 42, margin: '12px 0 8px' }}>{t({ tr: 'KAZANDINIZ!', en: 'YOU WON!' })}</h2>
+          <p style={{ color: '#9ba1aa', margin: 0 }}>{t({ tr: 'Ödülünüz için iletişim bilgilerinizi girin.', en: 'Enter your contact details to claim your prize.' })}</p>
+        </div>
+        <div style={{ display: 'grid', gap: 10, marginTop: 22 }}>
+          <input style={input} placeholder={t({ tr: 'Ad', en: 'First name' })} value={name} onChange={e => setName(e.target.value)} autoComplete="given-name" />
+          <input style={input} placeholder={t({ tr: 'Soyad', en: 'Surname' })} value={surname} onChange={e => setSurname(e.target.value)} autoComplete="family-name" />
+          <input style={input} placeholder={t({ tr: 'Telefon numarası', en: 'Phone number' })} value={phone} onChange={e => setPhone(e.target.value)} inputMode="tel" autoComplete="tel" />
+          <button
+            type="button"
+            onClick={() => void submitContact()}
+            disabled={!formValid || saving}
+            style={{ border: 0, borderRadius: 10, padding: 14, marginTop: 4, background: formValid ? '#fff' : '#363a40', color: '#08090b', fontWeight: 900, cursor: formValid ? 'pointer' : 'not-allowed' }}
+          >
+            {saving ? t({ tr: 'GÖNDERİLİYOR...', en: 'SUBMITTING...' }) : t({ tr: 'BİLGİLERİ GÖNDER', en: 'SUBMIT DETAILS' })}
+          </button>
+        </div>
+        {error && <p style={{ color: '#ff9c9c', fontSize: 12, marginBottom: 0 }}>{error}</p>}
+        <p style={{ color: '#666c75', fontSize: 11, lineHeight: 1.5, marginBottom: 0 }}>
+          {t({ tr: 'Bu bilgiler yalnızca çekiliş ödülünüz için sizinle iletişime geçmek amacıyla kullanılır.', en: 'These details are used only to contact you about the lottery prize.' })}
+        </p>
+      </div>
+    </div>
+  );
 }
