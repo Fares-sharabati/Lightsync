@@ -47,6 +47,18 @@
       }
     },
 
+    "lotteryEligibility": {
+      "$showId": {
+        ".read": false,
+        ".write": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
+          ".validate": "!newData.exists() || newData.val() === true"
+        }
+      }
+    },
+
     "lotteryContacts": {
       "$showId": {
         ".read": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
