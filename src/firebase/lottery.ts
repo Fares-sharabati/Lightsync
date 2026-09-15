@@ -31,6 +31,12 @@ export function watchLotteryContact(showId: string, uid: string, callback: (cont
   });
 }
 
+export function watchLotteryContacts(showId: string, callback: (contacts: Record<string, LotteryContact>) => void): Unsubscribe {
+  return onValue(ref(db, `lotteryContacts/${showId}`), snapshot => {
+    callback((snapshot.val() ?? {}) as Record<string, LotteryContact>);
+  });
+}
+
 export async function startLottery(showId: string, winnerIds: string[], eligibleCount: number, winnerCount: number) {
   const startedAt = Date.now();
   await set(ref(db, `lotteries/${showId}`), {
