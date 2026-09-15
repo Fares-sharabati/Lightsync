@@ -75,8 +75,8 @@ export default function Projects() {
             })}</p>
             <div className="nextted-case-grid">
               <div className="nextted-case-block"><h3>{t({ tr: 'Nereden doğdu?', en: 'Where it came from' })}</h3><p>{t({
-                tr: 'Ekibimiz Gaziantep Basketbol, Adam Voleybol, Gaziantep FK ve 2026–2027 sezonunda KBB Kipaş İstiklal Basketbol ile çalıştı.',
-                en: 'Our team has worked across Gaziantep Basketbol, Adam Voleybol, Gaziantep FK and, for 2026–2027, KBB Kipaş İstiklal Basketbol.',
+                tr: 'Ekibimiz Gaziantep Basketbol, Adam Voleybol ve 2026–2027 sezonunda KBB Kipaş İstiklal Basketbol ile çalıştı.',
+                en: 'Our team has worked across Gaziantep Basketbol, Adam Voleybol and, for 2026–2027, KBB Kipaş İstiklal Basketbol.',
               })}</p></div>
               <div className="nextted-case-block"><h3>{t({ tr: 'Işıktan daha fazlası', en: 'More than lights' })}</h3><p>{t({
                 tr: 'Senkronize telefon ışığı bunun yalnızca bir parçası. Anketler, sorular ve canlı etkileşimler kalabalığı deneyimin aktif bir parçası haline getirmenin merkezinde.',
