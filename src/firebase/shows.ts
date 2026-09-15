@@ -54,9 +54,9 @@ const EVENT_DELETE_PATHS = [
   'sportsResponses',
   'sportsResults',
   'sportsScreen',
+  'lotteryContacts',
   'lotteries',
   'lotteryPrivate',
-  'lotteryContacts',
   'lotteryEligibility',
 ] as const;
 
