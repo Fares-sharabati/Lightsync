@@ -54,26 +54,24 @@ const EVENT_DELETE_PATHS = [
   'sportsResponses',
   'sportsResults',
   'sportsScreen',
-  'lotteryContacts',
   'lotteries',
   'lotteryPrivate',
+  'lotteryContacts',
   'lotteryEligibility',
 ] as const;
 
 export async function deleteShow(showId: string) {
-  // Diagnostic mode: delete each dependent branch separately so Firebase reveals
-  // exactly which rule/path is denying the organizer's deletion.
-  for (const branch of EVENT_DELETE_PATHS) {
-    try {
-      await set(ref(db, `${branch}/${showId}`), null);
-    } catch (error) {
-      throw new Error(`Could not delete event data at ${branch}/${showId}: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
+  // Keep deletion atomic in production: either every dependent branch is
+  // removed or Firebase rejects the entire operation. This also prevents a
+  // half-deleted event if a later branch fails.
+  const updates: Record<string, null> = {};
+  for (const branch of EVENT_DELETE_PATHS) updates[`${branch}/${showId}`] = null;
+  updates[`showOwners/${showId}`] = null;
+  updates[`shows/${showId}`] = null;
 
   try {
-    await update(ref(db), { [`showOwners/${showId}`]: null, [`shows/${showId}`]: null });
+    await update(ref(db), updates);
   } catch (error) {
-    throw new Error(`Event data was cleared, but the event record for ${showId} could not be removed: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`Could not delete event ${showId}: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
