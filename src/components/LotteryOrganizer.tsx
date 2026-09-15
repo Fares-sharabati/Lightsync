@@ -15,6 +15,7 @@ export default function LotteryOrganizer({ participants, participantCount }: Lot
   const [winnerCount, setWinnerCount] = useState(1);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [seconds, setSeconds] = useState(10);
 
   useEffect(() => {
     if (!eventId) return;
@@ -32,6 +33,14 @@ export default function LotteryOrganizer({ participants, participantCount }: Lot
   );
   const winnerIds = lottery?.winnerIds ? Object.keys(lottery.winnerIds).filter(uid => lottery.winnerIds?.[uid]) : [];
   const winnerRows = winnerIds.map(uid => ({ uid, contact: contacts[uid] })).filter(row => row.contact);
+
+  useEffect(() => {
+    if (!lottery || lottery.status !== 'running') return;
+    const update = () => setSeconds(Math.max(0, Math.ceil((lottery.revealAt - Date.now()) / 1000)));
+    update();
+    const timer = window.setInterval(update, 100);
+    return () => window.clearInterval(timer);
+  }, [lottery?.status, lottery?.revealAt]);
 
   useEffect(() => {
     if (!eventId || lottery?.status !== 'running') return;
@@ -123,9 +132,10 @@ export default function LotteryOrganizer({ participants, participantCount }: Lot
       )}
 
       {lottery?.status === 'running' && (
-        <div style={{ marginTop: 14, borderRadius: 14, padding: 16, background: '#17120a', border: '1px solid #5b4820' }}>
-          <strong>LOTTERY RUNNING</strong>
-          <p style={{ margin: '7px 0 0', color: '#c9c0ae', fontSize: 12 }}>The result will be revealed automatically after 10 seconds.</p>
+        <div style={{ marginTop: 14, borderRadius: 14, padding: 18, background: '#17120a', border: '1px solid #5b4820', textAlign: 'center' }}>
+          <div className="ls-eyebrow">LOTTERY RUNNING</div>
+          <strong style={{ display: 'block', fontSize: 64, lineHeight: 1, marginTop: 8, color: '#f2c66d' }}>{seconds}</strong>
+          <p style={{ margin: '8px 0 0', color: '#c9c0ae', fontSize: 12 }}>The result will be revealed automatically when the countdown reaches zero.</p>
         </div>
       )}
 
