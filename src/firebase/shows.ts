@@ -45,23 +45,35 @@ export async function updateShow(showId: string, changes: Partial<Omit<Show, 'id
   await writeShowChanges(showId, changes);
 }
 
+const EVENT_DELETE_PATHS = [
+  'publicShows',
+  'showParticipants',
+  'showStats',
+  'sportsGames',
+  'sportsInteractions',
+  'sportsResponses',
+  'sportsResults',
+  'sportsScreen',
+  'lotteries',
+  'lotteryPrivate',
+  'lotteryContacts',
+  'lotteryEligibility',
+] as const;
+
 export async function deleteShow(showId: string) {
-  const dependentUpdates: Record<string, null> = {
-    [`publicShows/${showId}`]: null,
-    [`showParticipants/${showId}`]: null,
-    [`showStats/${showId}`]: null,
-    [`sportsGames/${showId}`]: null,
-    [`sportsInteractions/${showId}`]: null,
-    [`sportsResponses/${showId}`]: null,
-    [`sportsResults/${showId}`]: null,
-    [`sportsScreen/${showId}`]: null,
-    [`lotteries/${showId}`]: null,
-    [`lotteryPrivate/${showId}`]: null,
-    [`lotteryContacts/${showId}`]: null,
-    [`lotteryEligibility/${showId}`]: null,
-  };
-  try { await update(ref(db), dependentUpdates); }
-  catch (error) { throw new Error(`Could not delete event data for ${showId}: ${error instanceof Error ? error.message : String(error)}`); }
-  try { await update(ref(db), { [`showOwners/${showId}`]: null, [`shows/${showId}`]: null }); }
-  catch (error) { throw new Error(`Event data was cleared, but the event record for ${showId} could not be removed: ${error instanceof Error ? error.message : String(error)}`); }
+  // Diagnostic mode: delete each dependent branch separately so Firebase reveals
+  // exactly which rule/path is denying the organizer's deletion.
+  for (const branch of EVENT_DELETE_PATHS) {
+    try {
+      await set(ref(db, `${branch}/${showId}`), null);
+    } catch (error) {
+      throw new Error(`Could not delete event data at ${branch}/${showId}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  try {
+    await update(ref(db), { [`showOwners/${showId}`]: null, [`shows/${showId}`]: null });
+  } catch (error) {
+    throw new Error(`Event data was cleared, but the event record for ${showId} could not be removed: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
