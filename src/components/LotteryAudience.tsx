@@ -46,8 +46,9 @@ export default function LotteryAudience() {
     return () => window.clearInterval(timer);
   }, [lottery?.status, lottery?.revealAt]);
 
-  const isWinner = !!uid && !!lottery?.winnerIds?.[uid];
-  const active = lottery?.status === 'running' || lottery?.status === 'revealed';
+  const isEligible = !!uid && !!lottery?.eligibleIds?.[uid];
+  const isWinner = isEligible && !!lottery?.winnerIds?.[uid];
+  const active = isEligible && (lottery?.status === 'running' || lottery?.status === 'revealed');
   const flashColor = /^#[0-9a-fA-F]{6}$/.test(show?.screenLightColor || '') ? show!.screenLightColor! : '#FFFFFF';
   const background = lottery?.status === 'running'
     ? `radial-gradient(circle, ${flashColor} 0%, ${flashColor} 48%, rgba(255,255,255,.12) 100%)`
