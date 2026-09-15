@@ -53,11 +53,13 @@ function ScrollToHash() {
   return null;
 }
 
-function LotteryAudienceRouteLayer() {
-  const location = useLocation();
-  const isAudienceJoin = /^\/join\/[^/]+$/.test(location.pathname);
-
-  return isAudienceJoin ? <LotteryAudience /> : null;
+function JoinWithLottery() {
+  return (
+    <>
+      <Join />
+      <LotteryAudience />
+    </>
+  );
 }
 
 class RouteErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
@@ -81,7 +83,7 @@ class RouteErrorBoundary extends Component<{ children: ReactNode }, { hasError: 
 }
 
 export default function App() {
-  return <BrowserRouter><ScrollToHash /><LotteryAudienceRouteLayer /><RouteErrorBoundary><Suspense fallback={<RouteFallback />}><Routes>
+  return <BrowserRouter><ScrollToHash /><RouteErrorBoundary><Suspense fallback={<RouteFallback />}><Routes>
     <Route path="/" element={<Home />} />
     <Route path="/mission" element={<Mission />} />
     <Route path="/projects" element={<Projects />} />
@@ -92,6 +94,6 @@ export default function App() {
     <Route path="/audience/:eventId" element={<AudienceScreen />} />
     <Route path="/sports-screen/:eventId" element={<SportsScreen />} />
     <Route path="/join" element={<Join />} />
-    <Route path="/join/:eventId" element={<Join />} />
+    <Route path="/join/:eventId" element={<JoinWithLottery />} />
   </Routes></Suspense></RouteErrorBoundary></BrowserRouter>;
 }
