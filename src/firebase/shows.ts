@@ -15,11 +15,8 @@ export async function createShow(organizerId: string, input: CreateShowInput) {
   const show = { organizerId, name: input.name.trim(), date: input.date, venue: input.venue.trim(), kind: 'sports' as const, status: 'waiting' as ShowStatus, createdAt: now, showStartTime: null, showStartOffset: 0, screenLightColor: '#FFFFFF', phoneUiColor: '#FFFFFF' };
   const publicShow = { name: show.name, date: show.date, venue: show.venue, kind: 'sports' as const, status: show.status, showStartTime: null, showStartOffset: 0, lightTimeline: null, screenLightColor: show.screenLightColor, phoneUiColor: show.phoneUiColor };
 
-  try {
-    await set(ref(db, `showOwners/${showId}`), { organizerId });
-  } catch (error) {
-    throw new Error(`Could not reserve event ${showId}: ${error instanceof Error ? error.message : String(error)}`);
-  }
+  try { await set(ref(db, `showOwners/${showId}`), { organizerId }); }
+  catch (error) { throw new Error(`Could not reserve event ${showId}: ${error instanceof Error ? error.message : String(error)}`); }
 
   try {
     await update(ref(db), {
@@ -31,7 +28,6 @@ export async function createShow(organizerId: string, input: CreateShowInput) {
     try { await set(ref(db, `showOwners/${showId}`), null); } catch { /* preserve original error */ }
     throw new Error(`Could not create event ${showId}: ${error instanceof Error ? error.message : String(error)}`);
   }
-
   return showId;
 }
 
@@ -54,10 +50,7 @@ export async function updateShow(showId: string, changes: Partial<Omit<Show, 'id
     if (!currentSnapshot.exists()) throw new Error('Event not found.');
     const currentStatus = currentSnapshot.child('status').val() as ShowStatus;
     const nextStatus = changes.status;
-    const validTransition = currentStatus === nextStatus
-      || (currentStatus === 'waiting' && (nextStatus === 'running' || nextStatus === 'finished'))
-      || (currentStatus === 'running' && nextStatus === 'finished')
-      || (currentStatus === 'finished' && (nextStatus === 'waiting' || nextStatus === 'running'));
+    const validTransition = currentStatus === nextStatus || (currentStatus === 'waiting' && (nextStatus === 'running' || nextStatus === 'finished')) || (currentStatus === 'running' && nextStatus === 'finished') || (currentStatus === 'finished' && (nextStatus === 'waiting' || nextStatus === 'running'));
     if (!validTransition) throw new Error(`Invalid show status transition: ${currentStatus} -> ${nextStatus}.`);
     if (currentStatus === 'finished' && nextStatus === 'running') await writeShowChanges(showId, { status: 'waiting', showStartTime: null, showStartOffset: 0 });
   }
@@ -65,16 +58,6 @@ export async function updateShow(showId: string, changes: Partial<Omit<Show, 'id
 }
 
 export async function deleteShow(showId: string) {
-  // Mirrors the fix already used in createShow(): ownership-record writes are
-  // sequenced separately from the writes that depend on that ownership record
-  // existing. Every dependent path's rule (sportsGames, sportsInteractions,
-  // sportsResponses, sportsResults, sportsScreen, showParticipants) checks
-  // root.child('shows')...organizerId. Firebase evaluates multi-location
-  // update() rules against the fully-applied result of that same update, so
-  // deleting `shows/$showId` in the SAME call as those dependents would mean
-  // the very record authorizing their deletion is already gone by the time
-  // it's checked. Deleting dependents first - while shows/showOwners still
-  // exist - avoids relying on that at all, and is correct either way.
   const dependentUpdates: Record<string, null> = {
     [`publicShows/${showId}`]: null,
     [`showParticipants/${showId}`]: null,
@@ -84,19 +67,11 @@ export async function deleteShow(showId: string) {
     [`sportsResponses/${showId}`]: null,
     [`sportsResults/${showId}`]: null,
     [`sportsScreen/${showId}`]: null,
+    [`lotteries/${showId}`]: null,
+    [`lotteryContacts/${showId}`]: null,
   };
-
-  try {
-    await update(ref(db), dependentUpdates);
-  } catch (error) {
-    throw new Error(`Could not delete event data for ${showId}: ${error instanceof Error ? error.message : String(error)}`);
-  }
-
-  // The shows/showOwners records authorize themselves via their own existing
-  // data, not via each other, so they're safe to remove together last.
-  try {
-    await update(ref(db), { [`showOwners/${showId}`]: null, [`shows/${showId}`]: null });
-  } catch (error) {
-    throw new Error(`Event data was cleared, but the event record for ${showId} could not be removed: ${error instanceof Error ? error.message : String(error)}`);
-  }
+  try { await update(ref(db), dependentUpdates); }
+  catch (error) { throw new Error(`Could not delete event data for ${showId}: ${error instanceof Error ? error.message : String(error)}`); }
+  try { await update(ref(db), { [`showOwners/${showId}`]: null, [`shows/${showId}`]: null }); }
+  catch (error) { throw new Error(`Event data was cleared, but the event record for ${showId} could not be removed: ${error instanceof Error ? error.message : String(error)}`); }
 }
