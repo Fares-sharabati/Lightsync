@@ -58,6 +58,7 @@ export async function deleteShow(showId: string) {
     [`lotteries/${showId}`]: null,
     [`lotteryPrivate/${showId}`]: null,
     [`lotteryContacts/${showId}`]: null,
+    [`lotteryEligibility/${showId}`]: null,
   };
   try { await update(ref(db), dependentUpdates); }
   catch (error) { throw new Error(`Could not delete event data for ${showId}: ${error instanceof Error ? error.message : String(error)}`); }
