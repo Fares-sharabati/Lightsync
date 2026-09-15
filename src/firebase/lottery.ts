@@ -117,11 +117,25 @@ export async function submitLotteryContact(showId: string, uid: string, contact:
 export function shuffleAndPick<T>(items: T[], count: number): T[] {
   const copy = [...items];
   const webCrypto = globalThis.crypto;
-  for (let i = copy.length - 1; i > 0; i -= 1) {
+
+  // Fisher-Yates with rejection sampling. Using random % range directly
+  // introduces a small modulo bias whenever 2^32 is not evenly divisible by
+  // the requested range. Rejection sampling keeps every item equally likely.
+  function secureIndex(maxExclusive: number): number {
+    if (maxExclusive <= 1) return 0;
+    const limit = Math.floor(0x100000000 / maxExclusive) * maxExclusive;
     const random = new Uint32Array(1);
-    if (webCrypto && typeof webCrypto.getRandomValues === 'function') webCrypto.getRandomValues(random);
-    else random[0] = Math.floor(Math.random() * 0x100000000);
-    const j = random[0] % (i + 1);
+
+    do {
+      if (webCrypto && typeof webCrypto.getRandomValues === 'function') webCrypto.getRandomValues(random);
+      else random[0] = Math.floor(Math.random() * 0x100000000);
+    } while (random[0] >= limit);
+
+    return random[0] % maxExclusive;
+  }
+
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = secureIndex(i + 1);
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy.slice(0, Math.max(0, Math.min(count, copy.length)));
