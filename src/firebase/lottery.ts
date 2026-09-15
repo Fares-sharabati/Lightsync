@@ -9,6 +9,7 @@ export type LotteryState = {
   eligibleCount: number;
   startedAt: number;
   revealAt: number;
+  eligibleIds?: Record<string, boolean>;
   winnerIds?: Record<string, boolean>;
 };
 
@@ -31,7 +32,7 @@ export function watchLotteryContacts(showId: string, callback: (contacts: Record
   return onValue(ref(db, `lotteryContacts/${showId}`), snapshot => callback((snapshot.val() ?? {}) as Record<string, LotteryContact>));
 }
 
-export async function startLottery(showId: string, winnerIds: string[], eligibleCount: number, winnerCount: number) {
+export async function startLottery(showId: string, winnerIds: string[], eligibleIds: string[], eligibleCount: number, winnerCount: number) {
   const startedAt = Date.now();
   await set(ref(db, `lotteryPrivate/${showId}`), { winnerIds: Object.fromEntries(winnerIds.map(uid => [uid, true])) });
   await set(ref(db, `lotteries/${showId}`), {
@@ -40,6 +41,7 @@ export async function startLottery(showId: string, winnerIds: string[], eligible
     eligibleCount,
     startedAt,
     revealAt: startedAt + 10_000,
+    eligibleIds: Object.fromEntries(eligibleIds.map(uid => [uid, true])),
   } satisfies LotteryState);
 }
 
