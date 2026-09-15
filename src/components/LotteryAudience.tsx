@@ -27,7 +27,10 @@ export default function LotteryAudience() {
   useEffect(() => { if (!eventId || !uid) return; return watchLotteryContact(eventId, uid, setContact); }, [eventId, uid]);
   useEffect(() => { if (!lottery || lottery.status !== 'running') return; const update = () => setSeconds(Math.max(0, Math.ceil((lottery.revealAt - serverNow()) / 1000))); update(); const timer = window.setInterval(update, 250); return () => window.clearInterval(timer); }, [lottery?.status, lottery?.revealAt]);
 
-  const isEligible = !!uid && eligible; const resolving = lottery?.status === 'revealed' && !resultLoaded; const isWinner = isEligible && winner; const active = isEligible && eligibilityLoaded && (lottery?.status === 'running' || lottery?.status === 'revealed');
+  const isEligible = !!uid && eligible;
+  const resolving = lottery?.status === 'revealed' && (!lottery.resultsReady || !resultLoaded);
+  const isWinner = isEligible && winner;
+  const active = isEligible && eligibilityLoaded && (lottery?.status === 'running' || lottery?.status === 'revealed');
   const flashColor = /^#[0-9a-fA-F]{6}$/.test(show?.screenLightColor || '') ? show!.screenLightColor! : '#FFFFFF';
   const background = lottery?.status === 'running' ? `radial-gradient(circle, ${flashColor} 0%, ${flashColor} 48%, rgba(255,255,255,.12) 100%)` : 'rgba(4,5,7,.97)';
   const formValid = useMemo(() => name.trim().length >= 2 && surname.trim().length >= 2 && phone.trim().length >= 7, [name, surname, phone]);
