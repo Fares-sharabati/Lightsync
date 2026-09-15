@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useParams } from 'react-router-dom';
 import { ensureAnonymousAuth } from '../firebase/auth';
 import { submitLotteryContact, watchLottery, watchLotteryContact, type LotteryContact, type LotteryState } from '../firebase/lottery';
+import { watchPublicShow, type PublicShow } from '../firebase/shows';
 import { useTranslate } from '../i18n/LanguageContext';
 
 export default function LotteryAudience() {
   const { eventId } = useParams();
   const t = useTranslate();
   const [lottery, setLottery] = useState<LotteryState | null>(null);
+  const [show, setShow] = useState<PublicShow | null>(null);
   const [uid, setUid] = useState<string | null>(null);
   const [contact, setContact] = useState<LotteryContact | null>(null);
   const [name, setName] = useState('');
@@ -19,8 +21,9 @@ export default function LotteryAudience() {
 
   useEffect(() => {
     if (!eventId) return;
-    const stop = watchLottery(eventId, setLottery);
-    return stop;
+    const stopLottery = watchLottery(eventId, setLottery);
+    const stopShow = watchPublicShow(eventId, setShow);
+    return () => { stopLottery(); stopShow(); };
   }, [eventId]);
 
   useEffect(() => {
@@ -45,22 +48,18 @@ export default function LotteryAudience() {
 
   const isWinner = !!uid && !!lottery?.winnerIds?.[uid];
   const active = lottery?.status === 'running' || lottery?.status === 'revealed';
-  const countdownColor = '#FFFFFF';
+  const flashColor = /^#[0-9a-fA-F]{6}$/.test(show?.screenLightColor || '') ? show!.screenLightColor! : '#FFFFFF';
   const background = lottery?.status === 'running'
-    ? `radial-gradient(circle, ${countdownColor} 0%, ${countdownColor} 48%, rgba(255,255,255,.15) 100%)`
+    ? `radial-gradient(circle, ${flashColor} 0%, ${flashColor} 48%, rgba(255,255,255,.12) 100%)`
     : 'rgba(4,5,7,.97)';
-
   const formValid = useMemo(() => name.trim().length >= 2 && surname.trim().length >= 2 && phone.trim().length >= 7, [name, surname, phone]);
 
   async function submitContact() {
     if (!eventId || !uid || !isWinner || !formValid || saving) return;
     setSaving(true); setError('');
-    try {
-      await submitLotteryContact(eventId, uid, { name: name.trim(), surname: surname.trim(), phone: phone.trim() });
-    } catch (err) {
-      console.error(err);
-      setError(t({ tr: 'Bilgiler gönderilemedi. Lütfen tekrar deneyin.', en: 'Could not submit your details. Please try again.' }));
-    } finally { setSaving(false); }
+    try { await submitLotteryContact(eventId, uid, { name: name.trim(), surname: surname.trim(), phone: phone.trim() }); }
+    catch (err) { console.error(err); setError(t({ tr: 'Bilgiler gönderilemedi. Lütfen tekrar deneyin.', en: 'Could not submit your details. Please try again.' })); }
+    finally { setSaving(false); }
   }
 
   if (!active) return null;
@@ -71,6 +70,6 @@ export default function LotteryAudience() {
 
   if (contact) return <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'grid', placeItems: 'center', background, color: '#fff', textAlign: 'center', padding: 24 }}><div style={{ width: 'min(92vw,520px)' }}><div style={{ fontSize: 11, letterSpacing: '.3em', color: '#9fe0ad', fontWeight: 800 }}>{t({ tr: 'TEBRİKLER', en: 'CONGRATULATIONS' })}</div><h2 style={{ fontSize: 'clamp(42px,10vw,72px)', margin: '14px 0' }}>{t({ tr: 'KAZANDINIZ!', en: 'YOU WON!' })}</h2><p style={{ color: '#aeb5bd' }}>{t({ tr: 'İletişim bilgileriniz alındı. Ödülünüz için sizinle iletişime geçeceğiz.', en: 'Your contact details were received. We will contact you about your prize.' })}</p></div></div>;
 
-  const input: React.CSSProperties = { width: '100%', border: '1px solid #343940', background: '#0b0d10', color: '#fff', borderRadius: 10, padding: '13px 14px', fontSize: 16, outline: 'none' };
+  const input: CSSProperties = { width: '100%', border: '1px solid #343940', background: '#0b0d10', color: '#fff', borderRadius: 10, padding: '13px 14px', fontSize: 16, outline: 'none' };
   return <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'grid', placeItems: 'center', background, color: '#fff', textAlign: 'left', padding: 20, overflowY: 'auto' }}><div style={{ width: 'min(92vw,520px)', background: '#090b0e', border: '1px solid #30343a', borderRadius: 20, padding: '28px 22px', boxShadow: '0 30px 100px rgba(0,0,0,.5)' }}><div style={{ textAlign: 'center' }}><div style={{ fontSize: 11, letterSpacing: '.3em', color: '#9fe0ad', fontWeight: 800 }}>{t({ tr: 'TEBRİKLER', en: 'CONGRATULATIONS' })}</div><h2 style={{ fontSize: 42, margin: '12px 0 8px' }}>{t({ tr: 'KAZANDINIZ!', en: 'YOU WON!' })}</h2><p style={{ color: '#9ba1aa', margin: 0 }}>{t({ tr: 'Ödülünüz için iletişim bilgilerinizi girin.', en: 'Enter your contact details to claim your prize.' })}</p></div><div style={{ display: 'grid', gap: 10, marginTop: 22 }}><input style={input} placeholder={t({ tr: 'Ad', en: 'First name' })} value={name} onChange={e => setName(e.target.value)} autoComplete="given-name" /><input style={input} placeholder={t({ tr: 'Soyad', en: 'Surname' })} value={surname} onChange={e => setSurname(e.target.value)} autoComplete="family-name" /><input style={input} placeholder={t({ tr: 'Telefon numarası', en: 'Phone number' })} value={phone} onChange={e => setPhone(e.target.value)} inputMode="tel" autoComplete="tel" /><button type="button" onClick={() => void submitContact()} disabled={!formValid || saving} style={{ border: 0, borderRadius: 10, padding: 14, marginTop: 4, background: formValid ? '#fff' : '#363a40', color: '#08090b', fontWeight: 900, cursor: formValid ? 'pointer' : 'not-allowed' }}>{saving ? t({ tr: 'GÖNDERİLİYOR...', en: 'SUBMITTING...' }) : t({ tr: 'BİLGİLERİ GÖNDER', en: 'SUBMIT DETAILS' })}</button></div>{error && <p style={{ color: '#ff9c9c', fontSize: 12, marginBottom: 0 }}>{error}</p>}<p style={{ color: '#666c75', fontSize: 11, lineHeight: 1.5, marginBottom: 0 }}>{t({ tr: 'Bu bilgiler yalnızca çekiliş ödülünüz için sizinle iletişime geçmek amacıyla kullanılır.', en: 'These details are used only to contact you about the lottery prize.' })}</p></div></div>;
 }
