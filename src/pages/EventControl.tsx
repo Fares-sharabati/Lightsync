@@ -8,6 +8,7 @@ import { watchParticipants, type ParticipantInfo } from '../firebase/participant
 import { syncShowStats, watchShowStats, type ShowStats } from '../firebase/analytics';
 import { watchSportsGame, type SportsGame, getSportsLightColor } from '../firebase/sportsGame';
 import SportsInteractions from './SportsInteractions';
+import LotteryOrganizer from '../components/LotteryOrganizer';
 import { PUBLIC_APP_URL } from '../constants';
 import { getReadableTextColor } from '../utils/color';
 
@@ -17,79 +18,22 @@ function formatTime(seconds: number) { if (!Number.isFinite(seconds) || seconds 
 export default function EventControl() {
   const navigate = useNavigate(); const { eventId } = useParams();
   const [event, setEvent] = useState<Show | null>(null); const [game, setGame] = useState<SportsGame | null>(null); const [loaded, setLoaded] = useState(false); const [participantCount, setParticipantCount] = useState(0); const [totalJoinedCount, setTotalJoinedCount] = useState(0); const [starting, setStarting] = useState(false);
+  const [participants, setParticipants] = useState<Record<string, ParticipantInfo>>({});
   const [songName, setSongName] = useState(''); const [songFile, setSongFile] = useState<File | null>(null); const [songUrl, setSongUrl] = useState<string | null>(null); const [analyzing, setAnalyzing] = useState(false); const [analysisMessage, setAnalysisMessage] = useState(''); const [generatedTimeline, setGeneratedTimeline] = useState<LightTimeline | null>(null); const [countdown, setCountdown] = useState<number | null>(null); const [songCurrentTime, setSongCurrentTime] = useState(0); const [songDuration, setSongDuration] = useState(0); const [startDelay, setStartDelay] = useState(0); const [startOffset, setStartOffset] = useState(0);
   const [customColor, setCustomColor] = useState('#FFFFFF');
   const [stats, setStats] = useState<ShowStats>({ totalJoined: 0, peakConnected: 0 });
   const audioRef = useRef<HTMLAudioElement | null>(null); const startTimerRef = useRef<number | null>(null); const countdownTimerRef = useRef<number | null>(null); const statsSyncTimerRef = useRef<number | null>(null);
 
-  useEffect(() => { if (!eventId) return; const stopShowWatch = watchShow(eventId, show => { setEvent(show); setLoaded(true); }); const stopParticipantsWatch = watchParticipants(eventId, participants => { const list = Object.values(participants) as ParticipantInfo[]; setParticipantCount(list.filter(p => p.connected === true).length); setTotalJoinedCount(Object.keys(participants).length); }); const stopStatsWatch = watchShowStats(eventId, setStats); const stopGameWatch = watchSportsGame(eventId, setGame); return () => { stopShowWatch(); stopParticipantsWatch(); stopStatsWatch(); stopGameWatch(); }; }, [eventId]);
+  useEffect(() => { if (!eventId) return; const stopShowWatch = watchShow(eventId, show => { setEvent(show); setLoaded(true); }); const stopParticipantsWatch = watchParticipants(eventId, participantsData => { const list = Object.values(participantsData) as ParticipantInfo[]; setParticipants(participantsData); setParticipantCount(list.filter(p => p.connected === true).length); setTotalJoinedCount(Object.keys(participantsData).length); }); const stopStatsWatch = watchShowStats(eventId, setStats); const stopGameWatch = watchSportsGame(eventId, setGame); return () => { stopShowWatch(); stopParticipantsWatch(); stopStatsWatch(); stopGameWatch(); }; }, [eventId]);
   useEffect(() => { if (event?.screenLightColor) setCustomColor(event.screenLightColor); }, [event?.screenLightColor]);
   useEffect(() => { if (!eventId || !game?.homeTeam.primaryColor) return; document.documentElement.style.setProperty('--ls-accent', game.homeTeam.primaryColor); document.documentElement.style.setProperty('--ls-accent-2', game.awayTeam?.primaryColor || game.homeTeam.primaryColor); document.documentElement.style.setProperty('--ls-accent-ink', getReadableTextColor(game.homeTeam.primaryColor)); return () => { document.documentElement.style.removeProperty('--ls-accent'); document.documentElement.style.removeProperty('--ls-accent-2'); document.documentElement.style.removeProperty('--ls-accent-ink'); }; }, [eventId, game?.homeTeam.primaryColor, game?.awayTeam?.primaryColor]);
-  useEffect(() => {
-    // Debounce: a burst of thousands of joins in the seconds before a show
-    // would otherwise fire one write per single connect/disconnect event.
-    // This batches any burst into at most one write every 2 seconds.
-    if (!eventId) return;
-    if (statsSyncTimerRef.current !== null) window.clearTimeout(statsSyncTimerRef.current);
-    statsSyncTimerRef.current = window.setTimeout(() => {
-      statsSyncTimerRef.current = null;
-      void syncShowStats(eventId, totalJoinedCount, participantCount);
-    }, 2000);
-    return () => { if (statsSyncTimerRef.current !== null) window.clearTimeout(statsSyncTimerRef.current); };
-  }, [eventId, totalJoinedCount, participantCount]);
+  useEffect(() => { if (!eventId) return; if (statsSyncTimerRef.current !== null) window.clearTimeout(statsSyncTimerRef.current); statsSyncTimerRef.current = window.setTimeout(() => { statsSyncTimerRef.current = null; void syncShowStats(eventId, totalJoinedCount, participantCount); }, 2000); return () => { if (statsSyncTimerRef.current !== null) window.clearTimeout(statsSyncTimerRef.current); }; }, [eventId, totalJoinedCount, participantCount]);
   useEffect(() => () => { if (startTimerRef.current !== null) window.clearTimeout(startTimerRef.current); if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current); audioRef.current?.pause(); if (songUrl) URL.revokeObjectURL(songUrl); }, [songUrl]);
 
   function chooseSong(e: ChangeEvent<HTMLInputElement>) { const file = e.target.files?.[0]; if (!file) return; audioRef.current?.pause(); if (songUrl) URL.revokeObjectURL(songUrl); const url = URL.createObjectURL(new Blob([file], { type: getAudioMimeType(file) })); const audio = new Audio(url); audio.preload = 'auto'; audio.addEventListener('loadedmetadata', () => setSongDuration(audio.duration)); audio.addEventListener('timeupdate', () => setSongCurrentTime(audio.currentTime)); audio.addEventListener('ended', () => { setSongCurrentTime(audio.duration); if (eventId) void updateShow(eventId, { status: 'finished', showStartTime: null, showStartOffset: 0 }).then(() => setAnalysisMessage('Show finished automatically.')).catch(error => { console.error('Could not finish show automatically:', error); setAnalysisMessage('Song ended, but the show status could not be updated.'); }); }); audioRef.current = audio; setSongFile(file); setSongName(file.name); setSongUrl(url); setGeneratedTimeline(null); setAnalysisMessage(''); setCountdown(null); setSongCurrentTime(0); setSongDuration(0); setStartOffset(0); }
   async function analyzeSong() { if (!songFile) return setAnalysisMessage('Please select an audio file first.'); setAnalyzing(true); setAnalysisMessage('Analyzing music...'); try { const analysis = await analyzeAudioFile(songFile); setGeneratedTimeline(generateLightTimeline(analysis.beats)); setAnalysisMessage(`Analysis complete - ${analysis.beats.length} beats detected.`); } catch (error) { console.error(error); setGeneratedTimeline(null); setAnalysisMessage('Could not analyze this audio file.'); } finally { setAnalyzing(false); } }
-  async function startShow() {
-    const audio = audioRef.current;
-    if (!eventId || !generatedTimeline || !audio) { setAnalysisMessage(!generatedTimeline ? 'Analyze the song before starting the show.' : 'Please select the song again.'); return; }
-    const offset = Math.max(0, Math.min(startOffset, Math.max(0, songDuration - 0.05)));
-    const delay = Math.max(0, Math.min(30, Math.round(startDelay)));
-    setStarting(true); setAnalysisMessage('');
-    if (startTimerRef.current !== null) window.clearTimeout(startTimerRef.current);
-    if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current);
-    startTimerRef.current = null; countdownTimerRef.current = null;
-    try {
-      audio.pause();
-      audio.currentTime = offset;
-      audio.volume = 1;
-      const startTime = Date.now() + delay * 1000;
-      await updateShow(eventId, { status: 'running', showStartTime: startTime, showStartOffset: offset, lightTimeline: generatedTimeline });
-      setSongCurrentTime(offset);
-      if (delay > 0) {
-        setCountdown(delay);
-        countdownTimerRef.current = window.setInterval(() => setCountdown(current => {
-          if (current === null || current <= 1) { if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current); countdownTimerRef.current = null; return null; }
-          return current - 1;
-        }), 1000);
-      } else setCountdown(null);
-      const startPlayback = () => {
-        startTimerRef.current = null;
-        audio.currentTime = offset;
-        audio.volume = 1;
-        setSongCurrentTime(offset);
-        void audio.play().catch(error => { console.error('Could not play show audio:', error); setAnalysisMessage('The show is synchronized, but browser audio playback was blocked. Press Play on the audio player to start the soundtrack.'); });
-      };
-      if (delay > 0) startTimerRef.current = window.setTimeout(startPlayback, delay * 1000);
-      else startPlayback();
-    } catch (error) {
-      console.error('Could not start show:', error);
-      audio.pause(); audio.volume = 1; setCountdown(null);
-      const reason = error instanceof Error ? error.message : '';
-      setAnalysisMessage(reason ? `Could not start the show: ${reason}` : 'Could not start the show. Check the selected audio file and try again.');
-    } finally { setStarting(false); }
-  }
-  async function stopShow() {
-    if (!eventId) return;
-    if (startTimerRef.current !== null) window.clearTimeout(startTimerRef.current);
-    if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current);
-    startTimerRef.current = null; countdownTimerRef.current = null; setCountdown(null);
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current.volume = 1; audioRef.current.currentTime = 0; }
-    setSongCurrentTime(0); setStartOffset(0); setAnalysisMessage('Stopping show...');
-    try { await updateShow(eventId, { status: 'finished', showStartTime: null, showStartOffset: 0 }); setAnalysisMessage('Show finished.'); }
-    catch (error) { console.error(error); setAnalysisMessage('Could not finish the show. Check the Firebase rules and organizer account.'); }
-  }
+  async function startShow() { const audio = audioRef.current; if (!eventId || !generatedTimeline || !audio) { setAnalysisMessage(!generatedTimeline ? 'Analyze the song before starting the show.' : 'Please select the song again.'); return; } const offset = Math.max(0, Math.min(startOffset, Math.max(0, songDuration - 0.05))); const delay = Math.max(0, Math.min(30, Math.round(startDelay))); setStarting(true); setAnalysisMessage(''); if (startTimerRef.current !== null) window.clearTimeout(startTimerRef.current); if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current); startTimerRef.current = null; countdownTimerRef.current = null; try { audio.pause(); audio.currentTime = offset; audio.volume = 1; const startTime = Date.now() + delay * 1000; await updateShow(eventId, { status: 'running', showStartTime: startTime, showStartOffset: offset, lightTimeline: generatedTimeline }); setSongCurrentTime(offset); if (delay > 0) { setCountdown(delay); countdownTimerRef.current = window.setInterval(() => setCountdown(current => { if (current === null || current <= 1) { if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current); countdownTimerRef.current = null; return null; } return current - 1; }), 1000); } else setCountdown(null); const startPlayback = () => { startTimerRef.current = null; audio.currentTime = offset; audio.volume = 1; setSongCurrentTime(offset); void audio.play().catch(error => { console.error('Could not play show audio:', error); setAnalysisMessage('The show is synchronized, but browser audio playback was blocked. Press Play on the audio player to start the soundtrack.'); }); }; if (delay > 0) startTimerRef.current = window.setTimeout(startPlayback, delay * 1000); else startPlayback(); } catch (error) { console.error('Could not start show:', error); audio.pause(); audio.volume = 1; setCountdown(null); const reason = error instanceof Error ? error.message : ''; setAnalysisMessage(reason ? `Could not start the show: ${reason}` : 'Could not start the show. Check the selected audio file and try again.'); } finally { setStarting(false); } }
+  async function stopShow() { if (!eventId) return; if (startTimerRef.current !== null) window.clearTimeout(startTimerRef.current); if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current); startTimerRef.current = null; countdownTimerRef.current = null; setCountdown(null); if (audioRef.current) { audioRef.current.pause(); audioRef.current.volume = 1; audioRef.current.currentTime = 0; } setSongCurrentTime(0); setStartOffset(0); setAnalysisMessage('Stopping show...'); try { await updateShow(eventId, { status: 'finished', showStartTime: null, showStartOffset: 0 }); setAnalysisMessage('Show finished.'); } catch (error) { console.error(error); setAnalysisMessage('Could not finish the show. Check the Firebase rules and organizer account.'); } }
   async function changeScreenColor(color: string) { if (!/^#[0-9a-fA-F]{6}$/.test(color) || !eventId) return; try { const normalized = color.toUpperCase(); await updateShow(eventId, { screenLightColor: normalized }); setCustomColor(normalized); } catch (error) { console.error(error); setAnalysisMessage('Could not change the audience screen color.'); } }
   function applyCustomColor() { const value = customColor.trim().startsWith('#') ? customColor.trim() : `#${customColor.trim()}`; if (!/^#[0-9a-fA-F]{6}$/.test(value)) { setAnalysisMessage('Enter a valid 6-digit HEX color, for example #FFFFFF.'); return; } setAnalysisMessage(''); void changeScreenColor(value); }
 
@@ -110,34 +54,14 @@ export default function EventControl() {
     </div></div>
     <div className="ls-group"><div className="ls-group-heading"><span className="ls-group-bar" /><div><h2>Program</h2><span>Soundtrack &amp; show control</span></div></div><div className="ls-program-grid">
       <div className="ls-card"><div className="ls-section-title"><div><p className="ls-eyebrow">MUSIC & TIMELINE</p><h2>Show soundtrack</h2></div></div>
-        <div className="ls-subgroup">
-          <label className="ls-upload"><span>{songFile ? 'CHANGE SONG' : 'SELECT SONG'}</span><input type="file" accept="audio/*,.mp3,.mpeg,.m4a,.wav,.ogg,.webm,.aac,.flac" onChange={chooseSong} /></label>
-          {songName && <div className="ls-song-name"><span className="ls-song-icon">&#9834;</span><div><strong>{songName}</strong><small>{generatedTimeline ? 'Light timeline ready' : 'Ready to analyze'}</small></div></div>}
-          <button type="button" className="ls-button ls-secondary ls-full-button" style={{ marginTop: 14 }} onClick={analyzeSong} disabled={!songFile || analyzing}>{analyzing ? 'ANALYZING...' : 'ANALYZE SONG'}</button>
-          {analysisMessage && <p className={`ls-analysis-message ${generatedTimeline ? 'is-ready' : ''}`}>{analysisMessage}</p>}
-          {generatedTimeline && <div className="ls-ready-badge">&check; LIGHT TIMELINE READY</div>}
-        </div>
-        <div className="ls-subgroup">
-          <div className="ls-subgroup-head"><span className="ls-field-label">SONG START POSITION</span><input type="number" className="ls-mini-input" min="0" max={songDuration || undefined} step="0.1" value={startOffset} onChange={e => setStartOffset(Math.max(0, Number(e.target.value) || 0))} disabled={running} aria-label="Start position in seconds" /></div>
-          <input type="range" className="ls-range" min="0" max={songDuration || 0} step="0.1" value={Math.min(startOffset, songDuration || 0)} onChange={e => { const value = Number(e.target.value); setStartOffset(value); if (audioRef.current && !running) { audioRef.current.currentTime = value; setSongCurrentTime(value); } }} disabled={!songFile || !songDuration || running} aria-label="Choose song start time" />
-          <div className="ls-time-row"><span>{formatTime(songCurrentTime)}</span><span>{formatTime(songDuration)}</span></div>
-        </div>
+        <div className="ls-subgroup"><label className="ls-upload"><span>{songFile ? 'CHANGE SONG' : 'SELECT SONG'}</span><input type="file" accept="audio/*,.mp3,.mpeg,.m4a,.wav,.ogg,.webm,.aac,.flac" onChange={chooseSong} /></label>{songName && <div className="ls-song-name"><span className="ls-song-icon">&#9834;</span><div><strong>{songName}</strong><small>{generatedTimeline ? 'Light timeline ready' : 'Ready to analyze'}</small></div></div>}<button type="button" className="ls-button ls-secondary ls-full-button" style={{ marginTop: 14 }} onClick={analyzeSong} disabled={!songFile || analyzing}>{analyzing ? 'ANALYZING...' : 'ANALYZE SONG'}</button>{analysisMessage && <p className={`ls-analysis-message ${generatedTimeline ? 'is-ready' : ''}`}>{analysisMessage}</p>}{generatedTimeline && <div className="ls-ready-badge">&check; LIGHT TIMELINE READY</div>}</div>
+        <div className="ls-subgroup"><div className="ls-subgroup-head"><span className="ls-field-label">SONG START POSITION</span><input type="number" className="ls-mini-input" min="0" max={songDuration || undefined} step="0.1" value={startOffset} onChange={e => setStartOffset(Math.max(0, Number(e.target.value) || 0))} disabled={running} aria-label="Start position in seconds" /></div><input type="range" className="ls-range" min="0" max={songDuration || 0} step="0.1" value={Math.min(startOffset, songDuration || 0)} onChange={e => { const value = Number(e.target.value); setStartOffset(value); if (audioRef.current && !running) { audioRef.current.currentTime = value; setSongCurrentTime(value); } }} disabled={!songFile || !songDuration || running} aria-label="Choose song start time" /><div className="ls-time-row"><span>{formatTime(songCurrentTime)}</span><span>{formatTime(songDuration)}</span></div></div>
       </div>
-      <div className="ls-card"><div className="ls-section-title"><div><p className="ls-eyebrow">SHOW CONTROL</p><h2>{countdown !== null ? `Starting in ${countdown}` : running ? 'Show is live' : event.status === 'finished' ? 'Show finished' : 'Ready when you are'}</h2></div></div><p className="ls-muted">The soundtrack stays on this computer. Phones receive only synchronized light instructions.</p>
-        <div className="ls-subgroup">
-          <div className="ls-subgroup-head"><span className="ls-field-label">START DELAY</span><input type="number" className="ls-mini-input" min="0" max="30" step="1" value={startDelay} onChange={e => setStartDelay(Math.max(0, Math.min(30, Number(e.target.value) || 0)))} disabled={running} aria-label="Start delay in seconds" /></div>
-          <div className="ls-delay-row"><div className="ls-delay-presets">{[0, 3, 5, 10].map(seconds => <button key={seconds} type="button" className={`ls-delay-chip ${startDelay === seconds ? 'is-active' : ''}`} disabled={running} onClick={() => setStartDelay(seconds)}>{seconds === 0 ? 'INSTANT' : `${seconds}S`}</button>)}</div><span className="ls-muted" style={{ fontSize: 11 }}>Countdown before phones start flashing.</span></div>
-        </div>
-        <div className="ls-control-actions"><button type="button" className="ls-button ls-primary ls-control-main" onClick={startShow} disabled={startDisabled}>{starting ? 'STARTING...' : startDelay > 0 ? `START SHOW (${startDelay}s)` : 'START SHOW'}</button><button type="button" className="ls-button ls-stop" onClick={stopShow} disabled={stopDisabled}>STOP SHOW</button></div><p className="ls-stop-note">STOP SHOW stops the music and marks the event as finished.</p></div>
+      <div className="ls-card"><div className="ls-section-title"><div><p className="ls-eyebrow">SHOW CONTROL</p><h2>{countdown !== null ? `Starting in ${countdown}` : running ? 'Show is live' : event.status === 'finished' ? 'Show finished' : 'Ready when you are'}</h2></div></div><p className="ls-muted">The soundtrack stays on this computer. Phones receive only synchronized light instructions.</p><div className="ls-subgroup"><div className="ls-subgroup-head"><span className="ls-field-label">START DELAY</span><input type="number" className="ls-mini-input" min="0" max="30" step="1" value={startDelay} onChange={e => setStartDelay(Math.max(0, Math.min(30, Number(e.target.value) || 0)))} disabled={running} aria-label="Start delay in seconds" /></div><div className="ls-delay-row"><div className="ls-delay-presets">{[0, 3, 5, 10].map(seconds => <button key={seconds} type="button" className={`ls-delay-chip ${startDelay === seconds ? 'is-active' : ''}`} disabled={running} onClick={() => setStartDelay(seconds)}>{seconds === 0 ? 'INSTANT' : `${seconds}S`}</button>)}</div><span className="ls-muted" style={{ fontSize: 11 }}>Countdown before phones start flashing.</span></div></div><div className="ls-control-actions"><button type="button" className="ls-button ls-primary ls-control-main" onClick={startShow} disabled={startDisabled}>{starting ? 'STARTING...' : startDelay > 0 ? `START SHOW (${startDelay}s)` : 'START SHOW'}</button><button type="button" className="ls-button ls-stop" onClick={stopShow} disabled={stopDisabled}>STOP SHOW</button></div><p className="ls-stop-note">STOP SHOW stops the music and marks the event as finished.</p></div>
     </div></div>
-    <div className="ls-group"><div className="ls-group-heading"><span className="ls-group-bar" /><div><h2>Audience Engagement</h2><span>Screen color &amp; interactions</span></div></div><div className="ls-engage-grid">
-      <div className="ls-card"><div className="ls-section-title"><div><p className="ls-eyebrow">AUDIENCE SCREEN</p><h2>Phone screen light color</h2></div><div className="ls-current-color-swatch" style={{ background: screenColor, boxShadow: `0 0 28px ${screenColor}66` }} aria-label={`Current screen color ${screenColor}`} /></div><p className="ls-muted">This controls the color shown on connected phones when their synchronized light is ON. The physical flashlight remains white.</p>
-        {game && <div className="ls-color-presets">
-          <button type="button" className={`ls-color-preset-chip ${screenColor.toUpperCase() === homeColor.toUpperCase() ? 'is-active' : ''}`} style={{ '--side-color': homeColor } as React.CSSProperties} onClick={() => void changeScreenColor(homeColor)}><span className="ls-color-preset-dot" />{game.homeTeam.name} (Home)</button>
-          <button type="button" className={`ls-color-preset-chip ${screenColor.toUpperCase() === awayColor.toUpperCase() ? 'is-active' : ''}`} style={{ '--side-color': awayColor } as React.CSSProperties} onClick={() => void changeScreenColor(awayColor)}><span className="ls-color-preset-dot" />{game.awayTeam.name} (Away)</button>
-          <button type="button" className={`ls-color-preset-chip ${screenColor.toUpperCase() === '#FFFFFF' ? 'is-active' : ''}`} style={{ '--side-color': '#FFFFFF' } as React.CSSProperties} onClick={() => void changeScreenColor('#FFFFFF')}><span className="ls-color-preset-dot" />White</button>
-        </div>}
-        <div className="ls-screen-color-row"><label className="ls-color-chip-field"><input type="color" value={screenColor} onChange={e => void changeScreenColor(e.target.value)} aria-label="Choose screen light color" /><span>CUSTOM COLOR</span></label><input className="ls-hex-input" value={customColor} onChange={e => setCustomColor(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') applyCustomColor(); }} aria-label="Custom HEX color" placeholder="#FFFFFF" maxLength={7} /><button type="button" className="ls-button ls-secondary" onClick={applyCustomColor}>APPLY HEX</button></div></div>
+    <div className="ls-group"><div className="ls-group-heading"><span className="ls-group-bar" /><div><h2>Audience Engagement</h2><span>Screen color, lottery &amp; interactions</span></div></div><div className="ls-engage-grid">
+      <div className="ls-card"><div className="ls-section-title"><div><p className="ls-eyebrow">AUDIENCE SCREEN</p><h2>Phone screen light color</h2></div><div className="ls-current-color-swatch" style={{ background: screenColor, boxShadow: `0 0 28px ${screenColor}66` }} aria-label={`Current screen color ${screenColor}`} /></div><p className="ls-muted">This controls the color shown on connected phones when their synchronized light is ON. The physical flashlight remains white.</p>{game && <div className="ls-color-presets"><button type="button" className={`ls-color-preset-chip ${screenColor.toUpperCase() === homeColor.toUpperCase() ? 'is-active' : ''}`} style={{ '--side-color': homeColor } as React.CSSProperties} onClick={() => void changeScreenColor(homeColor)}><span className="ls-color-preset-dot" />{game.homeTeam.name} (Home)</button><button type="button" className={`ls-color-preset-chip ${screenColor.toUpperCase() === awayColor.toUpperCase() ? 'is-active' : ''}`} style={{ '--side-color': awayColor } as React.CSSProperties} onClick={() => void changeScreenColor(awayColor)}><span className="ls-color-preset-dot" />{game.awayTeam.name} (Away)</button><button type="button" className={`ls-color-preset-chip ${screenColor.toUpperCase() === '#FFFFFF' ? 'is-active' : ''}`} style={{ '--side-color': '#FFFFFF' } as React.CSSProperties} onClick={() => void changeScreenColor('#FFFFFF')}><span className="ls-color-preset-dot" />White</button></div>}<div className="ls-screen-color-row"><label className="ls-color-chip-field"><input type="color" value={screenColor} onChange={e => void changeScreenColor(e.target.value)} aria-label="Choose screen light color" /><span>CUSTOM COLOR</span></label><input className="ls-hex-input" value={customColor} onChange={e => setCustomColor(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') applyCustomColor(); }} aria-label="Custom HEX color" placeholder="#FFFFFF" maxLength={7} /><button type="button" className="ls-button ls-secondary" onClick={applyCustomColor}>APPLY HEX</button></div></div>
+      <LotteryOrganizer participants={participants} participantCount={participantCount} />
       <SportsInteractions embedded />
     </div></div>
   </main>;
