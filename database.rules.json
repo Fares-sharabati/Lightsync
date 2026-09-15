@@ -68,7 +68,7 @@
       "$showId": {
         ".read": true,
         ".write": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
-        ".validate": "!newData.exists() || (newData.hasChildren(['status', 'winnerCount', 'eligibleCount', 'startedAt', 'revealAt']) && (newData.child('status').val() === 'idle' || newData.child('status').val() === 'running' || newData.child('status').val() === 'revealed') && newData.child('winnerCount').isNumber() && newData.child('winnerCount').val() >= 1 && newData.child('eligibleCount').isNumber() && newData.child('eligibleCount').val() >= newData.child('winnerCount').val() && newData.child('startedAt').isNumber() && newData.child('revealAt').isNumber())"
+        ".validate": "!newData.exists() || (newData.hasChildren(['runId', 'status', 'winnerCount', 'eligibleCount', 'startedAt', 'revealAt']) && newData.child('runId').isString() && newData.child('runId').val().length >= 8 && (newData.child('status').val() === 'idle' || newData.child('status').val() === 'running' || newData.child('status').val() === 'revealed') && newData.child('winnerCount').isNumber() && newData.child('winnerCount').val() >= 1 && newData.child('eligibleCount').isNumber() && newData.child('eligibleCount').val() >= newData.child('winnerCount').val() && newData.child('startedAt').isNumber() && newData.child('revealAt').isNumber())"
       }
     },
 
@@ -76,7 +76,9 @@
       "$showId": {
         ".read": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
         ".write": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
-        ".validate": "!newData.exists() || newData.hasChild('winnerIds')"
+        "$runId": {
+          ".validate": "!newData.exists() || newData.hasChild('winnerIds')"
+        }
       }
     },
 
@@ -84,10 +86,26 @@
       "$showId": {
         ".read": false,
         ".write": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
-        "$uid": {
-          ".read": "auth != null && auth.uid === $uid",
-          ".write": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
-          ".validate": "!newData.exists() || newData.val() === true"
+        "$runId": {
+          "$uid": {
+            ".read": "auth != null && auth.uid === $uid",
+            ".write": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
+            ".validate": "!newData.exists() || newData.val() === true"
+          }
+        }
+      }
+    },
+
+    "lotteryResults": {
+      "$showId": {
+        ".read": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
+        ".write": false,
+        "$runId": {
+          "$uid": {
+            ".read": "auth != null && (auth.uid === $uid || root.child('shows').child($showId).child('organizerId').val() === auth.uid)",
+            ".write": false,
+            ".validate": "!newData.exists() || newData.val() === true"
+          }
         }
       }
     },
@@ -98,7 +116,7 @@
         ".write": "auth != null && (root.child('showOwners').child($showId).child('organizerId').val() === auth.uid || root.child('shows').child($showId).child('organizerId').val() === auth.uid)",
         "$uid": {
           ".read": "auth != null && (auth.uid === $uid || root.child('shows').child($showId).child('organizerId').val() === auth.uid)",
-          ".write": "auth != null && (root.child('showOwners').child($showId).child('organizerId').val() === auth.uid || root.child('shows').child($showId).child('organizerId').val() === auth.uid || (auth.uid === $uid && root.child('lotteries').child($showId).child('status').val() === 'revealed' && root.child('lotteries').child($showId).child('winnerIds').child($uid).val() === true))",
+          ".write": "auth != null && (root.child('showOwners').child($showId).child('organizerId').val() === auth.uid || root.child('shows').child($showId).child('organizerId').val() === auth.uid || (auth.uid === $uid && root.child('lotteries').child($showId).child('status').val() === 'revealed' && root.child('lotteryResults').child($showId).child(root.child('lotteries').child($showId).child('runId').val()).child($uid).val() === true))",
           ".validate": "!newData.exists() || (newData.hasChildren(['name', 'surname', 'phone', 'submittedAt']) && newData.child('name').isString() && newData.child('name').val().length >= 2 && newData.child('name').val().length <= 80 && newData.child('surname').isString() && newData.child('surname').val().length >= 2 && newData.child('surname').val().length <= 80 && newData.child('phone').isString() && newData.child('phone').val().length >= 7 && newData.child('phone').val().length <= 30 && newData.child('submittedAt').isNumber())"
         }
       }
