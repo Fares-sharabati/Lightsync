@@ -40,10 +40,19 @@ export default function LotteryOrganizer({ participants }: LotteryOrganizerProps
     return () => window.clearTimeout(timer);
   }, [eventId, lottery?.status, lottery?.revealAt, lottery?.runId]);
 
+  function changeWinnerCount(delta: number) {
+    setWinnerCount(current => Math.max(1, Math.min(100, current + delta)));
+    setMessage('');
+  }
+
   async function runLottery() {
     if (!eventId || busy || lottery?.status === 'running') return;
     if (connected.length === 0) { setMessage('There are no connected participants.'); return; }
-    const count = Math.max(1, Math.min(Number(winnerCount) || 1, connected.length));
+    if (winnerCount > connected.length) {
+      setMessage(`You selected ${winnerCount} winners, but only ${connected.length} phone${connected.length === 1 ? '' : 's'} are connected.`);
+      return;
+    }
+    const count = winnerCount;
     setBusy(true); setMessage('');
     try {
       const eligibleIds = connected.map(p => p.uid as string);
@@ -74,7 +83,15 @@ export default function LotteryOrganizer({ participants }: LotteryOrganizerProps
       <p className="ls-muted" style={{ marginTop: 0 }}>All currently connected phones are automatically eligible for the draw. The audience will see a 10-second synchronized flash countdown before the result is revealed.</p>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 16, alignItems: 'end', marginTop: 18 }}>
-        <label><span className="ls-field-label">NUMBER OF WINNERS</span><input aria-label="Number of winners" type="number" min={1} max={Math.max(1, connected.length)} value={winnerCount} disabled={lottery?.status === 'running'} onChange={e => setWinnerCount(Math.max(1, Math.min(Number(e.target.value) || 1, Math.max(1, connected.length))))} style={{ display: 'block', width: 120, marginTop: 7, border: '1px solid #343940', background: '#080a0d', color: '#fff', borderRadius: 10, padding: '12px 13px', fontWeight: 800 }} /></label>
+        <div>
+          <span className="ls-field-label">NUMBER OF WINNERS</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 7 }}>
+            <button type="button" aria-label="Decrease number of winners" onClick={() => changeWinnerCount(-1)} disabled={winnerCount <= 1 || lottery?.status === 'running'} style={{ width: 42, height: 42, border: '1px solid #343940', borderRadius: 10, background: '#080a0d', color: '#fff', fontSize: 22, fontWeight: 700, cursor: winnerCount <= 1 || lottery?.status === 'running' ? 'not-allowed' : 'pointer', opacity: winnerCount <= 1 || lottery?.status === 'running' ? .4 : 1 }}>−</button>
+            <input aria-label="Number of winners" type="number" min={1} max={100} value={winnerCount} disabled={lottery?.status === 'running'} onChange={e => { const value = Number(e.target.value); if (Number.isFinite(value)) setWinnerCount(Math.max(1, Math.min(100, Math.floor(value)))); }} style={{ width: 76, height: 42, boxSizing: 'border-box', border: '1px solid #343940', background: '#080a0d', color: '#fff', borderRadius: 10, padding: '10px 12px', fontWeight: 800, textAlign: 'center' }} />
+            <button type="button" aria-label="Increase number of winners" onClick={() => changeWinnerCount(1)} disabled={lottery?.status === 'running' || winnerCount >= 100} style={{ width: 42, height: 42, border: '1px solid #343940', borderRadius: 10, background: '#080a0d', color: '#fff', fontSize: 22, fontWeight: 700, cursor: lottery?.status === 'running' || winnerCount >= 100 ? 'not-allowed' : 'pointer', opacity: lottery?.status === 'running' || winnerCount >= 100 ? .4 : 1 }}>+</button>
+            <span className="ls-muted" style={{ fontSize: 12 }}>max 100</span>
+          </div>
+        </div>
         <div style={{ textAlign: 'right' }}><div className="ls-eyebrow">WINNERS</div><strong style={{ fontSize: 28, color: lottery?.status === 'running' ? '#f2c66d' : lottery?.status === 'revealed' ? '#9fe0ad' : '#fff' }}>{lottery?.status === 'running' || lottery?.status === 'revealed' ? lottery.winnerCount : winnerCount}</strong></div>
       </div>
 
