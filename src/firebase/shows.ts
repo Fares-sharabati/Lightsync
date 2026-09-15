@@ -58,6 +58,7 @@ const EVENT_DELETE_PATHS = [
   'lotteryPrivate',
   'lotteryContacts',
   'lotteryEligibility',
+  'lotteryResults',
 ] as const;
 
 export async function deleteShow(showId: string) {
