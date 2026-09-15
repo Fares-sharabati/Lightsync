@@ -3,7 +3,15 @@ import { db } from './config';
 import { serverNow } from './serverTime';
 
 export type LotteryStatus = 'idle' | 'running' | 'revealed';
-export type LotteryState = { runId: string; status: LotteryStatus; winnerCount: number; eligibleCount: number; startedAt: number; revealAt: number };
+export type LotteryState = {
+  runId: string;
+  status: LotteryStatus;
+  winnerCount: number;
+  eligibleCount: number;
+  startedAt: number;
+  revealAt: number;
+  resultsReady?: boolean;
+};
 export type LotteryContact = { name: string; surname: string; phone: string; submittedAt: number };
 
 export function watchLottery(showId: string, callback: (lottery: LotteryState | null) => void): Unsubscribe {
@@ -32,8 +40,14 @@ export function watchLotteryContacts(showId: string, callback: (contacts: Record
 }
 
 function createRunId() {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
-  const bytes = new Uint8Array(16); crypto.getRandomValues(bytes);
+  const webCrypto = globalThis.crypto;
+  if (webCrypto && typeof webCrypto.randomUUID === 'function') return webCrypto.randomUUID();
+
+  const bytes = new Uint8Array(16);
+  if (webCrypto && typeof webCrypto.getRandomValues === 'function') webCrypto.getRandomValues(bytes);
+  else {
+    for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  }
   return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
@@ -42,7 +56,15 @@ export async function startLottery(showId: string, winnerIds: string[], eligible
   const startedAt = serverNow();
   const updates: Record<string, unknown> = {
     [`lotteryPrivate/${showId}/${runId}`]: { winnerIds: Object.fromEntries(winnerIds.map(uid => [uid, true])) },
-    [`lotteries/${showId}`]: { runId, status: 'running' as LotteryStatus, winnerCount, eligibleCount, startedAt, revealAt: startedAt + 10_000 } satisfies LotteryState,
+    [`lotteries/${showId}`]: {
+      runId,
+      status: 'running' as LotteryStatus,
+      winnerCount,
+      eligibleCount,
+      startedAt,
+      revealAt: startedAt + 10_000,
+      resultsReady: false,
+    } satisfies LotteryState,
   };
   for (const uid of eligibleIds) updates[`lotteryEligibility/${showId}/${runId}/${uid}`] = true;
   await update(ref(db), updates);
@@ -62,9 +84,10 @@ export async function revealLottery(showId: string) {
 
   const winnersSnapshot = await get(ref(db, `lotteryPrivate/${showId}/${lottery.runId}/winnerIds`));
   const winnerIds = (winnersSnapshot.val() ?? {}) as Record<string, boolean>;
-  const updates: Record<string, boolean> = {};
+  const updates: Record<string, unknown> = {};
   for (const uid of Object.keys(winnerIds)) updates[`lotteryResults/${showId}/${lottery.runId}/${uid}`] = true;
-  if (Object.keys(updates).length > 0) await update(ref(db), updates);
+  updates[`lotteries/${showId}/resultsReady`] = true;
+  await update(ref(db), updates);
 }
 
 export async function submitLotteryContact(showId: string, uid: string, contact: Omit<LotteryContact, 'submittedAt'>) {
@@ -73,9 +96,13 @@ export async function submitLotteryContact(showId: string, uid: string, contact:
 
 export function shuffleAndPick<T>(items: T[], count: number): T[] {
   const copy = [...items];
+  const webCrypto = globalThis.crypto;
   for (let i = copy.length - 1; i > 0; i -= 1) {
-    const random = new Uint32Array(1); crypto.getRandomValues(random);
-    const j = random[0] % (i + 1); [copy[i], copy[j]] = [copy[j], copy[i]];
+    const random = new Uint32Array(1);
+    if (webCrypto && typeof webCrypto.getRandomValues === 'function') webCrypto.getRandomValues(random);
+    else random[0] = Math.floor(Math.random() * 0x100000000);
+    const j = random[0] % (i + 1);
+    [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy.slice(0, Math.max(0, Math.min(count, copy.length)));
 }
