@@ -58,12 +58,17 @@ export async function registerParticipant(showId: string, participantId: string)
     audienceId: getAudienceId(),
   };
 
-  await set(participantRef, info);
+  // Arm the disconnect handler BEFORE publishing connected=true. If the
+  // browser loses its connection in the tiny window between these two
+  // operations, Firebase can still mark the participant offline. This is
+  // important for lottery eligibility, which is based on connected phones.
   try {
     await onDisconnect(participantRef).update({ connected: false });
   } catch (err) {
     console.error('Could not arm disconnect handler:', err);
   }
+
+  await set(participantRef, info);
   return participantRef;
 }
 
