@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { useParams } from 'react-router-dom';
 import { watchPublicShow, type PublicShow } from '../firebase/shows';
 import { watchSportsInteractions, watchSportsResult, watchSportsScreen, type SportsInteraction, type SportsResult, type SportsScreenState } from '../firebase/sports';
@@ -22,9 +22,7 @@ export default function SportsScreen() {
   useEffect(() => { if (!showId) return; return watchSportsInteractions(showId, setInteractions); }, [showId]);
 
   const activeInteractionId = screen?.activeInteractionId ?? null;
-  const interaction = (activeInteractionId ? interactions.find(item => item.id === activeInteractionId) : null)
-    ?? interactions.find(item => item.status === 'open')
-    ?? null;
+  const interaction = (activeInteractionId ? interactions.find(item => item.id === activeInteractionId) : null) ?? interactions.find(item => item.status === 'open') ?? null;
   const resultInteractionId = interaction?.id ?? null;
 
   useEffect(() => {
@@ -34,15 +32,25 @@ export default function SportsScreen() {
 
   const options = Object.entries(interaction?.options ?? {});
   const total = result?.total ?? 0;
-  const homeColor = game?.homeTeam.primaryColor || '#FFFFFF';
+  const homeColor = game?.homeTeam.primaryColor || '#ff3030';
+  const awayColor = game?.awayTeam.primaryColor || homeColor;
+  const screenStyle = { '--ls-screen-accent': homeColor, '--ls-screen-accent-2': awayColor } as CSSProperties;
   const displayMode = interaction ? (screen?.displayMode === 'question' || interaction.type === 'question' ? 'question' : 'results') : 'idle';
 
-  return <main className="audience-screen">
-    <section className="audience-content">
-      <div className="audience-brand">LIGHTSYNC</div>
-      <p className="audience-eyebrow">{show?.name ?? t({ tr: 'CANLI SPOR', en: 'LIVE SPORTS' })}</p>
-      {game && <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 'clamp(14px, 3vw, 36px)', margin: '10px 0 24px', fontWeight: 900 }}><div style={{ borderBottom: `4px solid ${game.homeTeam.primaryColor || '#FFFFFF'}`, paddingBottom: 5 }}>{game.homeTeam.name}</div><span style={{ opacity: .5 }}>VS</span><div style={{ borderBottom: `4px solid ${game.awayTeam.primaryColor || '#FFFFFF'}`, paddingBottom: 5 }}>{game.awayTeam.name}</div></div>}
-      {displayMode === 'idle' ? <><h1>{t({ tr: 'HAZIR OLUN', en: 'GET READY' })}</h1><p className="audience-instruction">{t({ tr: 'Bir sonraki etkileÅŸim burada gÃ¶rÃ¼necek.', en: 'The next audience interaction will appear here.' })}</p></> : <><h1 style={{ whiteSpace: 'normal', fontSize: 'clamp(30px, 6vmin, 78px)' }}>{interaction?.question}</h1>{displayMode === 'question' ? <div style={{ marginTop: 28, fontSize: 'clamp(24px, 4vmin, 54px)', fontWeight: 800 }}>{t({ tr: 'TELEFONUNUZDAN CEVAPLAYIN', en: 'ANSWER ON YOUR PHONE' })}</div> : <div style={{ width: 'min(88vw, 1000px)', marginTop: 24 }}>{options.map(([id, label]) => { const count = result?.counts?.[id] ?? 0; const pct = total ? Math.round(count / total * 100) : 0; return <div key={id} style={{ margin: '18px 0' }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 20, fontSize: 'clamp(18px, 3vmin, 38px)', fontWeight: 800 }}><span>{label}</span><span>{pct}%</span></div><div style={{ height: 'clamp(12px, 2vmin, 22px)', background: '#25282d', borderRadius: 99, overflow: 'hidden', marginTop: 8 }}><div style={{ height: '100%', width: `${pct}%`, background: homeColor, transition: 'width .4s ease' }} /></div></div>})}<div style={{ marginTop: 26, color: '#9a9da2', fontFamily: 'JetBrains Mono, monospace', letterSpacing: '.12em' }}>{t({ tr: `${total} YANIT`, en: `${total} RESPONSES` })}</div></div>}</>}
+  return <main className="audience-screen ls-audience-show-screen" style={screenStyle}>
+    <div className="audience-vignette" />
+    <div className="ls-audience-color-wash" />
+    <section className="audience-content ls-audience-show-content ls-sports-show-content">
+      <header className="ls-audience-show-header">
+        <div className="audience-brand">LIGHTSYNC</div>
+        <div className="ls-audience-live"><span /> {show?.name ?? t({ tr: 'CANLI SPOR', en: 'LIVE SPORTS' })}</div>
+      </header>
+      <div className="ls-sports-title-block">
+        <p className="audience-eyebrow">{game?.sport?.toUpperCase() || t({ tr: 'CANLI SPOR', en: 'LIVE SPORTS' })}</p>
+        {game && <div className="ls-audience-teams"><span style={{ '--team-color': game.homeTeam.primaryColor || homeColor } as CSSProperties}>{game.homeTeam.name}</span><b>VS</b><span style={{ '--team-color': game.awayTeam.primaryColor || awayColor } as CSSProperties}>{game.awayTeam.name}</span></div>}
+      </div>
+      {displayMode === 'idle' ? <div className="ls-sports-state-card"><div className="ls-sports-state-number">01</div><p className="audience-eyebrow">{t({ tr: 'HAZIR OLUN', en: 'GET READY' })}</p><h1>{t({ tr: 'BİRAZDAN BAŞLIYOR', en: 'GET READY' })}</h1><p className="audience-instruction">{t({ tr: 'Bir sonraki etkileşim burada görünecek.', en: 'The next audience interaction will appear here.' })}</p></div> : <div className="ls-sports-interaction-card"><div className="ls-sports-state-number">02</div><p className="audience-eyebrow">{displayMode === 'question' ? t({ tr: 'SORU', en: 'QUESTION' }) : t({ tr: 'SONUÇLAR', en: 'RESULTS' })}</p><h1>{interaction?.question}</h1>{displayMode === 'question' ? <div className="ls-sports-answer-prompt">{t({ tr: 'TELEFONUNUZDAN CEVAPLAYIN', en: 'ANSWER ON YOUR PHONE' })}</div> : <div className="ls-sports-results">{options.map(([id, label]) => { const count = result?.counts?.[id] ?? 0; const pct = total ? Math.round(count / total * 100) : 0; return <div key={id} className="ls-sports-result-row"><div><span>{label}</span><b>{pct}%</b></div><div className="ls-sports-result-track"><i style={{ width: `${pct}%`, background: homeColor }} /></div></div>})}<div className="ls-sports-total">{t({ tr: `${total} YANIT`, en: `${total} RESPONSES` })}</div></div>}</div>}
+      <footer className="ls-audience-footer"><span>{t({ tr: 'TELEFONUNUZDAN KATILIN', en: 'JOIN FROM YOUR PHONE' })}</span><span className="ls-audience-footer-line" /><span>LIGHTSYNC</span></footer>
     </section>
   </main>;
 }
