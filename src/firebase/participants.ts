@@ -58,15 +58,13 @@ export async function registerParticipant(showId: string, participantId: string)
     audienceId: getAudienceId(),
   };
 
-  // Arm the disconnect handler BEFORE publishing connected=true. If the
-  // browser loses its connection in the tiny window between these two
-  // operations, Firebase can still mark the participant offline. This is
-  // important for lottery eligibility, which is based on connected phones.
-  try {
-    await onDisconnect(participantRef).update({ connected: false });
-  } catch (err) {
-    console.error('Could not arm disconnect handler:', err);
-  }
+  // A participant record must never be published as online unless Firebase
+  // has successfully armed its disconnect cleanup first. If the setup fails,
+  // do not create a record that could remain stuck at connected=true forever.
+  // Removing the record on disconnect also prevents stale participant rows
+  // from accumulating in the database and keeps the organizer's live count
+  // accurate without requiring heartbeat writes from every audience phone.
+  await onDisconnect(participantRef).remove();
 
   await set(participantRef, info);
   return participantRef;
