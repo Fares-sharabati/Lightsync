@@ -5,6 +5,7 @@ import { createShow, deleteShow, updateShow, watchOrganizerShows, type Show } fr
 import { signInOrganizer } from '../firebase/auth';
 import { saveSportsGame, type SportsTeam } from '../firebase/sportsGame';
 import { getReadableTextColor } from '../utils/color';
+import ConfirmDialog from '../components/ConfirmDialog';
 import '../styles/lightsync.css';
 
 const blankTeam = (name: string): SportsTeam => ({ name, primaryColor: '#FFFFFF', secondaryColor: '#111111' });
@@ -15,7 +16,7 @@ export default function Admin() {
   const [shows, setShows] = useState<Show[]>([]); const [date, setDate] = useState(''); const [venue, setVenue] = useState('');
   const [sport, setSport] = useState('Basketball'); const [home, setHome] = useState<SportsTeam>(blankTeam('')); const [away, setAway] = useState<SportsTeam>(blankTeam(''));
   const [lightTeam, setLightTeam] = useState<'home' | 'away' | 'custom'>('home'); const [customLightColor, setCustomLightColor] = useState('#FFFFFF');
-  const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [creating, setCreating] = useState(false); const [deletingId, setDeletingId] = useState<string | null>(null); const [message, setMessage] = useState(''); const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
+  const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [creating, setCreating] = useState(false); const [deletingId, setDeletingId] = useState<string | null>(null); const [deleteTarget, setDeleteTarget] = useState<Show | null>(null); const [message, setMessage] = useState(''); const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
   const [authenticated, setAuthenticated] = useState(!!auth.currentUser && !auth.currentUser.isAnonymous);
   const [search, setSearch] = useState(''); const [showFinished, setShowFinished] = useState(false);
 
@@ -42,9 +43,15 @@ export default function Admin() {
     } catch (error) { console.error(error); setMessage(error instanceof Error ? error.message : 'Could not create the sports event.'); } finally { setCreating(false); }
   }
 
-  async function handleDelete(show: Show) {
-    if (!auth.currentUser || deletingId) return; if (!window.confirm(`Delete "${show.name}"?\n\nThis permanently removes the event and audience data.`)) return;
-    setDeletingId(show.id); setMessage(''); try { await deleteShow(show.id); setMessage(`"${show.name}" was deleted.`); } catch (error) { console.error(error); setMessage(error instanceof Error ? error.message : 'Could not delete the event.'); } finally { setDeletingId(null); }
+  function requestDelete(show: Show) { if (!auth.currentUser || deletingId) return; setDeleteTarget(show); }
+
+  async function handleDeleteConfirmed() {
+    if (!auth.currentUser || !deleteTarget || deletingId) return;
+    const show = deleteTarget;
+    setDeletingId(show.id); setMessage('');
+    try { await deleteShow(show.id); setMessage(`"${show.name}" was deleted.`); setDeleteTarget(null); }
+    catch (error) { console.error(error); setMessage(error instanceof Error ? error.message : 'Could not delete the event.'); }
+    finally { setDeletingId(null); }
   }
 
   async function handleStatusChange(show: Show, status: 'waiting' | 'finished') {
@@ -75,9 +82,9 @@ export default function Admin() {
     </button>
     {show.status !== 'running' && <div className="ls-show-actions" style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 8 }}>
       <button type="button" onClick={() => void handleStatusChange(show, 'waiting')} disabled={statusUpdatingId === show.id || show.status === 'waiting'} style={{ border: '1px solid #45494e', background: show.status === 'waiting' ? '#24282c' : '#111315', color: '#c9cdd2', borderRadius: 8, padding: '7px 9px', fontSize: 9, fontWeight: 800, letterSpacing: '.06em', cursor: show.status === 'waiting' ? 'default' : 'pointer' }}>WAITING</button>
-      <button type="button" onClick={() => void handleStatusChange(show, 'finished')} disabled={statusUpdatingId === show.id || show.status === 'finished'} style={{ border: '1px solid #45494e', background: show.status === 'finished' ? '#24282c' : '#111315', color: '#c9cdd2', borderRadius: 8, padding: '7px 9px', fontSize: 9, fontWeight: 800, letterSpacing: '.06em', cursor: show.status === 'finished' ? 'default' : 'pointer' }}>{statusUpdatingId === show.id ? '...' : 'FINISHED'}</button>
+      <button type="button" onClick={() => void handleStatusChange(show, 'finished')} disabled={statusUpdatingId === show.id || show.status === 'finished'} style={{ border: '1px solid #45494e', background: show.status === 'finished' ? '#24282c' : '#111315', color: '#c9cdd2', borderRadius: 8, padding: '7px 9px', fontSize: 9, fontWeight: 800, letterSpacing: '.06em', cursor: 'pointer' }}>{statusUpdatingId === show.id ? '...' : 'FINISHED'}</button>
     </div>}
-    <button className="ls-delete-show" style={{ marginRight: 10, border: '1px solid #5a2a2f', background: '#1c1113', color: '#ff9c9c', borderRadius: 8, padding: '8px 10px', fontSize: 10, fontWeight: 800, letterSpacing: '.08em', cursor: 'pointer' }} onClick={() => void handleDelete(show)} disabled={deletingId === show.id}>{deletingId === show.id ? 'DELETING...' : 'DELETE'}</button>
+    <button className="ls-delete-show" style={{ marginRight: 10, border: '1px solid #5a2a2f', background: '#1c1113', color: '#ff9c9c', borderRadius: 8, padding: '8px 10px', fontSize: 10, fontWeight: 800, letterSpacing: '.08em', cursor: 'pointer' }} onClick={() => requestDelete(show)} disabled={deletingId === show.id}>{deletingId === show.id ? 'DELETING...' : 'DELETE'}</button>
   </div>;
 
   return <main className="ls-shell" style={theme}>
@@ -103,5 +110,6 @@ export default function Admin() {
         </div>}
       </>}
     </section>
+    <ConfirmDialog open={deleteTarget !== null} title="Delete this event?" description={deleteTarget ? `This will permanently remove “${deleteTarget.name}” and its audience/event data. This action cannot be undone.` : ''} busy={deletingId !== null} onCancel={() => { if (!deletingId) setDeleteTarget(null); }} onConfirm={() => void handleDeleteConfirmed()} />
   </main>;
 }
