@@ -48,10 +48,7 @@ export default function LotteryOrganizer({ participants }: LotteryOrganizerProps
   async function runLottery() {
     if (!eventId || busy || lottery?.status === 'running') return;
     if (connected.length === 0) { setMessage('There are no connected participants.'); return; }
-    if (winnerCount > connected.length) {
-      setMessage(`You selected ${winnerCount} winners, but only ${connected.length} phone${connected.length === 1 ? '' : 's'} are connected.`);
-      return;
-    }
+    if (winnerCount > connected.length) { setMessage(`You selected ${winnerCount} winners, but only ${connected.length} phone${connected.length === 1 ? '' : 's'} are connected.`); return; }
     const count = winnerCount;
     setBusy(true); setMessage('');
     try {
@@ -71,38 +68,38 @@ export default function LotteryOrganizer({ participants }: LotteryOrganizerProps
     finally { setCancelling(false); }
   }
 
-  const button: CSSProperties = { border: 0, borderRadius: 10, padding: '13px 18px', fontWeight: 900, letterSpacing: '.08em', cursor: busy || lottery?.status === 'running' ? 'not-allowed' : 'pointer', background: '#fff', color: '#08090b' };
-  const ghostButton: CSSProperties = { border: '1px solid #5b4820', borderRadius: 10, padding: '10px 16px', fontWeight: 800, letterSpacing: '.06em', cursor: cancelling ? 'not-allowed' : 'pointer', background: 'transparent', color: '#f2c66d' };
+  const button: CSSProperties = { border: 0, borderRadius: 12, padding: '14px 18px', fontWeight: 900, letterSpacing: '.08em', cursor: busy || lottery?.status === 'running' ? 'not-allowed' : 'pointer' };
+  const ghostButton: CSSProperties = { border: '1px solid color-mix(in srgb,var(--ls-accent) 42%,#343940 58%)', borderRadius: 10, padding: '10px 16px', fontWeight: 800, letterSpacing: '.06em', cursor: cancelling ? 'not-allowed' : 'pointer', background: 'color-mix(in srgb,var(--ls-accent) 7%,transparent)', color: 'var(--ls-accent)' };
 
   return (
-    <div className="ls-card" style={{ gridColumn: '1 / -1' }}>
+    <div className="ls-card ls-lottery-card" style={{ gridColumn: '1 / -1' }}>
       <div className="ls-section-title">
         <div><p className="ls-eyebrow">LOTTERY</p><h2>Pick winners from the crowd</h2></div>
-        <div style={{ textAlign: 'right' }}><div className="ls-eyebrow">CONNECTED PHONES</div><strong style={{ fontSize: 30 }}>{connected.length}</strong></div>
+        <div className="ls-lottery-connected"><div className="ls-eyebrow">CONNECTED PHONES</div><strong>{connected.length}</strong></div>
       </div>
       <p className="ls-muted" style={{ marginTop: 0 }}>All currently connected phones are automatically eligible for the draw. The audience will see a 10-second synchronized flash countdown before the result is revealed.</p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 16, alignItems: 'end', marginTop: 18 }}>
+      <div className="ls-winner-selector">
         <div>
           <span className="ls-field-label">NUMBER OF WINNERS</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 7 }}>
-            <button type="button" aria-label="Decrease number of winners" onClick={() => changeWinnerCount(-1)} disabled={winnerCount <= 1 || lottery?.status === 'running'} style={{ width: 42, height: 42, border: '1px solid #343940', borderRadius: 10, background: '#080a0d', color: '#fff', fontSize: 22, fontWeight: 700, cursor: winnerCount <= 1 || lottery?.status === 'running' ? 'not-allowed' : 'pointer', opacity: winnerCount <= 1 || lottery?.status === 'running' ? .4 : 1 }}>−</button>
-            <input aria-label="Number of winners" type="number" min={1} max={100} value={winnerCount} disabled={lottery?.status === 'running'} onChange={e => { const value = Number(e.target.value); if (Number.isFinite(value)) setWinnerCount(Math.max(1, Math.min(100, Math.floor(value)))); }} style={{ width: 76, height: 42, boxSizing: 'border-box', border: '1px solid #343940', background: '#080a0d', color: '#fff', borderRadius: 10, padding: '10px 12px', fontWeight: 800, textAlign: 'center' }} />
-            <button type="button" aria-label="Increase number of winners" onClick={() => changeWinnerCount(1)} disabled={lottery?.status === 'running' || winnerCount >= 100} style={{ width: 42, height: 42, border: '1px solid #343940', borderRadius: 10, background: '#080a0d', color: '#fff', fontSize: 22, fontWeight: 700, cursor: lottery?.status === 'running' || winnerCount >= 100 ? 'not-allowed' : 'pointer', opacity: lottery?.status === 'running' || winnerCount >= 100 ? .4 : 1 }}>+</button>
-            <span className="ls-muted" style={{ fontSize: 12 }}>max 100</span>
+          <div className="ls-winner-stepper">
+            <button type="button" className="ls-stepper-button" aria-label="Decrease number of winners" onClick={() => changeWinnerCount(-1)} disabled={winnerCount <= 1 || lottery?.status === 'running'}>−</button>
+            <div className="ls-winner-value"><input aria-label="Number of winners" type="number" inputMode="numeric" min={1} max={100} step={1} value={winnerCount} disabled={lottery?.status === 'running'} onChange={e => { const value = Number(e.target.value); if (Number.isFinite(value)) { setWinnerCount(Math.max(1, Math.min(100, Math.floor(value)))); setMessage(''); } }} /><span>WINNERS</span></div>
+            <button type="button" className="ls-stepper-button" aria-label="Increase number of winners" onClick={() => changeWinnerCount(1)} disabled={lottery?.status === 'running' || winnerCount >= 100}>+</button>
           </div>
+          <p className="ls-muted ls-winner-hint">{connected.length === 0 ? 'Connect audience phones before starting the lottery.' : `Up to ${connected.length} connected participant${connected.length === 1 ? '' : 's'} can be selected.`}</p>
         </div>
-        <div style={{ textAlign: 'right' }}><div className="ls-eyebrow">WINNERS</div><strong style={{ fontSize: 28, color: lottery?.status === 'running' ? '#f2c66d' : lottery?.status === 'revealed' ? '#9fe0ad' : '#fff' }}>{lottery?.status === 'running' || lottery?.status === 'revealed' ? lottery.winnerCount : winnerCount}</strong></div>
+        <div className="ls-winner-summary"><span>SELECTED</span><strong>{lottery?.status === 'running' || lottery?.status === 'revealed' ? lottery.winnerCount : winnerCount}</strong></div>
       </div>
 
-      {(!lottery || lottery.status === 'revealed' || lottery.status === 'idle') && <button type="button" onClick={() => void runLottery()} disabled={busy || connected.length === 0} style={{ ...button, width: '100%', marginTop: 14, opacity: busy || connected.length === 0 ? .45 : 1 }}>{busy ? 'STARTING...' : 'START LOTTERY'}</button>}
+      {(!lottery || lottery.status === 'revealed' || lottery.status === 'idle') && <button type="button" className="ls-button ls-primary ls-lottery-start" onClick={() => void runLottery()} disabled={busy || connected.length === 0} style={{ ...button, width: '100%', opacity: busy || connected.length === 0 ? .45 : 1 }}>{busy ? 'STARTING...' : 'START LOTTERY'}</button>}
 
-      {lottery?.status === 'running' && <div style={{ marginTop: 14, borderRadius: 14, padding: 18, background: '#17120a', border: '1px solid #5b4820', textAlign: 'center' }}><div className="ls-eyebrow">LOTTERY RUNNING</div><strong style={{ display: 'block', fontSize: 64, lineHeight: 1, marginTop: 8, color: '#f2c66d' }}>{seconds}</strong><p style={{ margin: '8px 0 0', color: '#c9c0ae', fontSize: 12 }}>The result will be revealed automatically when the countdown reaches zero.</p><button type="button" onClick={() => void stopLottery()} disabled={cancelling} style={{ ...ghostButton, marginTop: 14, opacity: cancelling ? .5 : 1 }}>{cancelling ? 'CANCELLING...' : 'CANCEL LOTTERY'}</button></div>}
+      {lottery?.status === 'running' && <div className="ls-lottery-running"><div className="ls-eyebrow">LOTTERY RUNNING</div><strong>{seconds}</strong><p>The result will be revealed automatically when the countdown reaches zero.</p><button type="button" onClick={() => void stopLottery()} disabled={cancelling} style={{ ...ghostButton, opacity: cancelling ? .5 : 1 }}>{cancelling ? 'CANCELLING...' : 'CANCEL LOTTERY'}</button></div>}
 
-      {lottery?.status === 'revealed' && <div style={{ marginTop: 14, borderRadius: 14, padding: 16, background: '#0e1711', border: '1px solid #294b35' }}><strong>{lottery.winnerCount} winner(s) selected</strong><p style={{ margin: '7px 0 0', color: '#9eb5a5', fontSize: 12 }}>Randomly selected from {lottery.eligibleCount} connected participants.</p></div>}
+      {lottery?.status === 'revealed' && <div className="ls-lottery-result"><strong>{lottery.winnerCount} winner(s) selected</strong><p>Randomly selected from {lottery.eligibleCount} connected participants.</p></div>}
 
-      {lottery?.status === 'revealed' && winnerUidList.length > 0 && <div style={{ marginTop: 16 }}><div className="ls-eyebrow" style={{ marginBottom: 10 }}>WINNERS / CONTACT DETAILS</div><div style={{ display: 'grid', gap: 8 }}>{winnerUidList.map(uid => { const contact = contacts[uid]; return <div key={uid} style={{ border: '1px solid #292d32', borderRadius: 10, padding: 12, background: '#090b0e' }}>{contact ? <><strong>{contact.name} {contact.surname}</strong><div style={{ color: '#aab0b8', fontSize: 13, marginTop: 4 }}>{contact.phone}</div></> : <span style={{ color: '#777d86', fontSize: 12 }}>Winner has not entered contact details yet.</span>}</div>; })}</div><div style={{ marginTop: 10, color: '#7fba92', fontSize: 12 }}>{winnerRows.length}/{winnerUidList.length} winners have submitted contact details.</div></div>}
-      {message && <p style={{ margin: '14px 0 0', color: '#ff9c9c', fontSize: 12 }}>{message}</p>}
+      {lottery?.status === 'revealed' && winnerUidList.length > 0 && <div style={{ marginTop: 16 }}><div className="ls-eyebrow" style={{ marginBottom: 10 }}>WINNERS / CONTACT DETAILS</div><div style={{ display: 'grid', gap: 8 }}>{winnerUidList.map(uid => { const contact = contacts[uid]; return <div key={uid} className="ls-winner-row">{contact ? <><strong>{contact.name} {contact.surname}</strong><div>{contact.phone}</div></> : <span>Winner has not entered contact details yet.</span>}</div>; })}</div><div className="ls-winner-submitted">{winnerRows.length}/{winnerUidList.length} winners have submitted contact details.</div></div>}
+      {message && <p className="ls-error" style={{ margin: '14px 0 0' }}>{message}</p>}
     </div>
   );
 }
