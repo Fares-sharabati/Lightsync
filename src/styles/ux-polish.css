@@ -1,6 +1,14 @@
-/* LightSync UX/UI polish layer.
-   Keeps the live-event visual system monochrome by default and lets
-   event/team colors provide the only intentional color accents. */
+/*
+ * LightSync UX/UI polish layer.
+ *
+ * This file is intentionally additive: the existing React structure,
+ * Firebase flows and show timing remain untouched. It provides the visual
+ * system on top of the current production UI.
+ */
+
+/* --------------------------------------------------------------------------
+   GLOBAL LIVE-EVENT COLOR RULES
+   -------------------------------------------------------------------------- */
 
 /* The old global hue animation was designed for marketing visuals, but it
    also changed --accent on live screens. Live UI must remain stable. */
@@ -14,6 +22,36 @@
   --ls-accent: #ffffff;
   --ls-accent-2: #ffffff;
   --ls-accent-ink: #08090b;
+}
+
+/* Keep native form controls in the same dark visual language as the app. */
+.ls-shell {
+  color-scheme: dark;
+  min-height: 100dvh;
+}
+
+/* --------------------------------------------------------------------------
+   ACCESSIBILITY + INPUT FEEL
+   -------------------------------------------------------------------------- */
+
+.ls-shell :where(button, input, select, textarea, a):focus-visible {
+  outline: 2px solid var(--ls-accent, #fff);
+  outline-offset: 3px;
+}
+
+.ls-shell :where(button, input, select, textarea):disabled {
+  cursor: not-allowed;
+}
+
+.ls-shell .ls-input::placeholder,
+.ls-shell .ls-mini-input::placeholder {
+  color: #69717c;
+  opacity: 1;
+}
+
+.ls-shell input[type="date"],
+.ls-shell select {
+  color-scheme: dark;
 }
 
 /* Number fields: remove browser-specific grey/white spinner controls. */
@@ -33,7 +71,6 @@
   margin: 0;
 }
 
-/* Make compact controls feel intentional rather than like native browser UI. */
 .ls-mini-input {
   min-height: 38px;
   border-color: #30343b;
@@ -52,8 +89,250 @@
   background: #0d1014;
 }
 
-/* Sports audience screen: neutral base, with team colors applied through the
-   existing --ls-screen-accent / --ls-screen-accent-2 variables. */
+/* --------------------------------------------------------------------------
+   ORGANIZER DASHBOARD — VISUAL HIERARCHY
+   -------------------------------------------------------------------------- */
+
+.ls-shell .ls-header {
+  position: relative;
+  z-index: 5;
+}
+
+.ls-shell .ls-brand {
+  user-select: none;
+}
+
+.ls-shell .ls-card,
+.ls-shell .ls-auth-card {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.ls-shell .ls-card {
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ls-shell .ls-card:hover {
+    box-shadow: 0 22px 70px rgba(0, 0, 0, .24);
+  }
+}
+
+.ls-shell .ls-section-title h2,
+.ls-shell .ls-group-heading h2 {
+  text-wrap: balance;
+}
+
+.ls-shell .ls-muted {
+  text-wrap: pretty;
+}
+
+/* Make the event title/status area feel like a real control console. */
+.ls-shell .ls-event-titlebar {
+  align-items: center;
+}
+
+.ls-shell .ls-live-pill {
+  min-height: 34px;
+  padding-inline: 12px;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+}
+
+.ls-shell .ls-event-titlebar h1 {
+  text-wrap: balance;
+}
+
+/* --------------------------------------------------------------------------
+   ADMIN EVENT LIST
+   -------------------------------------------------------------------------- */
+
+.ls-shell .ls-show-row {
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--ls-accent) 3%, transparent), transparent 55%),
+    #0b0e12;
+}
+
+.ls-shell .ls-show-main {
+  min-height: 76px;
+  transition: background .16s ease;
+}
+
+.ls-shell .ls-show-main:hover {
+  background: rgba(255, 255, 255, .018) !important;
+}
+
+.ls-shell .ls-show-main strong {
+  font-size: 14px;
+  letter-spacing: -.01em;
+}
+
+.ls-shell .ls-show-actions button,
+.ls-shell .ls-delete-show {
+  min-height: 36px;
+  transition: border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease;
+}
+
+.ls-shell .ls-show-actions button:hover:not(:disabled) {
+  border-color: var(--ls-accent) !important;
+  background: color-mix(in srgb, var(--ls-accent) 8%, #111315) !important;
+  color: #fff !important;
+}
+
+.ls-shell .ls-delete-show:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.ls-shell .ls-status {
+  min-width: 66px;
+  text-align: center;
+}
+
+/* --------------------------------------------------------------------------
+   FORM / COLOR PICKER POLISH
+   -------------------------------------------------------------------------- */
+
+.ls-shell .ls-team-card,
+.ls-shell .ls-light-option,
+.ls-shell .ls-matchup,
+.ls-shell .ls-swatch-field {
+  transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+
+.ls-shell .ls-team-card:focus-within,
+.ls-shell .ls-light-option:focus-within {
+  border-color: color-mix(in srgb, var(--side-color, var(--ls-accent)) 42%, #30343b);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--side-color, var(--ls-accent)) 12%, transparent);
+}
+
+.ls-shell .ls-swatch-field:hover:not(.is-disabled) {
+  border-color: #414751;
+  background: #0e1116;
+}
+
+.ls-shell .ls-swatch-field input[type="color"] {
+  appearance: none;
+  -webkit-appearance: none;
+  overflow: hidden;
+}
+
+.ls-shell .ls-swatch-field input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.ls-shell .ls-swatch-field input[type="color"]::-webkit-color-swatch {
+  border: 0;
+  border-radius: 50%;
+}
+
+.ls-shell .ls-input[type="date"] {
+  min-height: 46px;
+}
+
+/* --------------------------------------------------------------------------
+   QR / AUDIENCE ACCESS
+   -------------------------------------------------------------------------- */
+
+.ls-shell .ls-qr-frame {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.ls-shell .ls-qr-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .5);
+  opacity: .45;
+}
+
+.ls-shell .ls-qr-card > button[aria-label="Open QR audience screen"] {
+  border-radius: 16px !important;
+}
+
+.ls-shell .ls-qr-card > button[aria-label="Open QR audience screen"]:focus-visible {
+  outline-offset: 5px;
+}
+
+/* --------------------------------------------------------------------------
+   LIVE SHOW CONTROL
+   -------------------------------------------------------------------------- */
+
+.ls-shell .ls-control-main,
+.ls-shell .ls-stop,
+.ls-shell .ls-copy-id,
+.ls-shell .ls-upload {
+  min-height: 44px;
+}
+
+.ls-shell .ls-control-main {
+  font-weight: 900;
+}
+
+.ls-shell .ls-stop {
+  transition: transform .16s ease, border-color .16s ease, background .16s ease;
+}
+
+.ls-shell .ls-stop:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: #70757c !important;
+}
+
+.ls-shell .ls-copy-id {
+  min-width: 78px;
+  transition: transform .16s ease, border-color .16s ease, background .16s ease;
+}
+
+.ls-shell .ls-copy-id:active {
+  transform: scale(.97);
+}
+
+.ls-shell .ls-upload {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+/* Keep the audio progress/control area visually calm while running. */
+.ls-shell .ls-progress-fill {
+  transition: width .12s linear;
+}
+
+/* --------------------------------------------------------------------------
+   LOTTERY
+   -------------------------------------------------------------------------- */
+
+.ls-shell .ls-lottery-card {
+  position: relative;
+}
+
+.ls-shell .ls-lottery-connected {
+  box-shadow: inset 0 0 24px color-mix(in srgb, var(--ls-accent) 3%, transparent);
+}
+
+.ls-shell .ls-stepper-button {
+  min-width: 46px;
+  min-height: 46px;
+}
+
+.ls-shell .ls-winner-value {
+  min-height: 46px;
+}
+
+.ls-shell .ls-lottery-running strong {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.045em;
+}
+
+/* --------------------------------------------------------------------------
+   LIVE AUDIENCE SCREEN — STABLE, MONOCHROME BASE + TEAM ACCENTS
+   -------------------------------------------------------------------------- */
+
 .ls-audience-show-screen {
   --screen-accent: var(--ls-screen-accent, #ffffff);
   --screen-accent-2: var(--ls-screen-accent-2, #ffffff);
@@ -61,25 +340,167 @@
 
 .ls-audience-show-screen .ls-sports-state-card,
 .ls-audience-show-screen .ls-sports-interaction-card {
-  background: linear-gradient(
-      145deg,
-      color-mix(in srgb, var(--screen-accent) 7%, transparent),
-      transparent 55%
-    ),
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--screen-accent) 7%, transparent), transparent 55%),
     rgba(12, 14, 18, .92);
 }
 
 /* Avoid a rainbow/marketing accent leaking into live-screen decorative layers. */
-.ls-audience-show-screen .hologram-stage {
+.ls-audience-show-screen .hologram-stage,
+.ls-audience-show-screen .arena-dots,
+.ls-audience-show-screen .arena-beam {
   animation: none !important;
 }
 
-/* Keep the two team accents static. The center remains monochrome. */
 .ls-audience-show-screen .ls-audience-color-wash {
   animation: none !important;
 }
 
+/* Keep the center neutral; team colors remain intentional accents only. */
+.ls-audience-show-screen .ls-audience-color-wash {
+  opacity: .85;
+}
+
+/* --------------------------------------------------------------------------
+   MOBILE ORGANIZER LAYOUT
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .ls-shell {
+    padding: 20px;
+  }
+
+  .ls-shell .ls-hero-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding-bottom: 28px;
+  }
+
+  .ls-shell .ls-orbit {
+    height: 150px;
+    order: -1;
+  }
+
+  .ls-shell .ls-arena {
+    width: 170px;
+    height: 100px;
+  }
+
+  .ls-shell .ls-form-grid,
+  .ls-shell .ls-light-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ls-shell .ls-event-titlebar {
+    align-items: flex-start;
+  }
+
+  .ls-shell .ls-event-titlebar > div:last-child {
+    width: 100%;
+  }
+
+  .ls-shell .ls-live-pill {
+    width: fit-content;
+  }
+}
+
+@media (max-width: 640px) {
+  .ls-shell {
+    padding: 14px;
+  }
+
+  .ls-shell .ls-header {
+    margin-bottom: 24px;
+  }
+
+  .ls-shell .ls-header .ls-button {
+    min-height: 40px;
+    padding-inline: 12px;
+    font-size: 10px;
+  }
+
+  .ls-shell .ls-card,
+  .ls-shell .ls-auth-card {
+    border-radius: 16px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+
+  .ls-shell .ls-hero-grid h1 {
+    font-size: clamp(38px, 13vw, 58px);
+  }
+
+  .ls-shell .ls-team-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ls-shell .ls-swatch-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ls-shell .ls-show-row {
+    align-items: stretch;
+  }
+
+  .ls-shell .ls-show-main {
+    min-height: 70px;
+    padding: 14px !important;
+  }
+
+  .ls-shell .ls-show-main > div:last-child {
+    gap: 8px;
+  }
+
+  .ls-shell .ls-show-actions,
+  .ls-shell .ls-delete-show {
+    margin: 0 8px 8px !important;
+  }
+
+  .ls-shell .ls-show-actions button,
+  .ls-shell .ls-delete-show {
+    min-height: 38px;
+  }
+
+  .ls-shell .ls-winner-selector {
+    padding: 14px;
+  }
+
+  .ls-shell .ls-winner-stepper {
+    justify-content: space-between;
+  }
+
+  .ls-shell .ls-stepper-button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .ls-shell .ls-winner-value {
+    flex: 1;
+  }
+
+  .ls-shell .ls-lottery-running strong {
+    font-size: clamp(52px, 18vw, 72px);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   REDUCED MOTION
+   -------------------------------------------------------------------------- */
+
 @media (prefers-reduced-motion: reduce) {
+  .ls-shell *,
+  .ls-audience-show-screen * {
+    scroll-behavior: auto !important;
+  }
+
+  .ls-shell .ls-card,
+  .ls-shell .ls-button,
+  .ls-shell .ls-show-row,
+  .ls-shell .ls-show-main,
+  .ls-shell .ls-swatch-field {
+    transition: none !important;
+  }
+
   .ls-mini-input,
   .ls-winner-value input {
     transition: none;
