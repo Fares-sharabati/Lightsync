@@ -32,7 +32,9 @@ export default function SportsScreen() {
 
   const options = Object.entries(interaction?.options ?? {});
   const total = result?.total ?? 0;
-  const homeColor = show?.screenLightColor || game?.homeTeam.primaryColor || '#ff3030';
+  // Live sports screens are monochrome by default. Team colors are the only
+  // intentional accents and are supplied by the configured game data.
+  const homeColor = show?.screenLightColor || game?.homeTeam.primaryColor || '#FFFFFF';
   const awayColor = game?.awayTeam.primaryColor || homeColor;
   const screenStyle = { '--ls-screen-accent': homeColor, '--ls-screen-accent-2': awayColor } as CSSProperties;
   const displayMode = interaction ? (screen?.displayMode === 'question' || interaction.type === 'question' ? 'question' : 'results') : 'idle';
