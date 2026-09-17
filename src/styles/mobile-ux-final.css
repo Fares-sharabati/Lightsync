@@ -1,0 +1,595 @@
+/* LightSync — final mobile audience + lottery UX layer.
+   Presentation-only: no Firebase, timing, flashlight, lottery, or interaction logic changes. */
+
+/* ================================================================
+   AUDIENCE PHONE
+   Calm dark surface, deliberate spacing, thumb-friendly controls.
+   ================================================================ */
+.light-page:has(.light-shell-join) {
+  --phone-surface: #0b0d12;
+  --phone-surface-raised: #11141a;
+  --phone-border: rgba(255,255,255,.10);
+  --phone-border-soft: rgba(255,255,255,.07);
+  --phone-text: #f7f8fa;
+  --phone-muted: #9299a7;
+  --phone-accent: var(--phone-accent, #ffffff);
+  color: var(--phone-text);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.light-shell-join {
+  width: min(100%, 560px);
+  margin-inline: auto;
+  min-height: 100dvh;
+  padding: 20px 18px 28px;
+}
+
+.light-shell-join .light-header {
+  min-height: 40px;
+  margin-bottom: 22px;
+  padding: 0;
+}
+
+.light-shell-join .light-brand {
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: .17em;
+}
+
+.light-shell-join .light-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.light-shell-join .light-lang-toggle {
+  min-width: 38px;
+  min-height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--phone-border);
+  background: rgba(255,255,255,.035);
+  color: #dfe3e9;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+.light-shell-join .light-status {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid var(--phone-border);
+  border-radius: 999px;
+  background: rgba(255,255,255,.025);
+  color: #9da5b2;
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: .08em;
+}
+
+.light-shell-join .light-status span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--phone-accent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--phone-accent) 60%, transparent);
+}
+
+.light-shell-join .join-main {
+  width: 100%;
+  margin: 0 auto;
+  animation: ls-mobile-content-in .28s ease both;
+}
+
+.light-shell-join .light-kicker {
+  margin-bottom: 9px;
+  color: var(--phone-accent);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .16em;
+}
+
+.light-shell-join .join-main h1,
+.light-shell-join .light-main h1 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(32px, 9vw, 48px);
+  line-height: .98;
+  letter-spacing: -.05em;
+  text-wrap: balance;
+}
+
+.light-shell-join .join-main > p,
+.light-shell-join .light-main > p {
+  max-width: 470px;
+  margin: 13px 0 0;
+  color: var(--phone-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.light-shell-join .light-primary-button {
+  width: 100%;
+  min-height: 54px;
+  margin-top: 22px;
+  border: 1px solid color-mix(in srgb, var(--phone-accent) 45%, transparent);
+  border-radius: 15px;
+  background: var(--phone-accent);
+  color: #08090c;
+  box-shadow: 0 12px 34px color-mix(in srgb, var(--phone-accent) 16%, transparent);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: .11em;
+  transition: transform .16s ease, filter .16s ease, box-shadow .16s ease;
+}
+
+.light-shell-join .light-primary-button:active,
+.light-shell-join .interaction-submit:active,
+.light-shell-join .interaction-option:active {
+  transform: scale(.985);
+}
+
+/* Waiting / status state */
+.light-shell-join .light-waiting {
+  width: 100%;
+  min-height: 44vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 14px;
+  text-align: center;
+}
+
+.light-shell-join .light-waiting h2,
+.light-shell-join .light-waiting h1 {
+  margin: 13px 0 8px;
+  font-size: clamp(25px, 7vw, 36px);
+  line-height: 1;
+  letter-spacing: -.04em;
+}
+
+.light-shell-join .light-waiting p {
+  max-width: 310px;
+  margin: 0;
+  color: var(--phone-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* Live light state: don't decorate the actual light canvas with UI chrome. */
+.light-shell-join .light-state {
+  min-height: 56vh;
+  width: 100%;
+  padding: 28px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.light-shell-join .light-state h1,
+.light-shell-join .light-state h2 {
+  max-width: 92%;
+  margin: 10px auto;
+  line-height: .98;
+  letter-spacing: -.045em;
+}
+
+/* Interaction card */
+.light-shell-join .light-interaction {
+  width: 100%;
+  margin: 20px 0 0;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--phone-accent) 18%, var(--phone-border));
+  border-radius: 20px;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--phone-accent) 5%, transparent), transparent 48%),
+    rgba(9,11,15,.97);
+  box-shadow: 0 18px 50px rgba(0,0,0,.30);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.light-shell-join .light-interaction .interaction-header {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 13px;
+  color: var(--phone-accent);
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: .13em;
+}
+
+.light-shell-join .light-interaction .interaction-live-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--phone-accent);
+  box-shadow: 0 0 11px color-mix(in srgb, var(--phone-accent) 65%, transparent);
+}
+
+.light-shell-join .light-interaction .interaction-question {
+  margin: 0 0 17px;
+  color: #f8f9fb;
+  font-size: clamp(20px, 5.8vw, 27px);
+  font-weight: 800;
+  line-height: 1.14;
+  letter-spacing: -.025em;
+  text-wrap: balance;
+}
+
+.light-shell-join .light-interaction .interaction-options {
+  display: grid;
+  gap: 9px;
+}
+
+.light-shell-join .light-interaction .interaction-option {
+  width: 100%;
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 14px;
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 14px;
+  background: #11141a;
+  color: #e9ecf1;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.3;
+  transition: border-color .15s ease, background .15s ease, transform .15s ease, box-shadow .15s ease;
+}
+
+.light-shell-join .light-interaction .interaction-option.is-selected {
+  border-color: color-mix(in srgb, var(--choice-color, var(--phone-accent)) 70%, white 10%);
+  background: color-mix(in srgb, var(--choice-color, var(--phone-accent)) 13%, #11141a);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--choice-color, var(--phone-accent)) 15%, transparent), 0 9px 25px color-mix(in srgb, var(--choice-color, var(--phone-accent)) 10%, transparent);
+}
+
+.light-shell-join .light-interaction .choice-mark {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 50%;
+  color: #08090c;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.light-shell-join .light-interaction .interaction-option.is-selected .choice-mark {
+  border-color: var(--choice-color, var(--phone-accent));
+  background: var(--choice-color, var(--phone-accent));
+  color: var(--choice-ink, #08090c);
+}
+
+.light-shell-join .light-interaction .interaction-answer {
+  width: 100%;
+  min-height: 122px;
+  margin: 0;
+  padding: 14px 15px;
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 14px;
+  outline: none;
+  background: #0d1015;
+  color: #f4f6f8;
+  font: 500 15px/1.45 inherit;
+  resize: none;
+}
+
+.light-shell-join .light-interaction .interaction-answer:focus {
+  border-color: color-mix(in srgb, var(--phone-accent) 62%, #fff 10%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--phone-accent) 11%, transparent);
+}
+
+.light-shell-join .light-interaction .interaction-submit {
+  width: 100%;
+  min-height: 52px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 14px;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: .11em;
+  transition: transform .16s ease, filter .16s ease, box-shadow .16s ease;
+}
+
+.light-shell-join .light-interaction .interaction-submit:not(:disabled) {
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--phone-accent) 18%, transparent);
+}
+
+.light-shell-join .light-interaction .interaction-message {
+  margin-top: 11px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 11px;
+  background: rgba(255,255,255,.025);
+  color: #b8bec8;
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.light-shell-join .light-interaction .interaction-message.is-error {
+  border-color: rgba(255,110,110,.20);
+  color: #ff9a9a;
+}
+
+/* ================================================================
+   LOTTERY CONSOLE
+   Removes redundant micro-labels and gives the control a clearer rhythm.
+   ================================================================ */
+.ls-lottery-card {
+  padding: 28px !important;
+}
+
+.ls-lottery-card .ls-section-title {
+  margin-bottom: 12px !important;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.ls-lottery-card .ls-section-title > div:first-child {
+  min-width: 0;
+}
+
+.ls-lottery-card .ls-section-title h2 {
+  margin: 2px 0 0;
+  font-size: clamp(21px, 2vw, 25px);
+  line-height: 1.08;
+  letter-spacing: -.025em;
+}
+
+.ls-lottery-card > .ls-muted {
+  max-width: 760px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.ls-lottery-card .ls-lottery-connected {
+  min-width: 145px !important;
+  align-self: stretch;
+  padding: 12px 16px !important;
+  border-radius: 15px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: color-mix(in srgb, var(--ls-accent) 5%, #0b0e12);
+}
+
+.ls-lottery-card .ls-lottery-connected .ls-eyebrow {
+  margin-bottom: 4px;
+}
+
+.ls-lottery-card .ls-lottery-connected strong {
+  font-size: 30px !important;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.ls-lottery-card .ls-winner-selector {
+  margin-top: 22px !important;
+  padding: 20px !important;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 26px !important;
+  align-items: center;
+  border-radius: 17px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--ls-accent) 4%, transparent), transparent 55%), #0a0d11 !important;
+}
+
+.ls-lottery-card .ls-winner-selector .ls-field-label {
+  margin-bottom: 10px;
+}
+
+.ls-lottery-card .ls-winner-stepper {
+  gap: 8px !important;
+}
+
+.ls-lottery-card .ls-stepper-button {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 13px !important;
+}
+
+.ls-lottery-card .ls-winner-value {
+  width: 72px !important;
+  height: 48px !important;
+  border-radius: 13px !important;
+}
+
+.ls-lottery-card .ls-winner-value input {
+  width: 42px !important;
+  text-align: center !important;
+  font-size: 21px !important;
+}
+
+.ls-lottery-card .ls-winner-value span {
+  display: none !important;
+}
+
+.ls-lottery-card .ls-winner-hint {
+  max-width: 540px;
+  margin: 9px 0 0 !important;
+  line-height: 1.45;
+}
+
+.ls-lottery-card .ls-winner-summary {
+  min-width: 80px;
+  padding-left: 20px;
+  text-align: right;
+}
+
+.ls-lottery-card .ls-winner-summary span {
+  font-size: 8px;
+  letter-spacing: .15em;
+}
+
+.ls-lottery-card .ls-winner-summary strong {
+  margin-top: 3px;
+  font-size: 36px !important;
+  line-height: 1;
+}
+
+.ls-lottery-card .ls-lottery-start {
+  min-height: 52px;
+  margin-top: 14px !important;
+  border-radius: 14px !important;
+}
+
+.ls-lottery-card .ls-lottery-running {
+  margin-top: 14px;
+  padding: 24px !important;
+  border-radius: 17px !important;
+}
+
+.ls-lottery-card .ls-lottery-result {
+  margin-top: 14px;
+  padding: 17px 18px !important;
+  border-radius: 16px !important;
+}
+
+@media (max-width: 640px) {
+  .light-shell-join {
+    padding: max(15px, env(safe-area-inset-top)) 15px max(22px, env(safe-area-inset-bottom));
+  }
+
+  .light-shell-join .light-header {
+    margin-bottom: 20px;
+  }
+
+  .light-shell-join .light-status {
+    display: none;
+  }
+
+  .light-shell-join .join-main h1,
+  .light-shell-join .light-main h1 {
+    font-size: clamp(31px, 9.2vw, 43px);
+  }
+
+  .light-shell-join .light-waiting {
+    min-height: 48vh;
+  }
+
+  .light-shell-join .light-state {
+    min-height: 58vh;
+  }
+
+  .light-shell-join .light-interaction {
+    margin-top: 18px;
+    padding: 17px;
+  }
+
+  .ls-lottery-card {
+    padding: 20px !important;
+  }
+
+  .ls-lottery-card .ls-section-title {
+    gap: 14px;
+  }
+
+  .ls-lottery-card .ls-section-title > div:first-child {
+    flex: 1 1 100%;
+  }
+
+  .ls-lottery-card .ls-lottery-connected {
+    width: 100%;
+    min-width: 0 !important;
+    min-height: 58px;
+    align-self: auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    text-align: left !important;
+  }
+
+  .ls-lottery-card .ls-lottery-connected .ls-eyebrow {
+    margin: 0;
+  }
+
+  .ls-lottery-card .ls-lottery-connected strong {
+    font-size: 27px !important;
+  }
+
+  .ls-lottery-card .ls-winner-selector {
+    margin-top: 18px !important;
+    padding: 17px !important;
+    grid-template-columns: 1fr;
+    gap: 16px !important;
+  }
+
+  .ls-lottery-card .ls-winner-stepper {
+    width: max-content;
+    max-width: 100%;
+  }
+
+  .ls-lottery-card .ls-winner-summary {
+    width: 100%;
+    min-width: 0;
+    padding: 12px 0 0;
+    border-top: 1px solid rgba(255,255,255,.08);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    text-align: left;
+  }
+
+  .ls-lottery-card .ls-winner-summary strong {
+    font-size: 30px !important;
+  }
+
+  .ls-lottery-card .ls-lottery-start {
+    margin-top: 12px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .light-shell-join {
+    padding-inline: 12px;
+  }
+
+  .light-shell-join .light-interaction {
+    padding: 15px;
+    border-radius: 18px;
+  }
+
+  .light-shell-join .light-interaction .interaction-option {
+    min-height: 52px;
+    padding-inline: 12px;
+    font-size: 13px;
+  }
+
+  .ls-lottery-card {
+    padding: 17px !important;
+  }
+
+  .ls-lottery-card .ls-winner-selector {
+    padding: 15px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .light-shell-join .join-main,
+  .light-shell-join .light-primary-button,
+  .light-shell-join .interaction-option,
+  .light-shell-join .interaction-submit {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@keyframes ls-mobile-content-in {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
