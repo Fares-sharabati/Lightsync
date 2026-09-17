@@ -8,6 +8,7 @@ import './styles/pro-ui.css'
 import './styles/sports-pro.css'
 import './styles/mobile-pro.css'
 import './styles/ux-polish.css'
+import './styles/mobile-ux-final.css'
 import App from './App.tsx'
 import { LanguageProvider } from './i18n/LanguageContext'
 
