@@ -1,0 +1,444 @@
+/* LightSync — audience phone + lottery console polish.
+   Visual-only layer: no interaction, state, Firebase, or timing logic changes. */
+
+/* --------------------------------------------------------------------------
+   AUDIENCE PHONE — calm, readable, touch-first foundation
+   -------------------------------------------------------------------------- */
+.light-page:has(.light-shell-join) {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.light-shell-join .light-header {
+  padding-inline: 2px;
+}
+
+.light-shell-join .light-brand {
+  letter-spacing: .18em;
+}
+
+.light-shell-join .light-header-right {
+  gap: 10px;
+}
+
+.light-shell-join .light-status {
+  white-space: nowrap;
+}
+
+.light-shell-join .join-main {
+  animation: ls-phone-enter .35s ease both;
+}
+
+.light-shell-join .light-primary-button,
+.light-shell-join .interaction-option,
+.light-shell-join .interaction-submit,
+.light-shell-join .light-lang-toggle {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.light-shell-join .light-primary-button {
+  min-height: 52px;
+  border-radius: 15px;
+  font-size: 12px;
+  letter-spacing: .1em;
+  transition: transform .18s ease, filter .18s ease, box-shadow .18s ease;
+}
+
+.light-shell-join .light-primary-button:active,
+.light-shell-join .interaction-option:active,
+.light-shell-join .interaction-submit:active {
+  transform: scale(.985);
+}
+
+.light-interaction {
+  border-radius: 20px !important;
+  padding: clamp(18px, 4.5vw, 24px) !important;
+  background: linear-gradient(145deg, rgba(255,255,255,.035), transparent 52%), rgba(8,10,14,.94) !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,.28) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.light-interaction .interaction-header {
+  margin-bottom: 14px;
+  letter-spacing: .1em;
+}
+
+.light-interaction .interaction-question {
+  line-height: 1.18;
+  letter-spacing: -.02em;
+}
+
+.light-interaction .interaction-options {
+  gap: 9px;
+}
+
+.light-interaction .interaction-option {
+  min-height: 52px;
+  padding: 13px 14px;
+  border-radius: 14px;
+  transition: border-color .16s ease, background .16s ease, transform .16s ease, box-shadow .16s ease;
+}
+
+.light-interaction .interaction-option.is-selected {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--choice-color, #fff) 20%, transparent), 0 8px 26px color-mix(in srgb, var(--choice-color, #fff) 10%, transparent);
+}
+
+.light-interaction .interaction-answer {
+  min-height: 116px;
+  border-radius: 14px;
+  padding: 14px 15px;
+  line-height: 1.45;
+  resize: none;
+}
+
+.light-interaction .interaction-submit {
+  min-height: 50px;
+  border-radius: 14px;
+  margin-top: 12px;
+  font-size: 11px;
+  letter-spacing: .1em;
+  font-weight: 900;
+  transition: transform .16s ease, filter .16s ease, box-shadow .16s ease;
+}
+
+.light-interaction .interaction-submit:not(:disabled) {
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--phone-accent, #fff) 16%, transparent);
+}
+
+.light-interaction .interaction-message {
+  border-radius: 12px;
+  line-height: 1.45;
+}
+
+@keyframes ls-phone-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Small screens: prioritize thumb reach, breathing room and readable hierarchy. */
+@media (max-width: 600px) {
+  .light-shell-join {
+    width: 100%;
+    min-height: 100dvh;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+  }
+
+  .light-shell-join .light-header {
+    min-height: 42px;
+    margin-bottom: 18px;
+  }
+
+  .light-shell-join .light-brand {
+    font-size: 11px;
+    letter-spacing: .16em;
+  }
+
+  .light-shell-join .light-header-right {
+    gap: 7px;
+  }
+
+  .light-shell-join .light-status {
+    padding: 5px 8px;
+    font-size: 8px;
+  }
+
+  .light-shell-join .light-main,
+  .light-shell-join .join-main {
+    width: 100%;
+  }
+
+  .light-shell-join .light-kicker {
+    font-size: 9px;
+    letter-spacing: .14em;
+  }
+
+  .light-shell-join .light-main h1,
+  .light-shell-join .join-main h1 {
+    font-size: clamp(30px, 9vw, 42px);
+    line-height: .98;
+    letter-spacing: -.045em;
+  }
+
+  .light-shell-join .light-main p,
+  .light-shell-join .join-main p {
+    line-height: 1.5;
+  }
+
+  .light-shell-join .light-primary-button {
+    width: 100%;
+    min-height: 54px;
+  }
+
+  .light-interaction {
+    width: 100%;
+    margin-top: 16px !important;
+    padding: 18px !important;
+    border-radius: 18px !important;
+  }
+
+  .light-interaction .interaction-question {
+    font-size: clamp(20px, 5.8vw, 27px);
+    line-height: 1.14;
+    margin-bottom: 16px;
+  }
+
+  .light-interaction .interaction-option {
+    min-height: 54px;
+    padding: 13px 14px;
+    font-size: 14px;
+  }
+
+  .light-interaction .interaction-answer {
+    min-height: 120px;
+    font-size: 15px;
+  }
+
+  .light-interaction .interaction-submit {
+    width: 100%;
+    min-height: 52px;
+  }
+
+  .light-interaction .interaction-message {
+    margin-top: 10px;
+    padding: 10px 12px;
+    font-size: 11px;
+  }
+
+  .light-waiting.ls-mobile-waiting {
+    min-height: 42vh;
+    padding: 28px 12px;
+    text-align: center;
+    line-height: 1.45;
+  }
+
+  .light-state {
+    padding-inline: 18px;
+  }
+
+  .light-state h1,
+  .light-state h2 {
+    max-width: 100%;
+    line-height: .98;
+  }
+}
+
+@media (max-width: 380px) {
+  .light-shell-join {
+    padding-inline: 13px;
+  }
+
+  .light-shell-join .light-status {
+    display: none;
+  }
+
+  .light-interaction {
+    padding: 15px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .light-shell-join .join-main,
+  .light-shell-join .light-primary-button,
+  .light-interaction .interaction-option,
+  .light-interaction .interaction-submit {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   LOTTERY — stronger hierarchy + intentional spacing
+   -------------------------------------------------------------------------- */
+.ls-lottery-card {
+  padding: 28px !important;
+}
+
+.ls-lottery-card .ls-section-title {
+  margin-bottom: 14px;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.ls-lottery-card .ls-section-title h2 {
+  margin-top: 2px;
+  font-size: clamp(20px, 2vw, 25px);
+  line-height: 1.1;
+}
+
+.ls-lottery-card > .ls-muted {
+  max-width: 760px;
+  margin-bottom: 0;
+  font-size: 12px;
+}
+
+.ls-lottery-connected {
+  min-width: 142px !important;
+  padding: 11px 15px !important;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.ls-lottery-connected strong {
+  font-size: 30px !important;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.ls-winner-selector {
+  margin-top: 22px !important;
+  padding: 20px !important;
+  gap: 28px !important;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--ls-accent) 5%, transparent), transparent 58%), #0a0d11 !important;
+}
+
+.ls-winner-selector > div:first-child {
+  min-width: 0;
+}
+
+.ls-winner-selector .ls-field-label {
+  margin-bottom: 10px;
+}
+
+.ls-winner-stepper {
+  gap: 7px !important;
+}
+
+.ls-stepper-button {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 13px !important;
+}
+
+.ls-winner-value {
+  width: 104px !important;
+  height: 48px !important;
+  border-radius: 13px !important;
+}
+
+.ls-winner-value input {
+  width: 46px !important;
+  font-size: 21px !important;
+}
+
+.ls-winner-summary {
+  min-width: 76px;
+  padding-left: 8px;
+}
+
+.ls-winner-summary strong {
+  font-size: 38px !important;
+  line-height: 1;
+}
+
+.ls-winner-hint {
+  max-width: 520px;
+  margin-top: 9px !important;
+  line-height: 1.45;
+}
+
+.ls-lottery-start {
+  min-height: 50px;
+  margin-top: 12px !important;
+  border-radius: 13px !important;
+}
+
+.ls-lottery-running,
+.ls-lottery-result {
+  border-radius: 17px !important;
+}
+
+.ls-lottery-running {
+  padding: 24px !important;
+}
+
+.ls-lottery-running strong {
+  font-size: clamp(58px, 7vw, 76px) !important;
+}
+
+.ls-lottery-running p {
+  max-width: 520px;
+  margin: 9px auto 16px !important;
+  line-height: 1.5;
+}
+
+.ls-lottery-result {
+  padding: 17px 18px !important;
+}
+
+.ls-lottery-card .ls-winner-row {
+  padding: 14px !important;
+}
+
+@media (max-width: 640px) {
+  .ls-lottery-card {
+    padding: 20px !important;
+  }
+
+  .ls-lottery-card .ls-section-title {
+    gap: 12px;
+  }
+
+  .ls-lottery-card .ls-section-title > div:first-child {
+    flex: 1 1 100%;
+  }
+
+  .ls-lottery-connected {
+    width: 100%;
+    min-width: 0 !important;
+    min-height: 60px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    text-align: left !important;
+  }
+
+  .ls-lottery-connected .ls-eyebrow {
+    margin-bottom: 0 !important;
+  }
+
+  .ls-lottery-connected strong {
+    font-size: 26px !important;
+  }
+
+  .ls-winner-selector {
+    margin-top: 18px !important;
+    padding: 17px !important;
+    gap: 18px !important;
+  }
+
+  .ls-winner-summary {
+    width: 100%;
+    padding: 10px 0 0;
+    border-top: 1px solid #252a31;
+  }
+
+  .ls-winner-stepper {
+    justify-content: flex-start;
+  }
+
+  .ls-winner-hint {
+    margin-bottom: 0;
+  }
+
+  .ls-lottery-running {
+    padding: 20px 16px !important;
+  }
+
+  .ls-lottery-running strong {
+    font-size: 62px !important;
+  }
+
+  .ls-lottery-running button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ls-lottery-card * {
+    transition: none !important;
+  }
+}
