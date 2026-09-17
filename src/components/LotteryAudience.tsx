@@ -25,7 +25,7 @@ export default function LotteryAudience() {
   const [seconds, setSeconds] = useState(10);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [hasActiveInteraction, setHasActiveInteraction] = useState(false);
+  const [interactions, setInteractions] = useState<Array<{ status: 'open' | 'closed'; createdAt: number }>>([]);
 
   useEffect(() => watchServerTimeOffset(() => {}), []);
 
@@ -39,18 +39,17 @@ export default function LotteryAudience() {
     };
   }, [eventId]);
 
-  // LotteryAudience is mounted alongside Join on the audience route. After a
-  // lottery result it normally renders a full-screen result overlay. If the
-  // organizer opens a poll/question afterwards, that overlay would otherwise
-  // sit above Join and block the interaction. Keep this watcher independent of
-  // Join so the lottery overlay yields immediately whenever an interaction is open.
+  // Keep lottery and audience interactions independent. A running lottery is
+  // the highest-priority audience state, so an already-open poll/question must
+  // not cover the synchronized lottery countdown. After the result is shown,
+  // only activity created after that result can replace it permanently.
   useEffect(() => {
     if (!eventId) {
-      setHasActiveInteraction(false);
+      setInteractions([]);
       return;
     }
     return watchSportsInteractions(eventId, items => {
-      setHasActiveInteraction(items.some(item => item.status === 'open'));
+      setInteractions(items.map(item => ({ status: item.status, createdAt: item.createdAt })));
     });
   }, [eventId]);
 
@@ -136,21 +135,30 @@ export default function LotteryAudience() {
     }
   }
 
-  if (!active || !lottery || hasActiveInteraction) return null;
+  // A lottery countdown must always be visible to eligible participants while
+  // it is running. Open/unanswered interactions temporarily yield to it.
+  if (!active || !lottery) return null;
 
-  const overlayBase: CSSProperties = {
-    position: 'fixed',
-    inset: 0,
-    zIndex: 9999,
-    display: 'grid',
-    placeItems: 'center',
-    background,
-    color: '#fff',
-    textAlign: 'center',
-    padding: 24,
-  };
+  const latestInteractionAfterResult = lottery.status === 'revealed'
+    ? interactions.some(item => item.createdAt > lottery.revealAt)
+    : false;
+  const showStartedAfterResult = lottery.status === 'revealed'
+    && typeof show?.showStartTime === 'number'
+    && show.showStartTime > lottery.revealAt;
+  const resultSuperseded = latestInteractionAfterResult || showStartedAfterResult;
 
   if (lottery.status === 'running') {
+    const overlayBase: CSSProperties = {
+      position: 'fixed',
+      inset: 0,
+      zIndex: 9999,
+      display: 'grid',
+      placeItems: 'center',
+      background,
+      color: '#fff',
+      textAlign: 'center',
+      padding: 24,
+    };
     return (
       <div
         role="status"
@@ -176,6 +184,23 @@ export default function LotteryAudience() {
       </div>
     );
   }
+
+  // A later poll/question or a newly-started show is a new program state.
+  // Once that happens, never let the previous lottery result take the screen
+  // back when the interaction is closed or the show changes state.
+  if (resultSuperseded) return null;
+
+  const overlayBase: CSSProperties = {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 9999,
+    display: 'grid',
+    placeItems: 'center',
+    background,
+    color: '#fff',
+    textAlign: 'center',
+    padding: 24,
+  };
 
   if (resolving) {
     return (
