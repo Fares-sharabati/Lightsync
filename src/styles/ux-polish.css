@@ -1,0 +1,87 @@
+/* LightSync UX/UI polish layer.
+   Keeps the live-event visual system monochrome by default and lets
+   event/team colors provide the only intentional color accents. */
+
+/* The old global hue animation was designed for marketing visuals, but it
+   also changed --accent on live screens. Live UI must remain stable. */
+:root {
+  animation: none !important;
+  --hue: 0;
+  --accent: #ffffff;
+  --accent-strong: #ffffff;
+  --accent-glow: rgba(255, 255, 255, .35);
+  --accent-soft: rgba(255, 255, 255, .12);
+  --ls-accent: #ffffff;
+  --ls-accent-2: #ffffff;
+  --ls-accent-ink: #08090b;
+}
+
+/* Number fields: remove browser-specific grey/white spinner controls. */
+.ls-mini-input[type="number"],
+.ls-winner-value input[type="number"] {
+  -webkit-appearance: textfield;
+  appearance: textfield;
+  font-variant-numeric: tabular-nums;
+}
+
+.ls-mini-input[type="number"]::-webkit-inner-spin-button,
+.ls-mini-input[type="number"]::-webkit-outer-spin-button,
+.ls-winner-value input[type="number"]::-webkit-inner-spin-button,
+.ls-winner-value input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
+/* Make compact controls feel intentional rather than like native browser UI. */
+.ls-mini-input {
+  min-height: 38px;
+  border-color: #30343b;
+  background: #090b0e;
+  color: #f5f7fa;
+  font-weight: 800;
+  transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+
+.ls-mini-input:hover:not(:disabled) {
+  background: #0d1014;
+  border-color: #454b55;
+}
+
+.ls-mini-input:focus {
+  background: #0d1014;
+}
+
+/* Sports audience screen: neutral base, with team colors applied through the
+   existing --ls-screen-accent / --ls-screen-accent-2 variables. */
+.ls-audience-show-screen {
+  --screen-accent: var(--ls-screen-accent, #ffffff);
+  --screen-accent-2: var(--ls-screen-accent-2, #ffffff);
+}
+
+.ls-audience-show-screen .ls-sports-state-card,
+.ls-audience-show-screen .ls-sports-interaction-card {
+  background: linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--screen-accent) 7%, transparent),
+      transparent 55%
+    ),
+    rgba(12, 14, 18, .92);
+}
+
+/* Avoid a rainbow/marketing accent leaking into live-screen decorative layers. */
+.ls-audience-show-screen .hologram-stage {
+  animation: none !important;
+}
+
+/* Keep the two team accents static. The center remains monochrome. */
+.ls-audience-show-screen .ls-audience-color-wash {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ls-mini-input,
+  .ls-winner-value input {
+    transition: none;
+  }
+}
