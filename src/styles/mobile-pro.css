@@ -1,0 +1,52 @@
+/* LightSync mobile audience polish layer. Kept separate from lightsync-mobile.css
+   so the existing flashlight-sync logic and its CSS stay untouched - this file only
+   adds theming and small affordances on top. */
+
+.light-primary-button.ls-mobile-cta {
+  box-shadow: 0 10px 34px color-mix(in srgb, var(--phone-accent, #fff) 30%, transparent);
+}
+.light-primary-button.ls-mobile-cta:active { filter: brightness(.96); }
+
+/* Legibility shadow for the big ON/OFF flashlight label - purely cosmetic,
+   applied instantly alongside the state text with no transition delay so it
+   never affects the sync-critical flash timing. */
+.light-state { text-shadow: 0 2px 20px rgba(0, 0, 0, .18); }
+
+/* Waiting-for-show and loading indicators - a themed pulse dot instead of bare text. */
+.light-waiting.ls-mobile-waiting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 2vw, 14px);
+}
+.ls-mobile-pulse-dot {
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--phone-accent, #fff);
+  box-shadow: 0 0 12px var(--phone-accent, #fff);
+  animation: ls-mobile-pulse 1.6s ease-in-out infinite;
+}
+.light-waiting .ls-mobile-pulse-dot { width: clamp(8px, 1.8vw, 13px); height: clamp(8px, 1.8vw, 13px); }
+.light-loading.ls-mobile-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+.light-loading .ls-mobile-pulse-dot { width: 8px; height: 8px; background: #fff; box-shadow: none; }
+
+@keyframes ls-mobile-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .45; transform: scale(.78); }
+}
+
+/* Themed focus ring for the lottery-winner contact form, matching the accent
+   color of the event instead of a generic browser-default outline. */
+.ls-mobile-input { transition: border-color .15s ease, box-shadow .15s ease; }
+.ls-mobile-input:focus {
+  border-color: var(--phone-accent, #fff) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--phone-accent, #fff) 22%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ls-mobile-pulse-dot { animation: none; }
+}
