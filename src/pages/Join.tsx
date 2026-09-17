@@ -14,21 +14,7 @@ import { useLanguage, useTranslate, type Language } from '../i18n/LanguageContex
 type TorchConstraints = MediaTrackConstraintSet & { torch?: boolean };
 type TorchCapabilities = MediaTrackCapabilities & { torch?: boolean };
 
-type NoticeKey =
-  | 'invalid-link'
-  | 'not-found'
-  | 'connect-failed'
-  | 'flash-control-failed'
-  | 'torch-unsupported'
-  | 'torch-unavailable'
-  | 'torch-no-camera-api'
-  | 'join-failed'
-  | 'choose-answer-first'
-  | 'enter-answer-first'
-  | 'response-submitted'
-  | 'already-responded'
-  | 'submit-failed';
-
+type NoticeKey = 'invalid-link' | 'not-found' | 'connect-failed' | 'flash-control-failed' | 'torch-unsupported' | 'torch-unavailable' | 'torch-no-camera-api' | 'join-failed' | 'choose-answer-first' | 'enter-answer-first' | 'response-submitted' | 'already-responded' | 'submit-failed';
 type Notice = { key: NoticeKey; detail?: string; isError: boolean } | null;
 
 const NOTICE_TEXT: Record<NoticeKey, Record<Language, string>> = {
@@ -52,240 +38,26 @@ export default function Join() {
   const { eventId } = useParams();
   const { language, toggleLanguage } = useLanguage();
   const t = useTranslate();
-
-  function noticeText(notice: Notice): string {
-    if (!notice) return '';
-    if (notice.key === 'join-failed' && notice.detail) {
-      return t({ tr: `Etkinliğe katılınamadı: ${notice.detail}`, en: `Could not join the show: ${notice.detail}` });
-    }
-    return NOTICE_TEXT[notice.key][language];
-  }
-
-  const [event, setEvent] = useState<PublicShow | null>(null);
-  const [game, setGame] = useState<SportsGame | null>(null);
-  const [activeInteraction, setActiveInteraction] = useState<SportsInteraction | null>(null);
-  const [loaded, setLoaded] = useState(false);
-  const [joined, setJoined] = useState(false);
-  const [notice, setNotice] = useState<Notice>(null);
-  const [lightState, setLightState] = useState(false);
-  const [selectedOption, setSelectedOption] = useState('');
-  const [answer, setAnswer] = useState('');
-  const [message, setMessage] = useState<Notice>(null);
-  const [sending, setSending] = useState(false);
-  const [submittedInteractionId, setSubmittedInteractionId] = useState<string | null>(null);
-  const trackRef = useRef<MediaStreamTrack | null>(null);
-  const nextTimerRef = useRef<number | null>(null);
-  const currentLightRef = useRef(false);
-
+  function noticeText(notice: Notice): string { if (!notice) return ''; if (notice.key === 'join-failed' && notice.detail) return t({ tr: `Etkinliğe katılınamadı: ${notice.detail}`, en: `Could not join the show: ${notice.detail}` }); return NOTICE_TEXT[notice.key][language]; }
+  const [event, setEvent] = useState<PublicShow | null>(null); const [game, setGame] = useState<SportsGame | null>(null); const [activeInteraction, setActiveInteraction] = useState<SportsInteraction | null>(null); const [loaded, setLoaded] = useState(false); const [joined, setJoined] = useState(false); const [notice, setNotice] = useState<Notice>(null); const [lightState, setLightState] = useState(false); const [selectedOption, setSelectedOption] = useState(''); const [answer, setAnswer] = useState(''); const [message, setMessage] = useState<Notice>(null); const [sending, setSending] = useState(false); const [submittedInteractionId, setSubmittedInteractionId] = useState<string | null>(null);
+  const trackRef = useRef<MediaStreamTrack | null>(null); const nextTimerRef = useRef<number | null>(null); const currentLightRef = useRef(false);
   useEffect(() => watchServerTimeOffset(() => {}), []);
-
-  useEffect(() => {
-    if (!eventId) { setLoaded(true); setNotice({ key: 'invalid-link', isError: true }); return; }
-    const showId = eventId;
-    let cancelled = false;
-    let stopShow: (() => void) | undefined;
-    let stopGame: (() => void) | undefined;
-    let stopInteractions: (() => void) | undefined;
-    async function connect() {
-      try {
-        await ensureAnonymousAuth();
-        if (cancelled) return;
-        stopShow = watchPublicShow(showId, show => {
-          if (cancelled) return;
-          setEvent(show); setLoaded(true);
-          if (!show) setNotice({ key: 'not-found', isError: true });
-        });
-        stopGame = watchSportsGame(showId, setGame);
-        stopInteractions = watchSportsInteractions(showId, items => setActiveInteraction(items.find(item => item.status === 'open') ?? null));
-      } catch (err) {
-        console.error(err);
-        if (!cancelled) { setLoaded(true); setNotice({ key: 'connect-failed', isError: true }); }
-      }
-    }
-    void connect();
-    return () => { cancelled = true; stopShow?.(); stopGame?.(); stopInteractions?.(); };
-  }, [eventId]);
-
-  useEffect(() => {
-    setSelectedOption(''); setAnswer(''); setMessage(null); setSending(false); setSubmittedInteractionId(null);
-    if (!eventId || !activeInteraction) return;
-    let cancelled = false;
-    const interactionId = activeInteraction.id;
-    void (async () => {
-      try {
-        const uid = (await ensureAnonymousAuth()).uid;
-        const already = await hasRespondedToInteraction(eventId, interactionId, uid);
-        if (!cancelled && already) setSubmittedInteractionId(interactionId);
-      } catch (err) { console.error(err); }
-    })();
-    return () => { cancelled = true; };
-  }, [eventId, activeInteraction?.id]);
-
-  function clearNextTimer() {
-    if (nextTimerRef.current !== null) window.clearTimeout(nextTimerRef.current);
-    nextTimerRef.current = null;
-  }
-  async function setFlash(enabled: boolean) {
-    const track = trackRef.current;
-    if (!track || currentLightRef.current === enabled) return;
-    try {
-      await track.applyConstraints({ advanced: [{ torch: enabled } as TorchConstraints] });
-      currentLightRef.current = enabled; setLightState(enabled);
-    } catch (err) { console.error(err); setNotice({ key: 'flash-control-failed', isError: true }); }
-  }
-  function scheduleNextEvent(timeline: LightTimeline, start: number, offsetMs: number) {
-    clearNextTimer();
-    const now = serverNow();
-    if (now < start) {
-      nextTimerRef.current = window.setTimeout(() => synchronizeShow(start, timeline, offsetMs / 1000), Math.max(0, start - now));
-      return;
-    }
-    const position = now - start + offsetMs;
-    const next = getNextLightEvent(timeline, position);
-    if (!next) return;
-    const eventAt = start + next.time - offsetMs;
-    nextTimerRef.current = window.setTimeout(() => {
-      const currentPosition = serverNow() - start + offsetMs;
-      void setFlash(getLightStateAtTime(timeline, currentPosition));
-      scheduleNextEvent(timeline, start, offsetMs);
-    }, Math.max(0, eventAt - now));
-  }
-  function synchronizeShow(start: number, timeline: LightTimeline, offsetSeconds = 0) {
-    const offsetMs = Math.max(0, offsetSeconds) * 1000;
-    const now = serverNow();
-    const position = now >= start ? now - start + offsetMs : -1;
-    void setFlash(position >= 0 ? getLightStateAtTime(timeline, position) : false);
-    scheduleNextEvent(timeline, start, offsetSeconds);
-  }
-
-  async function joinShow() {
-    if (!eventId || !event) return;
-    setNotice(null);
-    let torchNotice: Notice = null;
-    if (navigator.mediaDevices?.getUserMedia) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
-        const track = stream.getVideoTracks()[0];
-        const capabilities = track?.getCapabilities?.() as TorchCapabilities | undefined;
-        if (track && capabilities?.torch) {
-          trackRef.current = track;
-        } else {
-          stream.getTracks().forEach(track => track.stop());
-          torchNotice = { key: 'torch-unsupported', isError: false };
-        }
-      } catch (mediaErr) {
-        console.error(mediaErr);
-        torchNotice = { key: 'torch-unavailable', isError: false };
-      }
-    } else {
-      torchNotice = { key: 'torch-no-camera-api', isError: false };
-    }
-    try {
-      const user = await ensureAnonymousAuth();
-      await registerParticipant(eventId, user.uid);
-      setJoined(true);
-      if (torchNotice) setNotice(torchNotice);
-      if (event.status === 'running' && event.showStartTime && event.lightTimeline) synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline, event.showStartOffset ?? 0);
-    } catch (err) {
-      console.error(err);
-      const reason = err instanceof Error ? err.message : '';
-      setNotice({ key: 'join-failed', detail: reason || undefined, isError: true });
-    }
-  }
-
-  async function submitInteraction() {
-    if (!eventId || !activeInteraction || sending) return;
-    if (activeInteraction.type === 'poll' && !selectedOption) { setMessage({ key: 'choose-answer-first', isError: true }); return; }
-    if (activeInteraction.type === 'question' && !answer.trim()) { setMessage({ key: 'enter-answer-first', isError: true }); return; }
-    const interactionId = activeInteraction.id;
-    setSending(true); setMessage(null);
-    try {
-      const uid = (await ensureAnonymousAuth()).uid;
-      await submitSportsResponse(eventId, interactionId, uid, activeInteraction.type === 'poll' ? { optionId: selectedOption } : { answer: answer.trim().slice(0, 200) });
-      setSubmittedInteractionId(interactionId); setMessage({ key: 'response-submitted', isError: false }); setSelectedOption(''); setAnswer('');
-    } catch (err) {
-      console.error(err);
-      const alreadyResponded = err instanceof Error && /permission/i.test(err.message);
-      if (alreadyResponded) { setSubmittedInteractionId(interactionId); setMessage({ key: 'already-responded', isError: false }); }
-      else setMessage({ key: 'submit-failed', isError: true });
-    }
-    finally { setSending(false); }
-  }
-
-  useEffect(() => {
-    if (!joined || !event) return;
-    if (event.status === 'running' && event.showStartTime && event.lightTimeline) synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline, event.showStartOffset ?? 0);
-    else { clearNextTimer(); void setFlash(false); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [joined, event?.status, event?.showStartTime, event?.showStartOffset, event?.lightTimeline]);
-
-  useEffect(() => {
-    if (!joined) return;
-    const resync = () => {
-      if (document.visibilityState !== 'visible' || !event) return;
-      if (event.status === 'running' && event.showStartTime && event.lightTimeline) {
-        synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline, event.showStartOffset ?? 0);
-      } else {
-        clearNextTimer();
-        void setFlash(false);
-      }
-    };
-    document.addEventListener('visibilitychange', resync);
-    window.addEventListener('pageshow', resync);
-    window.addEventListener('focus', resync);
-    return () => {
-      document.removeEventListener('visibilitychange', resync);
-      window.removeEventListener('pageshow', resync);
-      window.removeEventListener('focus', resync);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [joined, event?.status, event?.showStartTime, event?.showStartOffset, event?.lightTimeline]);
-
-  useEffect(() => () => {
-    clearNextTimer();
-    if (trackRef.current) {
-      void trackRef.current.applyConstraints({ advanced: [{ torch: false } as TorchConstraints] }).catch(() => {});
-      trackRef.current.stop();
-    }
-  }, []);
-
+  useEffect(() => { if (!eventId) { setLoaded(true); setNotice({ key: 'invalid-link', isError: true }); return; } const showId = eventId; let cancelled = false; let stopShow: (() => void) | undefined; let stopGame: (() => void) | undefined; let stopInteractions: (() => void) | undefined; async function connect() { try { await ensureAnonymousAuth(); if (cancelled) return; stopShow = watchPublicShow(showId, show => { if (cancelled) return; setEvent(show); setLoaded(true); if (!show) setNotice({ key: 'not-found', isError: true }); }); stopGame = watchSportsGame(showId, setGame); stopInteractions = watchSportsInteractions(showId, items => setActiveInteraction(items.find(item => item.status === 'open') ?? null)); } catch (err) { console.error(err); if (!cancelled) { setLoaded(true); setNotice({ key: 'connect-failed', isError: true }); } } } void connect(); return () => { cancelled = true; stopShow?.(); stopGame?.(); stopInteractions?.(); }; }, [eventId]);
+  useEffect(() => { setSelectedOption(''); setAnswer(''); setMessage(null); setSending(false); setSubmittedInteractionId(null); if (!eventId || !activeInteraction) return; let cancelled = false; const interactionId = activeInteraction.id; void (async () => { try { const uid = (await ensureAnonymousAuth()).uid; const already = await hasRespondedToInteraction(eventId, interactionId, uid); if (!cancelled && already) setSubmittedInteractionId(interactionId); } catch (err) { console.error(err); } })(); return () => { cancelled = true; }; }, [eventId, activeInteraction?.id]);
+  function clearNextTimer() { if (nextTimerRef.current !== null) window.clearTimeout(nextTimerRef.current); nextTimerRef.current = null; }
+  async function setFlash(enabled: boolean) { const track = trackRef.current; if (!track || currentLightRef.current === enabled) return; try { await track.applyConstraints({ advanced: [{ torch: enabled } as TorchConstraints] }); currentLightRef.current = enabled; setLightState(enabled); } catch (err) { console.error(err); setNotice({ key: 'flash-control-failed', isError: true }); } }
+  function scheduleNextEvent(timeline: LightTimeline, start: number, offsetMs: number) { clearNextTimer(); const now = serverNow(); if (now < start) { nextTimerRef.current = window.setTimeout(() => synchronizeShow(start, timeline, offsetMs / 1000), Math.max(0, start - now)); return; } const position = now - start + offsetMs; const next = getNextLightEvent(timeline, position); if (!next) return; const eventAt = start + next.time - offsetMs; nextTimerRef.current = window.setTimeout(() => { const currentPosition = serverNow() - start + offsetMs; void setFlash(getLightStateAtTime(timeline, currentPosition)); scheduleNextEvent(timeline, start, offsetMs); }, Math.max(0, eventAt - now)); }
+  function synchronizeShow(start: number, timeline: LightTimeline, offsetSeconds = 0) { const offsetMs = Math.max(0, offsetSeconds) * 1000; const now = serverNow(); const position = now >= start ? now - start + offsetMs : -1; void setFlash(position >= 0 ? getLightStateAtTime(timeline, position) : false); scheduleNextEvent(timeline, start, offsetSeconds); }
+  async function joinShow() { if (!eventId || !event) return; setNotice(null); let torchNotice: Notice = null; if (navigator.mediaDevices?.getUserMedia) { try { const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false }); const track = stream.getVideoTracks()[0]; const capabilities = track?.getCapabilities?.() as TorchCapabilities | undefined; if (track && capabilities?.torch) trackRef.current = track; else { stream.getTracks().forEach(track => track.stop()); torchNotice = { key: 'torch-unsupported', isError: false }; } } catch (mediaErr) { console.error(mediaErr); torchNotice = { key: 'torch-unavailable', isError: false }; } } else torchNotice = { key: 'torch-no-camera-api', isError: false }; try { const user = await ensureAnonymousAuth(); await registerParticipant(eventId, user.uid); setJoined(true); if (torchNotice) setNotice(torchNotice); if (event.status === 'running' && event.showStartTime && event.lightTimeline) synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline, event.showStartOffset ?? 0); } catch (err) { console.error(err); const reason = err instanceof Error ? err.message : ''; setNotice({ key: 'join-failed', detail: reason || undefined, isError: true }); } }
+  async function submitInteraction() { if (!eventId || !activeInteraction || sending) return; if (activeInteraction.type === 'poll' && !selectedOption) { setMessage({ key: 'choose-answer-first', isError: true }); return; } if (activeInteraction.type === 'question' && !answer.trim()) { setMessage({ key: 'enter-answer-first', isError: true }); return; } const interactionId = activeInteraction.id; setSending(true); setMessage(null); try { const uid = (await ensureAnonymousAuth()).uid; await submitSportsResponse(eventId, interactionId, uid, activeInteraction.type === 'poll' ? { optionId: selectedOption } : { answer: answer.trim().slice(0, 200) }); setSubmittedInteractionId(interactionId); setMessage({ key: 'response-submitted', isError: false }); setSelectedOption(''); setAnswer(''); } catch (err) { console.error(err); const alreadyResponded = err instanceof Error && /permission/i.test(err.message); if (alreadyResponded) { setSubmittedInteractionId(interactionId); setMessage({ key: 'already-responded', isError: false }); } else setMessage({ key: 'submit-failed', isError: true }); } finally { setSending(false); } }
+  useEffect(() => { if (!joined || !event) return; if (event.status === 'running' && event.showStartTime && event.lightTimeline) synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline, event.showStartOffset ?? 0); else { clearNextTimer(); void setFlash(false); } }, [joined, event?.status, event?.showStartTime, event?.showStartOffset, event?.lightTimeline]);
+  useEffect(() => { if (!joined) return; const resync = () => { if (document.visibilityState !== 'visible' || !event) return; if (event.status === 'running' && event.showStartTime && event.lightTimeline) synchronizeShow(event.showStartTime, event.lightTimeline as LightTimeline, event.showStartOffset ?? 0); else { clearNextTimer(); void setFlash(false); } }; document.addEventListener('visibilitychange', resync); window.addEventListener('pageshow', resync); window.addEventListener('focus', resync); return () => { document.removeEventListener('visibilitychange', resync); window.removeEventListener('pageshow', resync); window.removeEventListener('focus', resync); }; }, [joined, event?.status, event?.showStartTime, event?.showStartOffset, event?.lightTimeline]);
+  useEffect(() => () => { clearNextTimer(); if (trackRef.current) { void trackRef.current.applyConstraints({ advanced: [{ torch: false } as TorchConstraints] }).catch(() => {}); trackRef.current.stop(); } }, []);
   const langToggle = <button type="button" className="light-lang-toggle" onClick={toggleLanguage} aria-label="Switch language">{language === 'tr' ? 'EN' : 'TR'}</button>;
-
-  if (!loaded) return <main className="light-page light-page-loading"><div className="light-shell"><div className="light-header"><div className="light-brand">LIGHTSYNC</div>{langToggle}</div><div className="light-loading">{t({ tr: 'Etkinliğe bağlanılıyor...', en: 'Connecting to show...' })}</div></div></main>;
+  if (!loaded) return <main className="light-page light-page-loading"><div className="light-shell"><div className="light-header"><div className="light-brand">LIGHTSYNC</div>{langToggle}</div><div className="light-loading ls-mobile-loading"><span className="ls-mobile-pulse-dot" />{t({ tr: 'Etkinliğe bağlanılıyor...', en: 'Connecting to show...' })}</div></div></main>;
   if (!event || !eventId) return <main className="light-page light-page-loading"><div className="light-shell"><div className="light-header"><div className="light-brand">LIGHTSYNC</div>{langToggle}</div><div className="light-loading">{notice ? noticeText(notice) : t({ tr: 'Etkinlik bulunamadı.', en: 'Show not found.' })}</div><button className="light-primary-button" onClick={() => navigate('/')}>{t({ tr: 'GERİ', en: 'BACK' })}</button></div></main>;
-
-  const uiColor = event.phoneUiColor && /^#[0-9a-fA-F]{6}$/.test(event.phoneUiColor) ? event.phoneUiColor : getSportsLightColor(game);
-  const flashColor = event.screenLightColor && /^#[0-9a-fA-F]{6}$/.test(event.screenLightColor) ? event.screenLightColor : uiColor;
-  const running = event.status === 'running';
-  const alreadyResponded = !!activeInteraction && submittedInteractionId === activeInteraction.id;
-  const pageBackground = lightState ? flashColor : `radial-gradient(circle at 50% 0%, ${uiColor}55 0%, transparent 42%), linear-gradient(160deg, #101218 0%, #08090d 58%, #050507 100%)`;
-  const choiceInk = getReadableTextColor(uiColor);
-
-  const interactionCard = activeInteraction ? <section className="light-interaction" aria-live="polite">
-    <div className="interaction-header"><span className="interaction-live-dot" /><span>{activeInteraction.type === 'poll' ? t({ tr: 'CANLI ANKET', en: 'LIVE POLL' }) : t({ tr: 'CANLI SORU', en: 'LIVE QUESTION' })}</span></div>
-    <div className="interaction-question">{activeInteraction.question}</div>
-    {alreadyResponded ? <div className="interaction-message">{message ? noticeText(message) : t({ tr: 'Bu soruyu zaten cevapladınız.', en: 'You already responded to this one.' })}</div> : <>
-      {activeInteraction.type === 'poll' ? <div className="interaction-options">
-        {Object.entries(activeInteraction.options ?? {}).map(([id, label]) => <button key={id} type="button" className={`interaction-option ${selectedOption === id ? 'is-selected' : ''}`} disabled={sending} onClick={() => { setSelectedOption(id); setMessage(null); }} style={selectedOption === id ? ({ '--choice-color': uiColor, '--choice-ink': choiceInk } as CSSProperties) : undefined}><span>{label}</span><span className="choice-mark">{selectedOption === id ? 'v' : ''}</span></button>)}
-      </div> : <textarea className="interaction-answer" value={answer} onChange={e => { setAnswer(e.target.value); setMessage(null); }} maxLength={200} placeholder={t({ tr: 'Cevabınızı yazın...', en: 'Type your answer...' })} rows={3} />}
-      <button type="button" className="interaction-submit" disabled={sending} onClick={() => void submitInteraction()} style={{ background: uiColor, color: getReadableTextColor(uiColor) }}>{sending ? t({ tr: 'GÖNDERİLİYOR...', en: 'SUBMITTING...' }) : activeInteraction.type === 'poll' ? t({ tr: 'OYU GÖNDER', en: 'SUBMIT VOTE' }) : t({ tr: 'CEVABI GÖNDER', en: 'SUBMIT ANSWER' })}</button>
-      {message && <div className={`interaction-message ${message.isError ? 'is-error' : ''}`}>{noticeText(message)}</div>}
-    </>}
-  </section> : null;
-
-  if (!joined) return <main className="light-page" style={{ background: pageBackground }}><div className="light-shell light-shell-join">
-    <header className="light-header"><div className="light-brand">LIGHTSYNC</div><div className="light-header-right">{langToggle}<div className="light-status"><span /> {t({ tr: 'SİSTEM HAZIR', en: 'SYSTEM READY' })}</div></div></header>
-    <section className="light-main join-main"><div className="light-kicker">{t({ tr: 'BAĞLANDINIZ', en: "YOU'RE CONNECTED" })}</div><h1 className="light-title">{event.name}</h1>{game && <div className="light-matchup"><strong>{game.homeTeam.name}</strong><span>VS</span><strong>{game.awayTeam.name}</strong></div>}<p className="light-copy">{t({ tr: "Telefonunuzun fener ışığını etkinleştirmek ve canlı anket/sorulara katılmak için etkinliğe katılın.", en: "Join the show to enable your phone's flashlight and take part in live audience interactions." })}</p><button className="light-primary-button" onClick={() => void joinShow()}>{t({ tr: 'ETKİNLİĞE KATIL', en: 'JOIN SHOW' })}</button><div className="light-note">{t({ tr: 'Kamera izni yalnızca telefonunuzun fener ışığını kontrol etmek için kullanılır.', en: 'Camera permission is used only to control your phone flashlight.' })}</div></section>
-    {interactionCard}{notice && <p className="light-error">{noticeText(notice)}</p>}
-  </div></main>;
-
-  return <main className={`light-page ${lightState ? 'is-flashing' : ''}`} style={{ background: pageBackground, color: lightState ? getReadableTextColor(flashColor, '#050505') : '#fff' }}>
-    <div className="light-shell">
-      <header className="light-header"><div className="light-brand">LIGHTSYNC</div><div className="light-header-right">{langToggle}<div className="light-status" style={lightState ? { background: 'rgba(0,0,0,.16)' } : undefined}><span /> {running ? t({ tr: 'CANLI YAYINDA', en: 'SHOW LIVE' }) : t({ tr: 'SİSTEM HAZIR', en: 'SYSTEM READY' })}</div></div></header>
-      <section className="light-main"><div className="light-kicker">{running ? t({ tr: 'SALONLA SENKRONİZE', en: 'SYNCED WITH THE ARENA' }) : t({ tr: 'BAĞLANTIDA KALIN', en: 'STAY CONNECTED' })}</div><h1 className="light-title">{event.name}</h1>{game && <div className="light-matchup"><strong>{game.homeTeam.name}</strong><span>VS</span><strong>{game.awayTeam.name}</strong></div>}
-        {running ? <><div className="light-state" aria-label={lightState ? t({ tr: 'Fener ışığı açık', en: 'Flashlight on' }) : t({ tr: 'Fener ışığı kapalı', en: 'Flashlight off' })}>{lightState ? t({ tr: 'AÇIK', en: 'ON' }) : t({ tr: 'KAPALI', en: 'OFF' })}</div><p className="light-copy">{t({ tr: 'Fener ışığınız etkinlikle senkronize.', en: 'Your flashlight is synchronized with the show.' })}</p></> : <><div className="light-waiting">{t({ tr: 'IŞIK GÖSTERİSİ YAKINDA BAŞLAYACAK', en: 'FLASHLIGHT SHOW WILL START SOON' })}</div><p className="light-copy">{t({ tr: 'Bağlantıda kalın. Organizatör ışık gösterisini istediği an başlatabilir.', en: 'Stay connected. The organizer can start the light show at any time.' })}</p></>}
-      </section>
-      {interactionCard}{notice && <p className="light-error">{noticeText(notice)}</p>}
-    </div>
-  </main>;
+  const uiColor = event.phoneUiColor && /^#[0-9a-fA-F]{6}$/.test(event.phoneUiColor) ? event.phoneUiColor : getSportsLightColor(game); const flashColor = event.screenLightColor && /^#[0-9a-fA-F]{6}$/.test(event.screenLightColor) ? event.screenLightColor : uiColor; const running = event.status === 'running'; const alreadyResponded = !!activeInteraction && submittedInteractionId === activeInteraction.id; const pageBackground = lightState ? flashColor : `radial-gradient(circle at 50% 0%, ${uiColor}55 0%, transparent 42%), linear-gradient(160deg, #101218 0%, #08090d 58%, #050507 100%)`; const choiceInk = getReadableTextColor(uiColor);
+  const interactionCard = activeInteraction ? <section className="light-interaction" aria-live="polite"><div className="interaction-header"><span className="interaction-live-dot" /><span>{activeInteraction.type === 'poll' ? t({ tr: 'CANLI ANKET', en: 'LIVE POLL' }) : t({ tr: 'CANLI SORU', en: 'LIVE QUESTION' })}</span></div><div className="interaction-question">{activeInteraction.question}</div>{alreadyResponded ? <div className="interaction-message">{message ? noticeText(message) : t({ tr: 'Bu soruyu zaten cevapladınız.', en: 'You already responded to this one.' })}</div> : <>{activeInteraction.type === 'poll' ? <div className="interaction-options">{Object.entries(activeInteraction.options ?? {}).map(([id, label]) => <button key={id} type="button" className={`interaction-option ${selectedOption === id ? 'is-selected' : ''}`} disabled={sending} onClick={() => { setSelectedOption(id); setMessage(null); }} style={selectedOption === id ? ({ '--choice-color': uiColor, '--choice-ink': choiceInk } as CSSProperties) : undefined}><span>{label}</span><span className="choice-mark">{selectedOption === id ? '✓' : ''}</span></button>)}</div> : <textarea className="interaction-answer" value={answer} onChange={e => { setAnswer(e.target.value); setMessage(null); }} maxLength={200} placeholder={t({ tr: 'Cevabınızı yazın...', en: 'Type your answer...' })} rows={3} />}<button type="button" className="interaction-submit" disabled={sending} onClick={() => void submitInteraction()} style={{ background: uiColor, color: getReadableTextColor(uiColor) }}>{sending ? t({ tr: 'GÖNDERİLİYOR...', en: 'SUBMITTING...' }) : activeInteraction.type === 'poll' ? t({ tr: 'OYU GÖNDER', en: 'SUBMIT VOTE' }) : t({ tr: 'CEVABI GÖNDER', en: 'SUBMIT ANSWER' })}</button>{message && <div className={`interaction-message ${message.isError ? 'is-error' : ''}`}>{noticeText(message)}</div>}</>}</section> : null;
+  if (!joined) return <main className="light-page" style={{ background: pageBackground, '--phone-accent': uiColor } as CSSProperties}><div className="light-shell light-shell-join"><header className="light-header"><div className="light-brand">LIGHTSYNC</div><div className="light-header-right">{langToggle}<div className="light-status"><span /> {t({ tr: 'SİSTEM HAZIR', en: 'SYSTEM READY' })}</div></div></header><section className="light-main join-main"><div className="light-kicker">{t({ tr: 'BAĞLANDINIZ', en: "YOU'RE CONNECTED" })}</div><h1 className="light-title">{event.name}</h1>{game && <div className="light-matchup"><strong>{game.homeTeam.name}</strong><span>VS</span><strong>{game.awayTeam.name}</strong></div>}<p className="light-copy">{t({ tr: "Telefonunuzun fener ışığını etkinleştirmek ve canlı anket/sorulara katılmak için etkinliğe katılın.", en: "Join the show to enable your phone's flashlight and take part in live audience interactions." })}</p><button className="light-primary-button ls-mobile-cta" style={{ background: uiColor, color: getReadableTextColor(uiColor) }} onClick={() => void joinShow()}>{t({ tr: 'ETKİNLİĞE KATIL', en: 'JOIN SHOW' })}</button><div className="light-note">{t({ tr: 'Kamera izni yalnızca telefonunuzun fener ışığını kontrol etmek için kullanılır.', en: 'Camera permission is used only to control your phone flashlight.' })}</div></section>{interactionCard}{notice && <p className="light-error">{noticeText(notice)}</p>}</div></main>;
+  return <main className={`light-page ${lightState ? 'is-flashing' : ''}`} style={{ background: pageBackground, color: lightState ? getReadableTextColor(flashColor, '#050505') : '#fff', '--phone-accent': uiColor } as CSSProperties}><div className="light-shell"><header className="light-header"><div className="light-brand">LIGHTSYNC</div><div className="light-header-right">{langToggle}<div className="light-status" style={lightState ? { background: 'rgba(0,0,0,.16)' } : undefined}><span /> {running ? t({ tr: 'CANLI YAYINDA', en: 'SHOW LIVE' }) : t({ tr: 'SİSTEM HAZIR', en: 'SYSTEM READY' })}</div></div></header><section className="light-main"><div className="light-kicker">{running ? t({ tr: 'SALONLA SENKRONİZE', en: 'SYNCED WITH THE ARENA' }) : t({ tr: 'BAĞLANTIDA KALIN', en: 'STAY CONNECTED' })}</div><h1 className="light-title">{event.name}</h1>{game && <div className="light-matchup"><strong>{game.homeTeam.name}</strong><span>VS</span><strong>{game.awayTeam.name}</strong></div>}{running ? <><div className="light-state" aria-label={lightState ? t({ tr: 'Fener ışığı açık', en: 'Flashlight on' }) : t({ tr: 'Fener ışığı kapalı', en: 'Flashlight off' })}>{lightState ? t({ tr: 'AÇIK', en: 'ON' }) : t({ tr: 'KAPALI', en: 'OFF' })}</div><p className="light-copy">{t({ tr: 'Fener ışığınız etkinlikle senkronize.', en: 'Your flashlight is synchronized with the show.' })}</p></> : <><div className="light-waiting ls-mobile-waiting"><span className="ls-mobile-pulse-dot" />{t({ tr: 'IŞIK GÖSTERİSİ YAKINDA BAŞLAYACAK', en: 'FLASHLIGHT SHOW WILL START SOON' })}</div><p className="light-copy">{t({ tr: 'Bağlantıda kalın. Organizatör ışık gösterisini istediği an başlatabilir.', en: 'Stay connected. The organizer can start the light show at any time.' })}</p></>}</section>{interactionCard}{notice && <p className="light-error">{noticeText(notice)}</p>}</div></main>;
 }
