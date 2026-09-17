@@ -84,7 +84,7 @@ export default function LotteryOrganizer({ participants }: LotteryOrganizerProps
           <span className="ls-field-label">NUMBER OF WINNERS</span>
           <div className="ls-winner-stepper">
             <button type="button" className="ls-stepper-button" aria-label="Decrease number of winners" onClick={() => changeWinnerCount(-1)} disabled={winnerCount <= 1 || lottery?.status === 'running'}>−</button>
-            <div className="ls-winner-value"><input aria-label="Number of winners" type="number" inputMode="numeric" min={1} max={100} step={1} value={winnerCount} disabled={lottery?.status === 'running'} onChange={e => { const value = Number(e.target.value); if (Number.isFinite(value)) { setWinnerCount(Math.max(1, Math.min(100, Math.floor(value)))); setMessage(''); } }} /><span>WINNERS</span></div>
+            <div className="ls-winner-value"><input aria-label="Number of winners" type="number" inputMode="numeric" min={1} max={100} step={1} value={winnerCount} disabled={lottery?.status === 'running'} onChange={e => { const value = Number(e.target.value); if (Number.isFinite(value)) { setWinnerCount(Math.max(1, Math.min(100, Math.floor(value)))); setMessage(''); } }} /></div>
             <button type="button" className="ls-stepper-button" aria-label="Increase number of winners" onClick={() => changeWinnerCount(1)} disabled={lottery?.status === 'running' || winnerCount >= 100}>+</button>
           </div>
           <p className="ls-muted ls-winner-hint">{connected.length === 0 ? 'Connect audience phones before starting the lottery.' : `Up to ${connected.length} connected participant${connected.length === 1 ? '' : 's'} can be selected.`}</p>
