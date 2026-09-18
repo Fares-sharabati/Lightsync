@@ -3,9 +3,8 @@ import { useTranslate } from '../i18n/LanguageContext';
 import '../styles/nextted.css';
 
 const TIMELINE = [
-  { year: '2021 — 2023', name: 'Adam Voleybol', body: { tr: 'Müzik, ışık, anons ve canlı etkinlik deneyimi.', en: 'Music, lighting, announcing and live event experience.' } },
-  { year: { tr: '2020 — Günümüz', en: '2020 — Present' }, name: 'Gaziantep Basketbol', body: { tr: 'Müzik, ışık, anons ve maç günü operasyonları. Bugün hâlâ ekibin bir parçasıyız.', en: 'Music, lighting, announcing and game-day operations. We are still part of the team today.' } },
-  { year: '2026 — 2027', name: 'KBB Kipaş İstiklal Basketbol', body: { tr: 'Anonsör olarak ilk sezonumuz.', en: 'First season working as the announcer.' } },
+  { year: { tr: '2020 — Günümüz', en: '2020 — Present' }, name: { tr: 'Basketbol takımları', en: 'Basketball teams' }, body: { tr: 'Müzik, ışık, anons ve maç günü operasyonları. Bugün hâlâ takımlarla çalışıyoruz.', en: 'Music, lighting, announcing and game-day operations. We continue to work with teams today.' } },
+  { year: { tr: '2021 — Günümüz', en: '2021 — Present' }, name: { tr: 'Voleybol takımları', en: 'Volleyball teams' }, body: { tr: 'Müzik, ışık, anons ve canlı etkinlik deneyimi. Bu alandaki çalışmalarımız devam ediyor.', en: 'Music, lighting, announcing and live event experience. Our work in this space continues.' } },
 ];
 
 export default function Mission() {
@@ -58,16 +57,16 @@ export default function Mission() {
                 en: 'Our sports story started years ago with game-day work. Music, lighting, announcing and the small details that decide whether a game feels flat or unforgettable.',
               })}</p>
               <p>{t({
-                tr: 'Bu deneyim, çalıştığımız kulüp ve takımlarla büyüdü. Her biri canlı bir spor deneyiminin nasıl oluşturulduğuna dair farklı bir bakış açısı kazandırdı.',
-                en: 'That experience grew through the clubs and teams we worked with, each adding a different perspective on how a live sports experience is created.',
+                tr: 'Bu deneyim, çalıştığımız basketbol ve voleybol takımlarıyla büyüdü. Her biri canlı bir spor deneyiminin nasıl oluşturulduğuna dair farklı bir bakış açısı kazandırdı.',
+                en: 'That experience grew through the basketball and volleyball teams we worked with, each adding a different perspective on how a live sports experience is created.',
               })}</p>
 
               <div className="nextted-timeline">
                 {TIMELINE.map(item => (
-                  <div className="nextted-timeline-item" key={item.name}>
-                    <span className="nextted-timeline-year">{typeof item.year === 'string' ? item.year : t(item.year)}</span>
+                  <div className="nextted-timeline-item" key={typeof item.name === 'string' ? item.name : item.name.en}>
+                    <span className="nextted-timeline-year">{t(item.year)}</span>
                     <div>
-                      <h3>{item.name}</h3>
+                      <h3>{t(item.name)}</h3>
                       <p>{t(item.body)}</p>
                     </div>
                   </div>
