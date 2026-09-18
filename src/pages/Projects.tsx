@@ -67,7 +67,7 @@ export default function Projects() {
           </article>
 
           <article id="lightsync" className="nextted-case">
-            <div className="nextted-case-meta"><span>03 · LightSync</span><span>{t({ tr: 'Spor Teknolojisi / Ürün', en: 'Sports Technology / Product' })}</div>
+            <div className="nextted-case-meta"><span>03 · LightSync</span><span>{t({ tr: 'Spor Teknolojisi / Ürün', en: 'Sports Technology / Product' })}</span></div>
             <h2>{t({ tr: 'Taraftarı oyunun bir parçası haline getirmek.', en: 'Making the audience part of the game.' })}</h2>
             <p className="nextted-case-intro">{t({
               tr: 'LightSync, profesyonel spor etkinliklerinin içinde geçirdiğimiz yıllardan doğdu. Maçı prodüksiyon tarafından gördükten sonra taraftarların yalnızca izlemekle kalmayıp nasıl aktif şekilde katılabileceğini değiştirecek bir ürün geliştirmek istedik.',
