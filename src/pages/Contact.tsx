@@ -9,34 +9,67 @@ export default function Contact() {
     <div className="nextted-site">
       <NexttedNav />
       <main>
-        <section className="nextted-page-head"><div className="nextted-container">
-          <p className="nextted-kicker">{t({ tr: 'İletişime geçin', en: 'Get in touch' })}</p>
-          <h1>{t({ tr: 'Çözülmeye değer bir probleminiz mi var?', en: 'Have a problem worth solving?' })}</h1>
-          <p>{t({
-            tr: 'Üzerinde çalıştığınız şeyi bize anlatın. Dijital ürünler, kullanıcı deneyimi, teknoloji ve gerçek bir fark yaratabilecek fikirlerle ilgileniyoruz.',
-            en: 'Tell us what you are working on. We are interested in digital products, user experience, technology and ideas that can make a real difference.',
-          })}</p>
-        </div></section>
+        <section className="nextted-contact-hero">
+          <div className="nextted-container nextted-contact-hero-inner">
+            <div className="nextted-contact-hero-copy">
+              <p className="nextted-kicker">{t({ tr: 'İletişime geçin', en: 'Get in touch' })}</p>
+              <h1>{t({ tr: 'Çözülmeye değer bir probleminiz mi var?', en: 'Have a problem worth solving?' })}</h1>
+            </div>
+            <div className="nextted-contact-hero-note">
+              <span className="nextted-contact-index">01 / CONTACT</span>
+              <p>{t({
+                tr: 'Üzerinde çalıştığınız şeyi bize anlatın. Dijital ürünler, kullanıcı deneyimi, teknoloji ve gerçek bir fark yaratabilecek fikirlerle ilgileniyoruz.',
+                en: 'Tell us what you are working on. We are interested in digital products, user experience, technology and ideas that can make a real difference.',
+              })}</p>
+            </div>
+          </div>
+        </section>
 
-        <section className="nextted-section"><div className="nextted-container">
-          <div className="nextted-contact-grid">
-            <div className="nextted-contact-card">
+        <section className="nextted-section nextted-contact-section"><div className="nextted-container">
+          <div className="nextted-contact-heading">
+            <div>
+              <p className="nextted-kicker">{t({ tr: 'Doğrudan ulaşın', en: 'Reach us directly' })}</p>
+              <h2>{t({ tr: 'Konuşmayı başlatalım.', en: 'Start the conversation.' })}</h2>
+            </div>
+            <span>{t({ tr: 'İstanbul · Türkiye', en: 'Istanbul · Türkiye' })}</span>
+          </div>
+
+          <div className="nextted-contact-grid nextted-contact-grid-pro">
+            <a className="nextted-contact-card nextted-contact-card-featured" href="mailto:info@nextted.com">
+              <div className="nextted-contact-card-top">
+                <span className="nextted-contact-number">01</span>
+                <span className="nextted-contact-arrow">↗</span>
+              </div>
               <h3>{t({ tr: 'E-posta', en: 'Email' })}</h3>
-              <p><a href="mailto:info@nextted.com">info@nextted.com</a></p>
-            </div>
-            <div className="nextted-contact-card">
+              <p>info@nextted.com</p>
+              <span className="nextted-contact-label">{t({ tr: 'En hızlı başlangıç', en: 'Best place to start' })}</span>
+            </a>
+
+            <a className="nextted-contact-card nextted-contact-card-featured" href="tel:+905393833403">
+              <div className="nextted-contact-card-top">
+                <span className="nextted-contact-number">02</span>
+                <span className="nextted-contact-arrow">↗</span>
+              </div>
               <h3>{t({ tr: 'Telefon', en: 'Phone' })}</h3>
-              <p><a href="tel:+905393833403">+90 539 383 34 03</a></p>
-            </div>
-            <div className="nextted-contact-card">
+              <p>+90 539 383 34 03</p>
+              <span className="nextted-contact-label">{t({ tr: 'Doğrudan konuşalım', en: 'Talk directly' })}</span>
+            </a>
+
+            <div className="nextted-contact-card nextted-contact-card-featured">
+              <div className="nextted-contact-card-top">
+                <span className="nextted-contact-number">03</span>
+                <span className="nextted-contact-arrow">⌖</span>
+              </div>
               <h3>{t({ tr: 'İstanbul', en: 'Istanbul' })}</h3>
               <p>{t({
                 tr: <>Küçükyalı, Maltepe<br />İstanbul, Türkiye</>,
                 en: <>Küçükyalı, Maltepe<br />Istanbul, Türkiye</>,
               })}</p>
+              <span className="nextted-contact-label">{t({ tr: 'Merkezimiz', en: 'Our base' })}</span>
             </div>
           </div>
-          <div className="nextted-quote">{t({
+
+          <div className="nextted-quote nextted-contact-quote">{t({
             tr: 'Her zaman iyi bir probleme, güçlü bir fikre ya da teknolojinin neyi daha iyi yapabileceği üzerine bir sohbete açığız.',
             en: 'We are always open to a good problem, a strong idea or a conversation about what technology could do better.',
           })}</div>
