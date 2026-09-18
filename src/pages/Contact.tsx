@@ -29,13 +29,6 @@ export default function Contact() {
               <p><a href="tel:+905393833403">+90 539 383 34 03</a></p>
             </div>
             <div className="nextted-contact-card">
-              <h3>Gaziantep</h3>
-              <p>{t({
-                tr: <>Hasan Kalyoncu Üniversitesi<br />Gaziantep, Türkiye</>,
-                en: <>Hasan Kalyoncu University<br />Gaziantep, Türkiye</>,
-              })}</p>
-            </div>
-            <div className="nextted-contact-card">
               <h3>{t({ tr: 'İstanbul', en: 'Istanbul' })}</h3>
               <p>{t({
                 tr: <>Küçükyalı, Maltepe<br />İstanbul, Türkiye</>,
