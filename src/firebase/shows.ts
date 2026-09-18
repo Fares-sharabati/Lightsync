@@ -50,6 +50,7 @@ const EVENT_DELETE_PATHS = [
   'showParticipants',
   'showStats',
   'sportsGames',
+  'hapticEvents',
   'sportsInteractions',
   'sportsResponses',
   'sportsResults',
