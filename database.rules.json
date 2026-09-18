@@ -37,6 +37,14 @@
       }
     },
 
+    "hapticEvents": {
+      "$showId": {
+        ".read": true,
+        ".write": "auth != null && root.child('shows').child($showId).child('organizerId').val() === auth.uid",
+        ".validate": "!newData.exists() || (newData.hasChildren(['activeHaptic', 'timestamp']) && newData.child('activeHaptic').isString() && (newData.child('activeHaptic').val() === 'THREE_POINTER' || newData.child('activeHaptic').val() === 'DUNK' || newData.child('activeHaptic').val() === 'BLOCK' || newData.child('activeHaptic').val() === 'BUZZER_BEATER') && newData.child('timestamp').isNumber())"
+      }
+    },
+
     "sportsGames": {
       "$showId": {
         ".read": true,
