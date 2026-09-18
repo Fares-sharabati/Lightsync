@@ -166,10 +166,10 @@ export default function LotteryAudience() {
         style={{
           ...overlayBase,
           color: '#050505',
-          animation: 'lightsync-lottery-flash .55s ease-in-out infinite alternate',
+          animation: 'Fancourt360-lottery-flash .55s ease-in-out infinite alternate',
         }}
       >
-        <style>{'@keyframes lightsync-lottery-flash{from{filter:brightness(.72)}to{filter:brightness(1.18)}}'}</style>
+        <style>{'@keyframes Fancourt360-lottery-flash{from{filter:brightness(.72)}to{filter:brightness(1.18)}}'}</style>
         <div>
           <div style={{ fontSize: 12, letterSpacing: '.35em', fontWeight: 900 }}>
             {t({ tr: 'ÇEKİLİŞ', en: 'LOTTERY' })}
