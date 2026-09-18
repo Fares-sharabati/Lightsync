@@ -67,7 +67,7 @@ export default function Projects() {
           </article>
 
           <article id="lightsync" className="nextted-case">
-            <div className="nextted-case-meta"><span>03 · LightSync</span><span>{t({ tr: 'Spor Teknolojisi / Ürün', en: 'Sports Technology / Product' })}</span></div>
+            <div className="nextted-case-meta"><span>03 · LightSync</span><span>{t({ tr: 'Spor Teknolojisi / Ürün', en: 'Sports Technology / Product' })}</div>
             <h2>{t({ tr: 'Taraftarı oyunun bir parçası haline getirmek.', en: 'Making the audience part of the game.' })}</h2>
             <p className="nextted-case-intro">{t({
               tr: 'LightSync, profesyonel spor etkinliklerinin içinde geçirdiğimiz yıllardan doğdu. Maçı prodüksiyon tarafından gördükten sonra taraftarların yalnızca izlemekle kalmayıp nasıl aktif şekilde katılabileceğini değiştirecek bir ürün geliştirmek istedik.',
@@ -75,8 +75,8 @@ export default function Projects() {
             })}</p>
             <div className="nextted-case-grid">
               <div className="nextted-case-block"><h3>{t({ tr: 'Nereden doğdu?', en: 'Where it came from' })}</h3><p>{t({
-                tr: 'Ekibimiz Gaziantep Basketbol, Adam Voleybol ve 2026–2027 sezonunda KBB Kipaş İstiklal Basketbol ile çalıştı.',
-                en: 'Our team has worked across Gaziantep Basketbol, Adam Voleybol and, for 2026–2027, KBB Kipaş İstiklal Basketbol.',
+                tr: 'Ekibimiz basketbol ve voleybol takımlarıyla çalıştı ve bu çalışmalar bugün de devam ediyor.',
+                en: 'Our team has worked with basketball and volleyball teams, and that work continues today.',
               })}</p></div>
               <div className="nextted-case-block"><h3>{t({ tr: 'Işıktan daha fazlası', en: 'More than lights' })}</h3><p>{t({
                 tr: 'Senkronize telefon ışığı bunun yalnızca bir parçası. Anketler, sorular ve canlı etkileşimler kalabalığı deneyimin aktif bir parçası haline getirmenin merkezinde.',
