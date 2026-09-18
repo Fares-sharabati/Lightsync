@@ -53,12 +53,12 @@ export default function NexttedHome() {
               })}</p>
               <span className="nt-tag">{t({ tr: 'Geliştiriliyor →', en: 'In development →' })}</span>
             </Link>
-            <Link to="/projects#lightsync" className="nextted-project-card">
+            <Link to="/projects#fancourt360" className="nextted-project-card">
               <span className="nextted-project-no">{t({ tr: '03 / SPOR TEKNOLOJİSİ', en: '03 / SPORTS TECHNOLOGY' })}</span>
-              <h3>LightSync</h3>
+              <h3>FanCourt360</h3>
               <p>{t({
-                tr: 'Yıllarca canlı spor etkinliklerinin içinde çalışarak geliştirdiğimiz bir taraftar etkileşim platformu.',
-                en: 'An audience engagement platform built from years of working inside live sports events.',
+                tr: 'Canlı spor etkinliklerinde tüm taraftarları aynı deneyimde buluşturan bir etkileşim platformu.',
+                en: 'An audience engagement platform that brings every fan into the same live game experience.',
               })}</p>
               <span className="nt-tag">{t({ tr: 'Ürünümüz →', en: 'Our product →' })}</span>
             </Link>
@@ -70,12 +70,12 @@ export default function NexttedHome() {
             <h2>{t({ tr: 'Problemin içinden geldik.', en: 'We came from inside the problem.' })}</h2>
             <div>
               <p>{t({
-                tr: <>Profesyonel spordaki çalışmalarımız LightSync'ten yıllar önce başladı. <strong>Basketbol ve voleybol takımlarıyla</strong> müzik, ışık, anons ve maç günü operasyonlarında çalıştık. Bugün de bu deneyimin içinde olmaya ve takımlarla birlikte çalışmaya devam ediyoruz.</>,
-                en: <>Our work in professional sports started years before LightSync. We have worked with <strong>basketball and volleyball teams</strong> across music, lighting, announcing and game-day operations. We continue to work alongside teams today.</>,
+                tr: <>Profesyonel spordaki çalışmalarımız bu platformdan yıllar önce başladı. <strong>Basketbol ve voleybol takımlarıyla</strong> müzik, ışık, anons ve maç günü operasyonlarında çalıştık. Bugün de bu deneyimin içinde olmaya ve takımlarla birlikte çalışmaya devam ediyoruz.</>,
+                en: <>Our work in professional sports started years before this platform. We have worked with <strong>basketball and volleyball teams</strong> across music, lighting, announcing and game-day operations. We continue to work alongside teams today.</>,
               })}</p>
               <p>{t({
-                tr: 'Bu ortamların içinde olmak, canlı bir maçın ne kadar daha etkileşimli olabileceğini gösterdi. LightSync, bu deneyimi değiştirmek için geliştirdiğimiz ilk ürün.',
-                en: 'Being inside those environments showed us how much more engaging a live game could be. LightSync is the first product we are building to change that experience.',
+                tr: 'Bu ortamların içinde olmak, canlı bir maçın ne kadar daha etkileşimli olabileceğini gösterdi. FanCourt360, bu deneyimi değiştirmek için geliştirdiğimiz platform.',
+                en: 'Being inside those environments showed us how much more engaging a live game could be. FanCourt360 is the platform we are building to change that experience.',
               })}</p>
               <Link to="/mission" className="nextted-btn nextted-btn-secondary">{t({ tr: 'Hikâyemizi okuyun →', en: 'Read our story →' })}</Link>
             </div>
