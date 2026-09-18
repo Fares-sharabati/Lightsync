@@ -26,7 +26,7 @@ export default function AudienceScreen() {
   if (!show || !eventId) return <main className="audience-screen"><div className="audience-loading">{t({ tr: 'ETKİNLİK BULUNAMADI', en: 'SHOW NOT FOUND' })}</div></main>;
 
   const joinUrl = `${PUBLIC_APP_URL}/join/${eventId}`;
-  const homeColor = show.screenLightColor || game?.homeTeam.primaryColor || '#ff3030';
+  const homeColor = show.screenLightColor || game?.homeTeam.primaryColor || '#FFFFFF';
   const awayColor = game?.awayTeam.primaryColor || homeColor;
   const screenStyle = { '--ls-screen-accent': homeColor, '--ls-screen-accent-2': awayColor } as CSSProperties;
 
