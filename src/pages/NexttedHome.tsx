@@ -70,8 +70,8 @@ export default function NexttedHome() {
             <h2>{t({ tr: 'Problemin içinden geldik.', en: 'We came from inside the problem.' })}</h2>
             <div>
               <p>{t({
-                tr: <>Profesyonel spordaki çalışmalarımız LightSync'ten yıllar önce başladı. <strong>Gaziantep Basketbol</strong>, <strong>Adam Voleybol</strong> ve 2026–2027 sezonunda <strong>KBB Kipaş İstiklal Basketbol</strong> ile müzik, ışık, anons ve maç günü operasyonlarında çalıştık.</>,
-                en: <>Our work in professional sports started years before LightSync. We have worked on music, lighting, announcing and game-day operations with <strong>Gaziantep Basketbol</strong>, <strong>Adam Voleybol</strong> and, for the 2026–2027 season, <strong>KBB Kipaş İstiklal Basketbol</strong>.</>,
+                tr: <>Profesyonel spordaki çalışmalarımız LightSync'ten yıllar önce başladı. <strong>Basketbol ve voleybol takımlarıyla</strong> müzik, ışık, anons ve maç günü operasyonlarında çalıştık. Bugün de bu deneyimin içinde olmaya ve takımlarla birlikte çalışmaya devam ediyoruz.</>,
+                en: <>Our work in professional sports started years before LightSync. We have worked with <strong>basketball and volleyball teams</strong> across music, lighting, announcing and game-day operations. We continue to work alongside teams today.</>,
               })}</p>
               <p>{t({
                 tr: 'Bu ortamların içinde olmak, canlı bir maçın ne kadar daha etkileşimli olabileceğini gösterdi. LightSync, bu deneyimi değiştirmek için geliştirdiğimiz ilk ürün.',
