@@ -12,7 +12,7 @@ export default function NexttedNav() {
         <Link to="/mission">{t({ tr: 'Misyon & Vizyon', en: 'Mission & Vision' })}</Link>
         <Link to="/projects">{t({ tr: 'Projeler', en: 'Projects' })}</Link>
         <Link to="/contact">{t({ tr: 'İletişim', en: 'Contact' })}</Link>
-        <Link to="/admin" className="nextted-light-btn">{t({ tr: "LightSync'i Aç", en: 'Open LightSync' })}</Link>
+        <Link to="/admin" className="nextted-light-btn">{t({ tr: "FanCourt360'i Aç", en: 'Open FanCourt360' })}</Link>
         <button type="button" className="nextted-lang-toggle" onClick={toggleLanguage} aria-label="Switch language">
           {language === 'tr' ? 'EN' : 'TR'}
         </button>
