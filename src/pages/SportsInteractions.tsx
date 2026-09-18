@@ -223,5 +223,5 @@ export default function SportsInteractions({ embedded = false }: Props) {
   </div>;
 
   if (embedded) return content;
-  return <main className="ls-shell" style={{ minHeight: '100vh', padding: 24 }}><header className="ls-header"><div><div className="ls-brand">LIGHTSYNC</div><p className="ls-eyebrow">SPORTS INTERACTIONS</p></div><button className="ls-button ls-secondary" onClick={() => navigate(`/admin/event/${eventId}`)}>BACK TO EVENT</button></header><div style={{ maxWidth: 1200, margin: '0 auto' }}>{content}</div></main>;
+  return <main className="ls-shell" style={{ minHeight: '100vh', padding: 24 }}><header className="ls-header"><div><div className="ls-brand">FANCOURT360</div><p className="ls-eyebrow">SPORTS INTERACTIONS</p></div><button className="ls-button ls-secondary" onClick={() => navigate(`/admin/event/${eventId}`)}>BACK TO EVENT</button></header><div style={{ maxWidth: 1200, margin: '0 auto' }}>{content}</div></main>;
 }

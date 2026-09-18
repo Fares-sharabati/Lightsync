@@ -62,7 +62,7 @@ export default function Admin() {
     finally { setStatusUpdatingId(null); }
   }
 
-  if (!authenticated) return <main className="ls-shell" style={baseTheme}><section className="ls-auth-card"><div className="ls-brand">LIGHTSYNC</div><p className="ls-eyebrow">ORGANIZER ACCESS</p><h1>Control the crowd.</h1><p className="ls-muted">Sports event control for LightSync.</p><input className="ls-input" type="email" placeholder="Organizer email" value={email} onChange={e => setEmail(e.target.value)} /><input className="ls-input" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && void login()} /><button className="ls-button ls-primary" onClick={() => void login()}>ENTER DASHBOARD</button>{message && <p className="ls-error">{message}</p>}</section></main>;
+  if (!authenticated) return <main className="ls-shell" style={baseTheme}><section className="ls-auth-card"><div className="ls-brand">FANCOURT360</div><p className="ls-eyebrow">ORGANIZER ACCESS</p><h1>Control the crowd.</h1><p className="ls-muted">Sports event control for FanCourt360.</p><input className="ls-input" type="email" placeholder="Organizer email" value={email} onChange={e => setEmail(e.target.value)} /><input className="ls-input" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && void login()} /><button className="ls-button ls-primary" onClick={() => void login()}>ENTER DASHBOARD</button>{message && <p className="ls-error">{message}</p>}</section></main>;
 
   const teamFields = (side: 'home' | 'away', team: SportsTeam, setTeam: Dispatch<SetStateAction<SportsTeam>>) => (
     <div className="ls-team-card" style={{ '--side-color': team.primaryColor } as CSSProperties}>
@@ -88,8 +88,8 @@ export default function Admin() {
   </div>;
 
   return <main className="ls-shell" style={theme}>
-    <header className="ls-header"><div><div className="ls-brand">LIGHTSYNC</div><p className="ls-eyebrow">SPORTS CONTROL</p></div><button className="ls-button ls-secondary" onClick={() => navigate('/')}>HOME</button></header>
-    <section className="ls-hero-grid"><div><p className="ls-eyebrow">SPORTS EVENT CONTROL</p><h1>Synchronize the audience.</h1><p className="ls-muted">Create a match, choose its colors, then control the music and audience interactions from one event page.</p></div><div className="ls-orbit"><div className="ls-arena" style={{ borderColor: home.primaryColor }}><span style={{ color: home.primaryColor }}>LIGHTSYNC</span></div></div></section>
+    <header className="ls-header"><div><div className="ls-brand">FANCOURT360</div><p className="ls-eyebrow">SPORTS CONTROL</p></div><button className="ls-button ls-secondary" onClick={() => navigate('/')}>HOME</button></header>
+    <section className="ls-hero-grid"><div><p className="ls-eyebrow">SPORTS EVENT CONTROL</p><h1>Synchronize the audience.</h1><p className="ls-muted">Create a match, choose its colors, then control the music and audience interactions from one event page.</p></div><div className="ls-orbit"><div className="ls-arena" style={{ borderColor: home.primaryColor }}><span style={{ color: home.primaryColor }}>FANCOURT360</span></div></div></section>
     <section className="ls-card"><div className="ls-section-title"><div><p className="ls-eyebrow">NEW SPORTS EVENT</p><h2>Create a match</h2></div></div>
       <div className="ls-form-grid"><input className="ls-input" type="date" value={date} onChange={e => setDate(e.target.value)} /><input className="ls-input" placeholder="Venue" value={venue} onChange={e => setVenue(e.target.value)} /><select className="ls-input" value={sport} onChange={e => setSport(e.target.value)}><option>Basketball</option><option>Football</option><option>Volleyball</option><option>Handball</option><option>Other</option></select></div>
       <div className="ls-matchup" style={{ marginBottom: 4 }}><div className="ls-matchup-side" style={{ '--side-color': home.primaryColor } as CSSProperties}><strong>{home.name.trim() || 'Home Team'}</strong><small>HOME</small></div><div className="ls-matchup-vs">VS</div><div className="ls-matchup-side" style={{ '--side-color': away.primaryColor } as CSSProperties}><strong>{away.name.trim() || 'Away Team'}</strong><small>AWAY</small></div></div>
@@ -110,6 +110,6 @@ export default function Admin() {
         </div>}
       </>}
     </section>
-    <ConfirmDialog open={deleteTarget !== null} title="Delete this event?" description={deleteTarget ? `This will permanently remove “${deleteTarget.name}” and its audience/event data. This action cannot be undone.` : ''} busy={deletingId !== null} onCancel={() => { if (!deletingId) setDeleteTarget(null); }} onConfirm={() => void handleDeleteConfirmed()} />
+    <ConfirmDialog open={deleteTarget !== null} title="Delete this event?" description={deleteTarget ? `This will permanently remove "${deleteTarget.name}" and its audience/event data. This action cannot be undone.` : ''} busy={deletingId !== null} onCancel={() => { if (!deletingId) setDeleteTarget(null); }} onConfirm={() => void handleDeleteConfirmed()} />
   </main>;
 }
