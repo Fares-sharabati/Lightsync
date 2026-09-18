@@ -11,6 +11,7 @@ import SportsInteractions from './SportsInteractions';
 import LotteryOrganizer from '../components/LotteryOrganizer';
 import { PUBLIC_APP_URL } from '../constants';
 import { getReadableTextColor } from '../utils/color';
+import { triggerHapticEvent, type HapticEventType } from '../firebase/haptics';
 
 function getAudioMimeType(file: File) { const n = file.name.toLowerCase(); if (n.endsWith('.mp3') || n.endsWith('.mpeg')) return 'audio/mpeg'; if (n.endsWith('.m4a') || n.endsWith('.mp4')) return 'audio/mp4'; if (n.endsWith('.wav')) return 'audio/wav'; if (n.endsWith('.ogg') || n.endsWith('.oga')) return 'audio/ogg'; if (n.endsWith('.webm')) return 'audio/webm'; if (n.endsWith('.aac')) return 'audio/aac'; if (n.endsWith('.flac')) return 'audio/flac'; return file.type || 'audio/mpeg'; }
 function formatTime(seconds: number) { if (!Number.isFinite(seconds) || seconds < 0) return '0:00'; const total = Math.floor(seconds); return `${Math.floor(total / 60)}:${(total % 60).toString().padStart(2, '0')}`; }
@@ -36,6 +37,27 @@ export default function EventControl() {
   async function stopShow() { if (!eventId) return; if (startTimerRef.current !== null) window.clearTimeout(startTimerRef.current); if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current); startTimerRef.current = null; countdownTimerRef.current = null; setCountdown(null); if (audioRef.current) { audioRef.current.pause(); audioRef.current.volume = 1; audioRef.current.currentTime = 0; } setSongCurrentTime(0); setStartOffset(0); setAnalysisMessage('Stopping show...'); try { await updateShow(eventId, { status: 'finished', showStartTime: null, showStartOffset: 0 }); setAnalysisMessage('Show finished.'); } catch (error) { console.error(error); setAnalysisMessage('Could not finish the show. Check the Firebase rules and organizer account.'); } }
   async function changeScreenColor(color: string) { if (!/^#[0-9a-fA-F]{6}$/.test(color) || !eventId) return; try { const normalized = color.toUpperCase(); await updateShow(eventId, { screenLightColor: normalized }); setCustomColor(normalized); } catch (error) { console.error(error); setAnalysisMessage('Could not change the audience screen color.'); } }
   function applyCustomColor() { const value = customColor.trim().startsWith('#') ? customColor.trim() : `#${customColor.trim()}`; if (!/^#[0-9a-fA-F]{6}$/.test(value)) { setAnalysisMessage('Enter a valid 6-digit HEX color, for example #FFFFFF.'); return; } setAnalysisMessage(''); void changeScreenColor(value); }
+  const hapticButtons: Array<{ type: HapticEventType; label: string; hint: string }> = [
+    { type: 'THREE_POINTER', label: '3-Pointer', hint: '3 quick pulses' },
+    { type: 'DUNK', label: 'Slam Dunk', hint: 'Heavy impact' },
+    { type: 'BLOCK', label: 'Block', hint: 'Double impact' },
+    { type: 'BUZZER_BEATER', label: 'Buzzer Beater', hint: 'Clutch pulse train' },
+  ];
+  const [hapticSending, setHapticSending] = useState<HapticEventType | null>(null);
+  async function triggerMatchHaptic(type: HapticEventType) {
+    if (!eventId || hapticSending) return;
+    setHapticSending(type);
+    try {
+      await triggerHapticEvent(eventId, type);
+      setAnalysisMessage('Haptic signal sent to connected phones.');
+    } catch (error) {
+      console.error('Could not trigger haptic event:', error);
+      setAnalysisMessage('Could not send the haptic signal.');
+    } finally {
+      setHapticSending(null);
+    }
+  }
+
   async function copyEventId() { if (!eventId) return; try { if (!navigator.clipboard) throw new Error('Clipboard unavailable'); await navigator.clipboard.writeText(eventId); setCopiedId(true); window.setTimeout(() => setCopiedId(false), 1600); } catch (error) { console.error('Could not copy event ID:', error); setAnalysisMessage('Could not copy the event ID. Please select it manually.'); } }
 
   if (!loaded) return <main className="ls-shell"><div className="ls-card ls-event-loading">Loading event...</div></main>;
@@ -63,7 +85,14 @@ export default function EventControl() {
     <div className="ls-group"><div className="ls-group-heading"><span className="ls-group-bar" /><div><h2>Audience Engagement</h2><span>Screen color, lottery &amp; interactions</span></div></div><div className="ls-engage-grid">
       <div className="ls-card"><div className="ls-section-title"><div><p className="ls-eyebrow">AUDIENCE SCREEN</p><h2>Phone screen light color</h2></div><div className="ls-current-color-swatch" style={{ background: screenColor, boxShadow: `0 0 28px ${screenColor}66` }} aria-label={`Current screen color ${screenColor}`} /></div><p className="ls-muted">This controls the color shown on connected phones when their synchronized light is ON. The physical flashlight remains white.</p>{game && <div className="ls-color-presets"><button type="button" className={`ls-color-preset-chip ${screenColor.toUpperCase() === homeColor.toUpperCase() ? 'is-active' : ''}`} style={{ '--side-color': homeColor } as React.CSSProperties} onClick={() => void changeScreenColor(homeColor)}><span className="ls-color-preset-dot" />{game.homeTeam.name} (Home)</button><button type="button" className={`ls-color-preset-chip ${screenColor.toUpperCase() === awayColor.toUpperCase() ? 'is-active' : ''}`} style={{ '--side-color': awayColor } as React.CSSProperties} onClick={() => void changeScreenColor(awayColor)}><span className="ls-color-preset-dot" />{game.awayTeam.name} (Away)</button><button type="button" className={`ls-color-preset-chip ${screenColor.toUpperCase() === '#FFFFFF' ? 'is-active' : ''}`} style={{ '--side-color': '#FFFFFF' } as React.CSSProperties} onClick={() => void changeScreenColor('#FFFFFF')}><span className="ls-color-preset-dot" />White</button></div>}<div className="ls-screen-color-row"><label className="ls-color-chip-field"><input type="color" value={screenColor} onChange={e => void changeScreenColor(e.target.value)} aria-label="Choose screen light color" /><span>CUSTOM COLOR</span></label><input className="ls-hex-input" value={customColor} onChange={e => setCustomColor(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') applyCustomColor(); }} aria-label="Custom HEX color" placeholder="#FFFFFF" maxLength={7} /><button type="button" className="ls-button ls-secondary" onClick={applyCustomColor}>APPLY HEX</button></div></div>
       <LotteryOrganizer participants={participants} participantCount={participantCount} />
-      <SportsInteractions embedded />
+      <div className="ls-card" style={{ gridColumn: '1 / -1' }}>
+        <div className="ls-section-title"><div><p className="ls-eyebrow">MATCH DAY HAPTICS</p><h2>Feel the game</h2></div><span className="ls-count">LIVE</span></div>
+        <p className="ls-muted">Trigger a synchronized phone vibration for key moments. Only connected fan phones receive the signal.</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginTop: 16 }}>
+          {hapticButtons.map(button => <button key={button.type} type="button" className="ls-button ls-secondary" disabled={hapticSending !== null} onClick={() => void triggerMatchHaptic(button.type)} style={{ minHeight: 68, textAlign: 'left', padding: '12px 14px' }}><span style={{ display: 'block', fontWeight: 900, fontSize: 12 }}>{hapticSending === button.type ? 'SENDING...' : button.label}</span><span style={{ display: 'block', marginTop: 5, fontSize: 9, opacity: .62 }}>{button.hint}</span></button>)}
+        </div>
+      </div>
+            <SportsInteractions embedded />
     </div></div>
   </main>;
 }
