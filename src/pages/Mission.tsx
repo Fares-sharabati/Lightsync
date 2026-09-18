@@ -78,8 +78,8 @@ export default function Mission() {
                 en: <>That experience eventually led to a simple question: <strong>what if the audience could become part of the show?</strong></>,
               })}</p>
               <p>{t({
-                tr: 'LightSync şimdilik bizim cevabımız. Senkronize efektleri anketler, sorular ve diğer taraftar etkileşimleriyle birleştirerek kalabalığı oyunun aktif bir parçası haline getiriyor.',
-                en: 'LightSync is our answer so far. It combines synchronized effects with polls, questions and other audience interactions to make the crowd part of the game.',
+                tr: 'FanCourt360 şimdilik bizim cevabımız. Tüm taraftarları aynı deneyimde buluşturuyor; anketler, sorular, çekiliş ve daha fazlasıyla kalabalığı oyunun aktif bir parçası haline getiriyor.',
+                en: 'FanCourt360 is our answer so far. It brings every fan into the same experience with polls, questions, lotteries and more, making the crowd an active part of the game.',
               })}</p>
               <p>{t({
                 tr: 'Türkiye\'de başlıyoruz çünkü problemi burada, ilk elden biliyoruz. Ama hedef çok daha büyük.',
