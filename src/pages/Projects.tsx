@@ -66,21 +66,21 @@ export default function Projects() {
             </div>
           </article>
 
-          <article id="lightsync" className="nextted-case">
-            <div className="nextted-case-meta"><span>03 · LightSync</span><span>{t({ tr: 'Spor Teknolojisi / Ürün', en: 'Sports Technology / Product' })}</span></div>
+          <article id="fancourt360" className="nextted-case">
+            <div className="nextted-case-meta"><span>03 · FanCourt360</span><span>{t({ tr: 'Spor Teknolojisi / Ürün', en: 'Sports Technology / Product' })}</span></div>
             <h2>{t({ tr: 'Taraftarı oyunun bir parçası haline getirmek.', en: 'Making the audience part of the game.' })}</h2>
             <p className="nextted-case-intro">{t({
-              tr: 'LightSync, profesyonel spor etkinliklerinin içinde geçirdiğimiz yıllardan doğdu. Maçı prodüksiyon tarafından gördükten sonra taraftarların yalnızca izlemekle kalmayıp nasıl aktif şekilde katılabileceğini değiştirecek bir ürün geliştirmek istedik.',
-              en: 'LightSync came from years of working inside professional sports events. After seeing the game from the production side, we wanted to build a product that could change how fans participate — not just watch.',
+              tr: 'FanCourt360, profesyonel spor etkinliklerinin içinde geçirdiğimiz yıllardan doğdu. Maçı prodüksiyon tarafından gördükten sonra taraftarların yalnızca izlemekle kalmayıp nasıl aktif şekilde katılabileceğini değiştirecek bir ürün geliştirmek istedik.',
+              en: 'FanCourt360 came from years of working inside professional sports events. After seeing the game from the production side, we wanted to build a product that could change how fans participate — not just watch.',
             })}</p>
             <div className="nextted-case-grid">
               <div className="nextted-case-block"><h3>{t({ tr: 'Nereden doğdu?', en: 'Where it came from' })}</h3><p>{t({
-                tr: 'Ekibimiz basketbol ve voleybol takımlarıyla çalıştı ve bu çalışmalar bugün de devam ediyor.',
-                en: 'Our team has worked with basketball and volleyball teams, and that work continues today.',
+                tr: 'Ekibimiz basketbol ve voleybol takımlarıyla çalıştı ve bu çalışmalar bugün de devam ediyor. Bu saha deneyimi, taraftarların tek bir sistem üzerinden birlikte hareket edebileceği bir yapı kurmamızı sağladı.',
+                en: 'Our team has worked with basketball and volleyball teams, and that work continues today. That field experience shaped the idea of bringing the entire crowd together through one system.',
               })}</p></div>
-              <div className="nextted-case-block"><h3>{t({ tr: 'Işıktan daha fazlası', en: 'More than lights' })}</h3><p>{t({
-                tr: 'Senkronize telefon ışığı bunun yalnızca bir parçası. Anketler, sorular ve canlı etkileşimler kalabalığı deneyimin aktif bir parçası haline getirmenin merkezinde.',
-                en: 'The synchronized phone light is only one part. Polls, questions and live interactions are central to making the crowd an active part of the experience.',
+              <div className="nextted-case-block"><h3>{t({ tr: 'Tüm taraftarlar aynı deneyimde', en: 'One experience for every fan' })}</h3><p>{t({
+                tr: 'Senkronize telefon ışığı bunun yalnızca bir parçası. Anketler, sorular, çekilişler ve canlı etkileşimler tüm taraftarları oyunun içine dahil eder.',
+                en: 'The synchronized phone light is only one part. Polls, questions, lotteries and live interactions bring every fan into the game.',
               })}</p></div>
               <div className="nextted-case-block"><h3>{t({ tr: 'Hedef', en: 'The ambition' })}</h3><p>{t({
                 tr: 'Türkiye\'de başlamak, gerçek salonlarda deneyimi kanıtlamak ve spor taraftar etkileşimi için yeni bir standart oluşturmak.',
@@ -88,7 +88,7 @@ export default function Projects() {
               })}</p></div>
             </div>
             <div className="nextted-actions">
-              <Link to="/admin" className="nextted-btn nextted-btn-primary">{t({ tr: "LightSync'i Aç", en: 'Open LightSync' })}</Link>
+              <Link to="/admin" className="nextted-btn nextted-btn-primary">{t({ tr: "FanCourt360'i Aç", en: 'Open FanCourt360' })}</Link>
             </div>
           </article>
         </section>
