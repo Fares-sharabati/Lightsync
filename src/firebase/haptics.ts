@@ -15,12 +15,6 @@ export const HAPTIC_PATTERNS: Record<HapticEventType, number[]> = {
   BUZZER_BEATER: [220, 70, 220, 70, 320, 70, 420, 70, 1200],
 };
 
-/**
- * Kept as a no-op for backward compatibility with Join.tsx.
- * Audio fallback was intentionally removed: match-day feedback is vibration-first.
- */
-export function initializeHapticAudio() {}
-
 let hapticAudioContext: AudioContext | null = null;
 
 function getHapticAudioContext() {
