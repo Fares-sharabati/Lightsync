@@ -50,3 +50,76 @@
 @media (prefers-reduced-motion: reduce) {
   .ls-mobile-pulse-dot { animation: none; }
 }
+
+
+/* MATCH DAY HAPTICS — cross-browser visual fallback.
+   Vibration is used when the device exposes navigator.vibrate().
+   iOS Safari does not expose it, so the visual rhythm remains the fallback
+   without introducing any sound. */
+.fc-haptic-feedback {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  pointer-events: none;
+  opacity: 0;
+  background: #fff;
+  mix-blend-mode: screen;
+  will-change: opacity, transform;
+}
+
+.fc-haptic-feedback.is-active { opacity: 0; }
+
+.fc-haptic-three_pointer.is-active {
+  animation: fc-haptic-three-pointer 1.15s linear both;
+}
+.fc-haptic-dunk.is-active {
+  animation: fc-haptic-dunk 1.05s linear both;
+}
+.fc-haptic-block.is-active {
+  animation: fc-haptic-block 1.0s linear both;
+}
+.fc-haptic-buzzer_beater.is-active {
+  animation: fc-haptic-buzzer-beater 1.65s linear both;
+}
+
+@keyframes fc-haptic-three-pointer {
+  0%, 8% { opacity: 0; }
+  9%, 21% { opacity: .72; }
+  22%, 34% { opacity: 0; }
+  35%, 47% { opacity: .72; }
+  48%, 60% { opacity: 0; }
+  61%, 73% { opacity: .72; }
+  74%, 100% { opacity: 0; }
+}
+
+@keyframes fc-haptic-dunk {
+  0%, 8% { opacity: 0; transform: scale(.96); }
+  9%, 30% { opacity: .82; transform: scale(1); }
+  31%, 42% { opacity: .24; transform: scale(1.015); }
+  43%, 100% { opacity: 0; transform: scale(1.03); }
+}
+
+@keyframes fc-haptic-block {
+  0%, 8% { opacity: 0; }
+  9%, 25% { opacity: .78; }
+  26%, 43% { opacity: 0; }
+  44%, 70% { opacity: .82; }
+  71%, 100% { opacity: 0; }
+}
+
+@keyframes fc-haptic-buzzer-beater {
+  0%, 5% { opacity: 0; }
+  6%, 12% { opacity: .72; }
+  13%, 18% { opacity: 0; }
+  19%, 25% { opacity: .72; }
+  26%, 32% { opacity: 0; }
+  33%, 41% { opacity: .78; }
+  42%, 49% { opacity: 0; }
+  50%, 60% { opacity: .82; }
+  61%, 68% { opacity: 0; }
+  69%, 100% { opacity: .90; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fc-haptic-feedback { display: none; }
+}
