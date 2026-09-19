@@ -450,7 +450,7 @@
 /* Full-screen audience lighting: when the synchronized light is ON,
    the phone becomes the light. No card, header or footer competes with it. */
 .light-page:has(.fc-audience-state.is-flashing) {
-  background: var(--phone-accent, #fff) !important;
+  background: var(--flash-accent, #fff) !important;
 }
 
 .light-page:has(.fc-audience-state.is-flashing) .light-shell {
