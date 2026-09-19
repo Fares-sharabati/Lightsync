@@ -18,20 +18,34 @@ export const HAPTIC_PATTERNS: Record<HapticEventType, number[]> = {
 let audioContext: AudioContext | null = null;
 
 export function initializeHapticAudio() {
-  if (typeof window === 'undefined' || !('AudioContext' in window || 'webkitAudioContext' in window)) return;
+  if (typeof window === 'undefined' || !('AudioContext' in window || 'webkitAudioContext' in window)) {
+    console.info('[haptics] AudioContext unsupported on this device; audio fallback will be unavailable.');
+    return;
+  }
   try {
     const AudioContextCtor = (window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext);
     if (!AudioContextCtor) return;
     if (!audioContext) audioContext = new AudioContextCtor();
     if (audioContext.state === 'suspended') void audioContext.resume().catch(() => {});
-  } catch {
+    console.info(`[haptics] Audio context initialized (state: ${audioContext.state}).`);
+  } catch (error) {
+    console.warn('[haptics] Could not initialize audio context.', error);
     audioContext = null;
   }
 }
 
 export function playHapticFallback() {
-  if (!audioContext) return;
+  if (!audioContext) {
+    console.warn('[haptics] Audio fallback unavailable: audio context was never initialized (joinShow() must run first).');
+    return;
+  }
   try {
+    // iOS Safari can silently re-suspend an AudioContext after a period of
+    // inactivity, even after it was successfully resumed once inside the
+    // join button's user gesture. Nudge it awake before scheduling sound so
+    // a haptic that fires minutes into the show doesn't play into a
+    // suspended context and produce no audible result.
+    if (audioContext.state === 'suspended') void audioContext.resume().catch(() => {});
     const now = audioContext.currentTime;
     const oscillator = audioContext.createOscillator();
     const gain = audioContext.createGain();
@@ -45,21 +59,45 @@ export function playHapticFallback() {
     gain.connect(audioContext.destination);
     oscillator.start(now);
     oscillator.stop(now + 0.12);
-  } catch {
+  } catch (error) {
     // Haptic/audio support is optional and must never affect the show.
+    console.warn('[haptics] Audio fallback failed to play.', error);
   }
 }
 
 export function triggerHaptic(type: HapticEventType, visible: boolean) {
-  if (visible && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-    try {
-      navigator.vibrate(HAPTIC_PATTERNS[type]);
-      return;
-    } catch {
-      // Continue silently to the audio fallback.
-    }
+  // A backgrounded tab is the one case we deliberately do nothing for: mobile
+  // browsers throttle/suspend both the Vibration API and AudioContext in
+  // background tabs, so attempting either there is unreliable at best and,
+  // for the audio fallback, would mean an unexpected chime playing from a
+  // tab the fan isn't even looking at. Skip cleanly and silently.
+  if (!visible) {
+    console.info(`[haptics] Skipped ${type}: tab not visible.`);
+    return;
   }
-  if (!visible) playHapticFallback();
+
+  const supportsVibration = typeof navigator !== 'undefined' && 'vibrate' in navigator;
+  if (supportsVibration) {
+    try {
+      // navigator.vibrate() returns false (without throwing) if the pattern
+      // could not be queued - e.g. permissions, or a browser that defines
+      // the method but doesn't actually support it. Treat that the same as
+      // a thrown error and fall through to the audio fallback below, rather
+      // than silently doing nothing.
+      const accepted = navigator.vibrate(HAPTIC_PATTERNS[type]);
+      if (accepted !== false) {
+        console.info(`[haptics] Vibrated for ${type}.`);
+        return;
+      }
+      console.warn(`[haptics] navigator.vibrate() rejected the pattern for ${type}; falling back to audio.`);
+    } catch (error) {
+      console.warn(`[haptics] navigator.vibrate() threw for ${type}; falling back to audio.`, error);
+    }
+  } else {
+    console.info(`[haptics] Vibration API unsupported (likely iOS Safari); using audio fallback for ${type}.`);
+  }
+
+  playHapticFallback();
 }
 
 export function triggerHapticEvent(showId: string, activeHaptic: HapticEventType) {
