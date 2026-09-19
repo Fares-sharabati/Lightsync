@@ -11,7 +11,6 @@ import { serverNow, watchServerTimeOffset } from '../firebase/serverTime';
 import { getReadableTextColor } from '../utils/color';
 import { initializeHapticAudio, triggerHaptic, watchHapticEvent } from '../firebase/haptics';
 import { useLanguage, useTranslate, type Language } from '../i18n/LanguageContext';
-import '../styles/audience-lottery-polish.css';
 
 type TorchConstraints = MediaTrackConstraintSet & { torch?: boolean };
 type TorchCapabilities = MediaTrackCapabilities & { torch?: boolean };
@@ -81,8 +80,8 @@ export default function Join() {
       <div className="fc-audience-event">{event.name}</div>
       {notice && <div className={`light-notice ${notice.isError ? 'is-error' : ''}`}>{noticeText(notice)}</div>}
       {interactionCard}
-      {!running && !activeInteraction && <div className="light-waiting ls-mobile-waiting fc-audience-state"><span className="ls-mobile-pulse-dot" />{t({ tr: 'Gösterinin başlaması bekleniyor...', en: 'Waiting for the show to start...' })}</div>}
-      {running && !activeInteraction && <div className="light-state fc-audience-state"><div className="fc-light-orb" aria-hidden="true"><span /></div><h1>{lightState ? t({ tr: 'IŞIK AÇIK', en: 'LIGHT ON' }) : t({ tr: 'HAZIR OL', en: 'GET READY' })}</h1><p>{t({ tr: 'Telefonunuzu açık tutun ve gösterinin tadını çıkarın.', en: 'Keep your phone open and enjoy the show.' })}</p></div>}
+      {!running && !activeInteraction && <div className="light-waiting ls-mobile-waiting fc-audience-state"><div className="fc-off-orb" aria-hidden="true" /><h1>{t({ tr: 'GÖSTERİ KAPALI', en: 'SHOW OFF' })}</h1><p>{t({ tr: 'Organizatör gösteriyi başlattığında burada olacaksınız.', en: 'You will see the show here when the organizer starts it.' })}</p></div>}
+      {running && !activeInteraction && <div className={`light-state fc-audience-state ${lightState ? 'is-flashing' : ''}`}><div className="fc-light-orb" aria-hidden="true"><span /></div><h1>{t({ tr: 'GÖSTERİ AÇIK', en: 'SHOW ON' })}</h1><p>{t({ tr: 'Telefonunuzu açık tutun ve gösterinin tadını çıkarın.', en: 'Keep your phone open and enjoy the show.' })}</p></div>}
       <div className="fc-audience-footer">{running ? t({ tr: 'EKRANI AÇIK TUTUN', en: 'KEEP SCREEN ON' }) : t({ tr: 'FANCOURT360 • CANLI ETKİNLİK', en: 'FANCOURT360 • LIVE EVENT' })}</div>
     </section></div></main>;
 }
