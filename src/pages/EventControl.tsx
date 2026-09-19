@@ -12,6 +12,7 @@ import LotteryOrganizer from '../components/LotteryOrganizer';
 import { PUBLIC_APP_URL } from '../constants';
 import { getReadableTextColor } from '../utils/color';
 import { triggerHapticEvent, type HapticEventType } from '../firebase/haptics';
+import '../styles/audience-lottery-polish.css';
 
 function getAudioMimeType(file: File) { const n = file.name.toLowerCase(); if (n.endsWith('.mp3') || n.endsWith('.mpeg')) return 'audio/mpeg'; if (n.endsWith('.m4a') || n.endsWith('.mp4')) return 'audio/mp4'; if (n.endsWith('.wav')) return 'audio/wav'; if (n.endsWith('.ogg') || n.endsWith('.oga')) return 'audio/ogg'; if (n.endsWith('.webm')) return 'audio/webm'; if (n.endsWith('.aac')) return 'audio/aac'; if (n.endsWith('.flac')) return 'audio/flac'; return file.type || 'audio/mpeg'; }
 function formatTime(seconds: number) { if (!Number.isFinite(seconds) || seconds < 0) return '0:00'; const total = Math.floor(seconds); return `${Math.floor(total / 60)}:${(total % 60).toString().padStart(2, '0')}`; }
