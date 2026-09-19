@@ -9,11 +9,17 @@ export type HapticEvent = {
 };
 
 export const HAPTIC_PATTERNS: Record<HapticEventType, number[]> = {
-  THREE_POINTER: [150, 100, 150, 100, 150],
-  DUNK: [800],
-  BLOCK: [200, 50, 400],
-  BUZZER_BEATER: [100, 50, 100, 50, 200, 50, 300, 50, 1000],
+  THREE_POINTER: [280, 90, 280, 90, 280],
+  DUNK: [1200],
+  BLOCK: [420, 80, 700],
+  BUZZER_BEATER: [220, 70, 220, 70, 320, 70, 420, 70, 1200],
 };
+
+/**
+ * Kept as a no-op for backward compatibility with Join.tsx.
+ * Audio fallback was intentionally removed: match-day feedback is vibration-first.
+ */
+export function initializeHapticAudio() {}
 
 function triggerVisualFeedback(type: HapticEventType) {
   if (typeof document === 'undefined') return;
