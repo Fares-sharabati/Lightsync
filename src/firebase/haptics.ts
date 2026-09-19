@@ -21,31 +21,85 @@ export const HAPTIC_PATTERNS: Record<HapticEventType, number[]> = {
  */
 export function initializeHapticAudio() {}
 
-function triggerVisualFeedback(type: HapticEventType) {
-  if (typeof document === 'undefined') return;
+let hapticAudioContext: AudioContext | null = null;
 
-  const existing = document.querySelector('.fc-haptic-feedback');
-  existing?.remove();
+function getHapticAudioContext() {
+  if (typeof window === 'undefined') return null;
+  if (!hapticAudioContext) {
+    const AudioContextClass = window.AudioContext || (window as typeof window & {
+      webkitAudioContext?: typeof AudioContext;
+    }).webkitAudioContext;
+    if (!AudioContextClass) return null;
+    hapticAudioContext = new AudioContextClass();
+  }
+  return hapticAudioContext;
+}
 
-  const feedback = document.createElement('div');
-  feedback.className = `fc-haptic-feedback fc-haptic-${type.toLowerCase()}`;
-  feedback.setAttribute('aria-hidden', 'true');
-  document.body.appendChild(feedback);
+/**
+ * Must be called from the user's Join button gesture so iOS Safari/Chrome
+ * allow subsequent event sounds to play without another tap.
+ */
+export function initializeHapticAudio() {
+  const context = getHapticAudioContext();
+  if (!context) return;
+  void context.resume().catch(() => {});
+}
 
-  // Let the browser paint a fresh element so the same event can retrigger
-  // immediately when two game moments happen close together.
-  window.requestAnimationFrame(() => {
-    feedback.classList.add('is-active');
-    window.setTimeout(() => feedback.remove(), 1800);
-  });
+function playHapticSound(type: HapticEventType) {
+  const context = getHapticAudioContext();
+  if (!context) return;
+
+  void context.resume().then(() => {
+    const pattern = HAPTIC_PATTERNS[type];
+    const startTime = context.currentTime + 0.01;
+    let cursor = startTime;
+
+    // A short, low-frequency impact tone is intentionally used so the
+    // audience feels/hears each pulse without turning the event into music.
+    const frequency = 180;
+    const master = context.createGain();
+    master.gain.value = 0.32;
+    master.connect(context.destination);
+
+    pattern.forEach((duration, index) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(frequency, cursor);
+
+      const attack = Math.min(0.012, duration / 1000 / 5);
+      const release = Math.min(0.06, duration / 1000 / 4);
+      const pulseEnd = cursor + duration / 1000;
+      gain.gain.setValueAtTime(0.0001, cursor);
+      gain.gain.exponentialRampToValueAtTime(1, cursor + attack);
+      gain.gain.setValueAtTime(1, Math.max(cursor + attack, pulseEnd - release));
+      gain.gain.exponentialRampToValueAtTime(0.0001, pulseEnd);
+
+      oscillator.connect(gain);
+      gain.connect(master);
+      oscillator.start(cursor);
+      oscillator.stop(pulseEnd + 0.01);
+
+      // Every entry is a vibration "on" duration. Entries after it are
+      // separated by the corresponding gap from the existing pattern.
+      cursor = pulseEnd;
+      if (index < pattern.length - 1) {
+        cursor += pattern[index + 1] / 1000;
+      }
+    });
+
+    window.setTimeout(() => {
+      master.disconnect();
+    }, Math.max(2500, (cursor - context.currentTime) * 1000 + 100));
+  }).catch(() => {});
 }
 
 export function triggerHaptic(type: HapticEventType, visible: boolean) {
   if (!visible) return;
 
-  // Always provide a distinct visual reaction. This is the cross-browser
-  // fallback for iOS Safari and other browsers without the Vibration API.
-  triggerVisualFeedback(type);
+  // On iOS Safari/Chrome the Vibration API is unavailable, so use the same
+  // timing ratios as the physical vibration pattern as an audible fallback.
+  playHapticSound(type);
 
   const supportsVibration =
     typeof navigator !== 'undefined' &&
